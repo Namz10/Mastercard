@@ -6,7 +6,8 @@ Full 24-item taxonomy collapses into 5 umbrella categories — nothing dropped, 
 
 ## 1. Network / Transaction Structuring Fraud
 
-**Covers:** mule networks, fan-in/fan-out, smurfing under UPI caps, automated chain-hopping/dust laundering, synthetic merchant collusion **Data shape:** transaction graphs (nodes = accounts, edges = transfers)
+**Covers:** mule networks, fan-in/fan-out, smurfing under UPI caps, automated chain-hopping/dust laundering, synthetic merchant collusion, card testing / BIN attacks — distributed low-value auth probing across merchants + BIN-space enumeration, evading velocity/CAPTCHA thresholds
+**Data shape:** transaction graphs (nodes = accounts, edges = transfers) or auth-attempt graphs — nodes = card-candidate/BIN + merchant endpoint, edges = authorization attempts
 
 ## 2. Identity Fraud
 
@@ -44,6 +45,13 @@ Full 24-item taxonomy collapses into 5 umbrella categories — nothing dropped, 
 - "Fidelity" + "Detection efficacy" → only need depth on 5, not 24 — real generation + real classifier per category
 - "Closed loop" requirement → category 4 IS the loop, not extra work
 
+## Detection — Defend features (card-testing/BIN addition only)
+
+- Per-BIN attempt velocity (attempts/min against a single BIN prefix)
+- Decline-rate clustering by session/device fingerprint (many declines, one device signature)
+- CVV-guess entropy (low entropy = systematic enumeration, not human typos)
+- IP/device-rotation entropy (rotating identity per attempt, human shoppers don't)
+
 ---
 
 ## Validation / Holdout Datasets Per Category
@@ -64,6 +72,7 @@ Real labeled holdouts exist — best category for clean validation.
 | **MoMTSim V2**        | 4.22M rows, 52.84% fraud (artificial) | Structurally closest to UPI (agent cash-out, instant settlement) — recalibrate metrics for inflated fraud rate |
 | ~~IEEE-CIS / PaySim~~ | —                                     | Legacy, weak — PCA-obfuscated features, no semantic depth. Avoid as primary.                                   |
 
+**[Card testing / BIN attacks]** None of the datasets above cover auth-attempt-level data (SAML-D/TransXion/MoMTSim are all transfer-graph, not card-auth-graph) — this sub-pattern has no real holdout. Fallback: **proxy injection**, same technique already used for Category 2's ATO gap — inject distributed low-value probing patterns (rotating IP/device, BIN-clustered attempts) into a legit auth-log baseline, evaluate TPR on the injected anomalies.
 
 ### 2. Identity Fraud
 
@@ -104,5 +113,3 @@ No static dataset applies by definition — evasion is relative to *your* model,
 | 3. Social Engineering  | ❌ No (not India-relevant) | LLM-as-judge + blinded human review      |
 | 4. Adversarial         | ❌ N/A by design           | TabAttackBench evasion rate              |
 | 5. Document Forgery    | ❌ No                      | GST stats sanity-check + expert red-team |
-
-
