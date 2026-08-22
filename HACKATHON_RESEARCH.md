@@ -390,3 +390,222 @@ Generative AI did not invent payment fraud. It collapsed the cost of **believabl
 The company did not ask you to “detect fraud.” They asked you to **industrialize the arms race** under payment-system constraints: **coverage of many GenAI vectors, believable synthetic payments, accurate low-FP detection, and a loop that gets stronger as the attacker does.** That is what “real-world feasibility in live payments” means here: millisecond-class scoring, mule/scam reality, explainable actions, and respect for the fact that **the most damaging GenAI fraud often looks like a genuine customer paying a genuine-looking payee.**
 
 Build the lab. Show the loop. Speak like a network.
+
+---
+
+## aarush:defend research — Mid-Tier ML/AutoML for Fraud Classifiers (2–3 Day Hackathon)
+
+**Scope.** Approaches that sit **between** (a) fixed-search AutoML (`AutoGluon`, `FLAML`) and (b) fully open-ended autoresearch (LLM proposes architectures, features, and hypotheses with autonomous code execution). Target: **tabular fraud/anomaly classifier**, **severe class imbalance**, **2–3 day build window** for Mastercard GFF hackathon Defend pillar.
+
+**Spectrum anchors.**
+
+| Pole | Characteristics | Hackathon fit |
+|------|-----------------|---------------|
+| **Plain AutoML** (`FLAML`, `AutoGluon good_quality`) | Fixed model families, fixed feature space, minutes to hours | Baseline floor — do this first |
+| **Mid-tier (this doc)** | Expands features, warm-starts search, automates imbalance handling, or runs **bounded** agent loops | Where most lift + novelty lives |
+| **Full autoresearch** (`AIDE`, `SELA`, `MLE-STAR`) | LLM writes/edits full pipelines; open action space; high variance | Demo theater + risk; hard to ship in 48h |
+
+**Risk/ceiling shorthand.** `Low risk / low ceiling` → predictable, rarely beats a tuned XGBoost stack. `Medium` → meaningful PR-AUC lift on fraud tails. `High risk / high ceiling` → can discover surprising features or blow up on leakage/overfit.
+
+**Local vs API.** `Local` = runs offline after `pip install`. `Hybrid` = core local, optional LLM API for one step. `API-required` = needs hosted LLM during training/search.
+
+---
+
+### 1. Feature-engineering automation (expands what AutoML sees; does not change model search)
+
+| Tool | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **Featuretools** | Deep Feature Synthesis: aggregations (`count`, `mean`, `time_since_previous`) across related tables | EntitySet schema, relationships, `max_depth`, primitive list; single-table fraud needs manual entity design | 2–4 | Medium CPU; feature matrix can be wide (memory) | Low–medium risk; medium ceiling on **relational** fraud (customer→txn→merchant) | Local | `fm, _ = ft.dfs(entityset=es, target_dataframe_name="customers", max_depth=2)` |
+| **OpenFE** | Operator search (23 ops), feature boosting + two-stage pruning; **validated on IEEE-CIS fraud** | Operator set bounded; no semantic/domain features; runtime grows with `#features × rows` | 1–2 | Medium–high CPU; parallel `n_jobs` | Medium risk; **high ceiling** on flat tabular fraud (Kaggle-grade lift reported) | Local | `features = OpenFE().fit(data=X_train, label=y_train); X_tr, X_te = transform(X_train, X_test, features)` |
+| **tsfresh** | 794 time-series features + FRESH statistical filtering | Needs **sequential** structure (per-user txn streams); not for static wide tables | 2–3 | Medium; Dask for scale | Low–medium; medium ceiling if velocity/sequence matters | Local | `X_ts = extract_features(df, column_id="customer_id", column_sort="timestamp")` |
+| **AutoFeat** | Polynomial/ratio/log transforms + L1 selection | Under ~100k rows; symbolic explosion; interpretable but slow | 1–2 | High CPU on wide data | Medium; modest ceiling on small wide fraud sets | Local | `X_aug = AutoFeatClassifier(max_depth=2).fit_transform(X, y)` |
+| **evo-gpfe** | Genetic-programming symbolic features (DEAP) | Population/generations; anti-bloat tuning | 2–4 | High CPU per generation | Medium–high risk; niche ceiling (interpretable nonlinear combos) | Local | `X_aug = GPFeatureEngineer(GPConfig(n_generations=20)).fit_transform(X, y)` |
+| **EvolutionaryForest** | GP ensemble features for tree models | Research-oriented API; many hyperparams | 3–5 | High | High risk; research novelty, uneven production lift | Local | `EvolutionaryForestRegressor(n_gen=20, n_pop=200).fit(X, y)` |
+| **PyCaret `setup()`** | Imputation, encoding, polynomial interactions, binning (bundled) | Model search is separate; FE primitives are fixed | 0.5–1 | Low setup; CV cost depends on `compare_models` | Low risk; low–medium ceiling (convenience layer) | Local | `setup(data, target="is_fraud", polynomial_features=True); compare_models()` |
+
+**Fraud hackathon notes.**
+
+- **Single flat transaction table:** prioritize **OpenFE** → feed into AutoGluon/FLAML.
+- **Customer + transactions (+ merchants):** **Featuretools** is the natural fit (velocity, time-since, MCC aggregates).
+- **Per-user time-ordered streams:** stack **tsfresh** on rolling windows, then merge to txn-level model.
+- These tools **do not** pick SMOTE vs class weights — pair with Section 5.
+
+---
+
+### 2. Meta-learning / warm-started AutoML (smarter starting points; search still bounded)
+
+| Tool | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **auto-sklearn 2.0** | Portfolio warmstart (meta-feature-free) + optional KNN meta-learning init + SMAC BO + ensembling | Model pipeline components fixed; `time_left_for_this_task` budget; imbalanced metrics manual | 1–2 | High per time budget; disk for ensembles | Medium risk; **solid ceiling** in 10–60 min budgets | Local | `AutoSklearnClassifier(time_left_for_this_task=3600, metric=autosklearn.metrics.f1).fit(X, y)` |
+| **AutoGluon `best_quality`** | `auto_stack=True`, dynamic stacking, zeroshot HPO, multi-layer ensembles | Preset model zoo fixed; no custom feature synthesis; imbalance needs `eval_metric` / `sample_weight` | 0.5 | **High** train time + **heavy** inference (stacked ensemble) | Low–medium risk; **high ceiling** on tabular if time budget ≥30–60 min | Local | `TabularPredictor(eval_metric="average_precision").fit(train, presets="best_quality", time_limit=3600)` |
+| **AutoGluon `experimental_quality`** | Stronger stacking / foundation-model hooks (version-dependent) | Same as above; less battle-tested | 0.5 | Very high train | Medium risk; chases SOTA, less predictable | Local | `predictor.fit(train, presets="experimental_quality", time_limit=7200)` |
+| **FLAML** | Fast cost-aware HPO across fixed learners; optional `resampler=` per-fold | No meta-learning warmstart; learner list bounded; imbalance not auto-detected | 0.5 | **Low** train; **fast** infer (single best model) | Low risk; medium ceiling; best for **latency story** | Local | `AutoML().fit(X, y, task="classification", metric="ap", time_budget=600, resampler=SMOTE())` |
+| **H2O AutoML** | Leaderboard + stacked ensemble + optional exploitation of past runs | Java backend; less hackathon-friendly | 1–2 | Medium–high | Low–medium risk; similar ceiling to AutoGluon | Local | `H2OAutoML(max_runtime_secs=3600, balance_classes=True).train(x=cols, y="label", training_frame=hf)` |
+
+**Fraud hackathon notes.**
+
+- Run **FLAML** (fast, `metric="ap"` or `metric="f1"`) for the **authorization-latency** narrative; run **AutoGluon best_quality** offline for **leaderboard score**.
+- auto-sklearn shines when you have **30–60 min** and want a **strong ensemble without hand-picking** — set `metric` to F1 or balanced accuracy, not accuracy.
+- None of these **auto-select SMOTE variant** — combine with Section 5.
+
+---
+
+### 3. LLM-assisted feature / config suggestion (human or script in the loop — not autonomous autoresearch)
+
+| Approach | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|----------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **DIY analyst prompt** (recommended) | LLM reads schema + `df.describe()` + current leaderboard → suggests features, resampling, metrics as **text** | Human or script applies suggestions; no auto code exec | 1–2 | API: ~$0.10–2 per iteration | Medium risk; **high ceiling** if domain-aware (fraud velocity, device graphs) | Hybrid | Paste schema + `predictor.leaderboard()` into chat; implement top 3 suggestions in Python |
+| **CAAFE** | LLM generates Python feature code; validates on holdout; keeps if metric improves | `iterations` cap; base classifier must be fast (TabPFN default); **OpenAI API** | 2–4 | API + many small model fits per iteration | Medium–high risk; semantic features (scam urgency, amount ratios) | API-required | `CAAFEClassifier(base_classifier=rf, llm_model="gpt-4", iterations=3).fit_pandas(df, "is_fraud", dataset_description="card txn fraud...")` |
+| **OCTree** (research) | LLM feature rules + decision-tree reasoning feedback | GitHub install; API; research code | 4–6 | API + tree fits | Medium–high; NeurIPS 2024 method | Hybrid | Clone [jaehyun513/OCTree](https://github.com/jaehyun513/OCTree); run paper pipeline |
+| **OpenFE + LLM feature descriptions** | OpenFE math features + LLM explains/names them for judge deck | Two-step | 2–3 | OpenFE CPU + API | Medium; good **explainability** story | Hybrid | OpenFE features → prompt LLM: "Given columns X, suggest 5 domain fraud features" → manual add |
+
+**Fraud hackathon prompt template (DIY).**
+
+```
+Columns: {schema}. Target rate: {pos_rate}. Metric: PR-AUC={score}.
+Top model: {leaderboard_row}. Missing: velocity, device, beneficiary graph.
+Suggest 5 executable pandas features for payment fraud, 1 resampling strategy,
+and whether to tune threshold vs class weight. No code execution — bullet list only.
+```
+
+**Why this tier matters for judges.** You get **"semantic AutoML"** language (CAAFE paper) without betting the repo on an agent that rewrites itself into a syntax error at 3 a.m.
+
+---
+
+### 4. Neural architecture search (NAS) scoped to tabular — lightweight enough for hackathon?
+
+| Tool | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **pytorch-tabnet + Optuna** | Attention steps, depth, width, learning rate (HPO **not** full NAS) | Architecture family fixed (TabNet); GPU helpful; imbalance manual | 3–5 | GPU train; moderate infer | Medium risk; interpretable masks; sometimes beats GBDT on wide data | Local | `TabNetClassifier().fit(X_train, y_train, eval_set=[(X_val,y_val)])` |
+| **TabNAS** (NeurIPS 2022) | RL NAS with rejection sampling for tabular NNs | **Research code**; setup heavy; not pip | 6–10+ | GPU | High risk; paper gains, hackathon fragility | Local | Reproduce from [TabNAS paper repo](https://github.com/google-research/google-research/tree/master/tabnet) paths |
+| **pTNAS / ATLAS** (2024–2025) | Anytime NAS: zero-cost proxy filter + budgeted refinement | **No mature pip package**; research-only | 8–12+ | GPU | High risk / high ceiling academically | Local | See [arXiv:2403.10318](https://arxiv.org/abs/2403.10318) |
+| **AutoKeras** | Full NAS (CNN/MLP heads) | Slow; ill-suited to 48h unless tiny data | 4–8 | Very high | High risk; rarely best on fraud tabular | Local | `ak.ImageClassifier(max_trials=10).fit(X, y)` — **avoid for this hackathon** |
+
+**Honest verdict for hackathon.** True tabular NAS is **not** lightweight in 2025 — production teams still use **GBDT + OpenFE/Featuretools**. For novelty + interpretability, **TabNet + SHAP on attention masks** beats running NAS papers. For score, **AutoGluon stack >> TabNet** on most fraud tables unless you have GPU time to spare.
+
+---
+
+### 5. Imbalanced-classification automation (SMOTE variants, class weights, threshold tuning)
+
+| Tool | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **`TunedThresholdClassifierCV`** (sklearn 1.4+) | Post-hoc threshold on `predict_proba` to max F1 / balanced acc / **custom business cost** | Does not change features or base model; needs good scores | 0.5 | Trivial | Low risk; **high practical lift** on fraud (recall @ fixed FPR) | Local | `TunedThresholdClassifierCV(xgb, scoring="average_precision").fit(X, y)` |
+| **imblearn `Pipeline` + `GridSearchCV`** | Search over **sampler × model × hyperparams** with leak-safe CV | Search space you define; combinatorial explosion if too wide | 1–2 | Medium–high (many fits) | Medium risk; reliable PR-AUC gains | Local | `GridSearchCV(Pipeline([("s", SMOTENC(...)), ("clf", XGBClassifier())]), param_grid, scoring="average_precision")` |
+| **smote-variants + `model_selection`** | **86 SMOTE variants** + automated comparison framework | Still need to pick classifier list; slow if `n_repeats` high | 2–3 | High (many sampler×model pairs) | Medium; can overfit to sampler lottery | Local | `sv.model_selection(dataset, samplers=sv.list_available(), classifiers=[("sklearn", "XGBClassifier", {})])` |
+| **PyCaret `fix_imbalance`** | SMOTE (default) or any `imblearn` sampler **inside CV folds** | Default SMOTE only unless `fix_imbalance_method=` set | 0.5 | Low–medium | Low–medium risk; convenient | Local | `setup(data, target="is_fraud", fix_imbalance=True, fix_imbalance_method=BorderlineSMOTE())` |
+| **FLAML `resampler=`** (2025) | Per-fold resampling inside CV/holdout | Single sampler per run; no auto-selection across variants | 0.5 | +SMOTE cost per fold | Low–medium | Local | `automl.fit(X, y, resampler=SMOTE(k_neighbors=3), metric="ap")` |
+| **AutoGluon `sample_weight="balance_weight"`** | Class-balanced sample weights in supported models | Not SMOTE; tree models handle differently than neural nets | 0.5 | Low extra | Low risk | Local | `TabularPredictor(sample_weight="balance_weight", eval_metric="average_precision").fit(train)` |
+| **AutoImblearn** | End-to-end: imputer + **15+ resamplers** + model HPO | Medical-data focus; heavier than needed; Docker docs | 3–5 | High | Medium; overlaps PyCaret + FLAML | Local | `AutoImblearn().fit(X, y, mode="classification", pipeline=["knn", "smote", "xgb"])` |
+
+**Fraud-specific playbook (recommended stack).**
+
+1. **Metric:** `average_precision` (PR-AUC) or cost-weighted scorer — never plain accuracy.
+2. **Resampling:** `SMOTENC` if categoricals; else `BorderlineSMOTE` or **no SMOTE** + `scale_pos_weight` (often better on large fraud data).
+3. **Threshold:** `TunedThresholdClassifierCV` on holdout for **operating point** (e.g., recall @ 1% FPR).
+4. Report **precision at fixed FPR** — matches Mastercard DI false-positive narrative.
+
+---
+
+### 6. Bounded / capped agentic loops (constrained autoresearch)
+
+| Tool | Automates | Still fixed / manual | Setup (hrs) | Train/infer cost | Risk / ceiling vs plain AutoML | Local? | Example |
+|------|-----------|----------------------|-------------|------------------|--------------------------------|--------|---------|
+| **DIY co-evolution loop** (recommended) | Fixed actions: `{add OpenFE features, swap resampler, re-fit FLAML/AG}` × **N generations**; score on **fixed holdout** | You implement action space + logging; red/blue loop separate | 3–6 | N × AutoML budget | Medium risk; **best judge story** (arms race chart) | Local | `for gen in range(5): X=apply_action(state); score=fit_flaml(X,y); state=mutate(state, score)` |
+| **CAAFE** (`iterations=K`) | LLM feature loop with accept/reject | Feature-only actions; API | 2–4 | API + fits | Medium–high | API-required | `CAAFEClassifier(iterations=5, ...)` |
+| **AIDE** | Tree-search over **full Python scripts**; metric feedback | Needs dataset dir + goal string; API; can diverge | 4–8 | **Very high** (many full runs) | **High risk / high ceiling** | API-required | `aide data_dir=./data goal="Maximize PR-AUC fraud" eval="average_precision"` |
+| **SELA** (MetaGPT ext) | MCTS over ML pipeline stages (EDA → FE → train) | MetaGPT install; datasets; API; fragile | 8–12+ | Very high | High risk | Hybrid | `cd metagpt/ext/sela && python run_sela.py --task credit` |
+| **MLAgentBench** | Benchmark env for agents (not a product) | Evaluation harness | 6+ | N/A | Research only | Local | Agent reads/writes files in `benchmarks/` task folder |
+
+**Bounded loop design for hackathon (copy this architecture).**
+
+```text
+HOLDOUT: fixed stratified 20% — NEVER used for search, only final report + plot
+SEARCH:  inner CV or FLAML with time_budget per generation
+
+Action space (pick 3–5):
+  A1: OpenFE top-k features
+  A2: resampler ∈ {none, BorderlineSMOTE, class_weight balanced}
+  A3: model family ∈ {FLAML 10min, AutoGluon good_quality 20min}
+  A4: threshold tune on inner val only
+  A5: red-agent evasion batch → append to train (closed-loop only)
+
+Stop: max_generations=5 OR no improvement × 2
+Log: PR-AUC, FPR@recall=0.8, best features, evasion rate
+```
+
+This is **not** full autoresearch — the LLM (if used) only proposes actions from the menu; your script executes.
+
+---
+
+### 7. Master ranking — implementation effort × expected lift (2–3 day window)
+
+**Scoring.** Effort **E** (1=trivial … 5=multi-day). Expected **lift** **L** (1=marginal … 5=large PR-AUC / judge impact). **ROI = L/E** (higher = do first).
+
+| Rank | Approach | E | L | ROI | 🎤 Novelty | 🔧 Practical |
+|------|----------|---|---|-----|------------|--------------|
+| 1 | **AutoGluon `best_quality` + `eval_metric=average_precision` + `balance_weight`** | 1 | 4 | 4.0 | 🔧 | ✅ |
+| 2 | **OpenFE → AutoGluon/FLAML pipeline** | 2 | 4 | 2.0 | 🎤 (IEEE-CIS proven) | ✅ |
+| 3 | **`TunedThresholdClassifierCV` on best model** | 1 | 3 | 3.0 | 🔧 | ✅ |
+| 4 | **FLAML + `resampler=SMOTENC` + `metric="ap"`** | 1 | 3 | 3.0 | 🔧 | ✅ |
+| 5 | **imblearn Pipeline + narrow GridSearch** (2 samplers × XGB) | 2 | 3 | 1.5 | 🔧 | ✅ |
+| 6 | **DIY LLM feature suggestions → manual pandas** | 2 | 4 | 2.0 | 🎤 ✅ | partial |
+| 7 | **Featuretools** (if relational txn data) | 3 | 4 | 1.3 | 🎤 (graph-adjacent) | ✅ |
+| 8 | **Bounded co-evolution loop** (scripted actions + holdout) | 4 | 5 | 1.25 | 🎤 ✅✅ | ✅ |
+| 9 | **auto-sklearn 2.0** (60 min budget, F1/AP metric) | 2 | 3 | 1.5 | 🔧 | ✅ |
+| 10 | **PyCaret `fix_imbalance` + `compare_models`** | 1 | 2 | 2.0 | 🔧 | ✅ |
+| 11 | **CAAFE** (`iterations=3`, fraud description) | 3 | 4 | 1.3 | 🎤 ✅ | partial |
+| 12 | **tsfresh** on per-user txn windows | 3 | 3 | 1.0 | 🔧 | ✅ |
+| 13 | **smote-variants auto `model_selection`** | 3 | 2 | 0.7 | 🔧 | marginal |
+| 14 | **TabNet + attention explainability** | 4 | 2 | 0.5 | 🎤 (interpretable DL) | partial |
+| 15 | **AIDE** (tree-search full scripts) | 4 | 4 | 1.0 | 🎤 ✅ | ❌ risky |
+| 16 | **AutoFeat / evo-gpfe** | 3 | 2 | 0.7 | 🔧 | niche |
+| 17 | **SELA / MLAgentBench agent** | 5 | 3 | 0.6 | 🎤 ✅ | ❌ |
+| 18 | **TabNAS / pTNAS research code** | 5 | 2 | 0.4 | 🎤 academic | ❌ |
+| 19 | **AutoImblearn** | 4 | 2 | 0.5 | 🔧 | overlap |
+| 20 | **EvolutionaryForest** | 4 | 2 | 0.5 | 🎤 GP | niche |
+
+---
+
+### 8. Recommended 48-hour Defend build path
+
+**Day 1 morning (floor).** FLAML 10 min (`metric="ap"`) + AutoGluon 30 min (`best_quality`, `average_precision`) on raw features → leaderboard baseline.
+
+**Day 1 afternoon (mid-tier lift).** OpenFE (or Featuretools if multi-table) → re-run AutoGluon. Add `TunedThresholdClassifierCV` on holdout. Narrow imblearn search: `{none, BorderlineSMOTE}` × XGB `scale_pos_weight`.
+
+**Day 2 morning (novelty layer).** One LLM session: schema + leaderboard → implement 3 domain features (velocity z-score, new-payee flag, night-time amount ratio). Optional: CAAFE `iterations=2` if API key ready.
+
+**Day 2 afternoon (closed loop).** Bounded outer loop: red agent adds evasion batch → blue retrains (action A5 above) → plot PR-AUC vs generation. **Do not** let an LLM rewrite the whole pipeline overnight.
+
+**Inference story for judges.** Ship **FLAML single model** or **AutoGluon with `predictor.persist()` + distill** for demo latency; keep heavy stack for offline retrain.
+
+---
+
+### 9. Novelty vs invisible — what to say on stage
+
+| Say this (novelty) | Don't oversell (invisible plumbing) |
+|--------------------|-------------------------------------|
+| "OpenFE + co-evolutionary retrain on synthetic red-team evasions" | "We used GridSearchCV" |
+| "Context-aware LLM feature ideation for fraud semantics (CAAFE-style)" | "We set `class_weight=balanced`" |
+| "Bounded agent loop — fixed holdout, capped actions — not black-box autoresearch" | "SMOTE in the pipeline" |
+| "PR-AUC + threshold tuned for 1% FPR operating point" | "TunedThresholdClassifierCV wrapper" |
+| Featuretools graph aggregations → "network-adjacent velocity features" | Raw `count(transactions)` |
+
+---
+
+### 10. References (tools & papers)
+
+| Resource | URL |
+|----------|-----|
+| OpenFE (IEEE-CIS fraud) | [github.com/IIIS-Li-Group/OpenFE](https://github.com/IIIS-Li-Group/OpenFE) |
+| Featuretools | [featuretools.alteryx.com](https://featuretools.alteryx.com/) |
+| CAAFE | [github.com/automl/CAAFE](https://github.com/automl/CAAFE) |
+| auto-sklearn 2.0 | [JMLR 23(261)](http://jmlr.org/papers/v23/21-0992.html) |
+| AutoGluon presets | [auto.gluon.ai tabular-indepth](https://auto.gluon.ai/stable/tutorials/tabular/tabular-indepth.html) |
+| FLAML resampler PR | [microsoft/FLAML#1568](https://github.com/microsoft/FLAML/pull/1568) |
+| TunedThresholdClassifierCV | [sklearn classification_threshold](https://scikit-learn.org/stable/modules/classification_threshold.html) |
+| smote-variants | [github.com/analyticalmindsltd/smote_variants](https://github.com/analyticalmindsltd/smote_variants) |
+| AIDE | [github.com/WecoAI/aideml](https://github.com/WecoAI/aideml) |
+| SELA | [arXiv:2410.17238](https://arxiv.org/abs/2410.17238) |
+| TabNAS | [NeurIPS 2022](https://proceedings.neurips.cc/paper/2022/file/4e392aa9bc70ed731d3c9c32810f92fb-Paper-Conference.pdf) |
+| pTNAS | [arXiv:2403.10318](https://arxiv.org/abs/2403.10318) |
+| OCTree | [NeurIPS 2024 paper](https://proceedings.neurips.cc/paper_files/paper/2024/file/a7ebe2e8d8cfd2fcec6cd77f9e6fd34d-Paper-Conference.pdf) |
