@@ -134,7 +134,7 @@ LLM proposer → deterministic engine (rules/schema) → verifier/judge (accept 
 
 ## B2. Defend
 
-> **Status:** AutoML family locked. Live vs case feature split locked. Spec: `defense_architecture.md`.
+> **Status:** AutoML family locked. Live vs case feature split locked. Spec: `defense_architecture.md`. Loops: `feedback-loop.md`.
 
 Maps to PS **Defend** pillar. **No novel net.**
 
