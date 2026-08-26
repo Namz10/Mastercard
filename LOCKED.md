@@ -1,0 +1,20 @@
+# LOCKED — AegisLoop planning spine
+
+**These four plans supersede competing architecture forks** in `V1_MASTERPLAN.md`, `ARCHITECTURE.md`, `decisions.md` Part B, `identify_pipeline_implementation_2025ee2b.plan.md`, and informal Identify drafts.
+
+**Problem-statement SSOT (never overridden):** [`MC_PS.md`](MC_PS.md), then [`HACKATHON_RESEARCH.md`](HACKATHON_RESEARCH.md).
+
+| File | What it locks |
+|---|---|
+| [`plans/00-correct-planning-defects.md`](plans/00-correct-planning-defects.md) | Defects, fork winners, naming, status enum, canary vs HoldoutVault |
+| [`plans/01-identify-catalog-lock.md`](plans/01-identify-catalog-lock.md) | AttackSpec, T01–T24, OSINT, identify_graph, simulatable_signals |
+| [`plans/02-generate-defend-loop-lock.md`](plans/02-generate-defend-loop-lock.md) | ShadowRail, AuthGate/Brake, loops, splits, metrics |
+| [`plans/03-platform-demo-build-lock.md`](plans/03-platform-demo-build-lock.md) | Repo, demo, safety, **single** build order |
+
+Process detail for Identify still lives in patched [`Updated Identify Phase.md`](Updated%20Identify%20Phase.md). [`Identify Phase.md`](Identify%20Phase.md) is **superseded**.
+
+**Do not reopen:** LLM-on-ledger, LLM-on-authorization, dark-web Identify, two taxonomies, Canary Vault as a name, AutoGluon as the live scorer, parallel Identify swarms, Cat 4 on the public API.
+
+**Still unset (not architecture):** Kaggle/GitHub TeamName; verified holdout download URLs; optional overnight AutoGluon host.
+
+Implementation starts at Plan 03 step 1: Pydantic `AttackSpec` + seed YAML + empty threat map.
