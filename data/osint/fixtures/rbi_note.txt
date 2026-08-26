@@ -1,0 +1,26 @@
+RBI-Style Payment Security Note (fixture excerpt for lab / airplane mode)
+
+The Reserve Bank of India and regulated payment system participants have highlighted a sharp rise
+in customer-authorized fraud on instant payment rails, particularly impersonation scams where
+fraudsters pose as bank officials, government agencies, or courier services.
+
+Documented patterns relevant to payment fraud identification:
+
+- UPI impersonation APP: victims authorize transfers to mule VPAs after smishing or voice coaching.
+  Session indicators include new payee flags, copy-paste payee entry, and active call overlap.
+
+- Cap-adjacent smurfing: inbound credits structured just below product velocity thresholds across
+  many small senders funneling into a single receiving account.
+
+- QR and refund inversion scams: social engineering labels combined with in-app payment initiation
+  under urgency pressure.
+
+- APP fraud growth context: complaint volumes and reported values have risen sharply versus classic
+  account takeover on the same rails.
+
+Regulatory tier: primary source class for India-hosted demo narrative. Controls bypassed include
+OTP reliance as a single factor, human callback gaps, and beneficiary risk scoring at payee level.
+
+Rail focus: UPI-like instant credit-push with mule fan-in and fan-out within hours.
+
+This fixture is synthetic prose aligned to public RBI discussion themes for offline Identify demos.

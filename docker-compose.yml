@@ -15,6 +15,13 @@ services:
       timeout: 5s
       retries: 5
 
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
   api:
     build:
       context: .
@@ -30,3 +37,4 @@ services:
 
 volumes:
   postgres_data:
+  qdrant_data:
