@@ -147,9 +147,14 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments / secrets — never commit real keys
 .env
+.env.*
+!.env.example
 .envrc
+*.pem
+credentials.json
+secrets.json
 .venv
 env/
 venv/
@@ -205,6 +210,13 @@ tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
+
+# Generate ledgers / local run dumps (not training artifacts in git)
+data/runs/
+data/priors_history/
+
+# OS
+.DS_Store
 
 # PyPI configuration file
 .pypirc

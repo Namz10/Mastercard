@@ -1,4 +1,4 @@
-"""Extractor node — fetch body, LLM/rule extract, Qdrant chunk."""
+"""Extractor node — fetch body, LLM/rule extract, pgvector chunk."""
 
 import os
 
@@ -25,7 +25,7 @@ def _max_docs() -> int:
 
 
 def _body_for_url(url: str) -> tuple[str, str]:
-    """Return (text, extractor_name)."""
+    """Return (text, extractor_name). Fixture lookup is keyed by URL only."""
     settings = get_osint_settings()
     for key, (_, fixture_url) in FIXTURE_FILES.items():
         if url == fixture_url or url.rstrip("/") == fixture_url.rstrip("/"):
@@ -33,8 +33,7 @@ def _body_for_url(url: str) -> tuple[str, str]:
             return doc.text, doc.extractor
 
     if not settings.identify_live_search:
-        doc = extract_fixture_text("fincen_alert004")
-        return doc.text, doc.extractor
+        raise ValueError(f"no_fixture_for_url:{url}")
 
     doc = extract_url(url)
     return doc.text, doc.extractor
@@ -42,7 +41,6 @@ def _body_for_url(url: str) -> tuple[str, str]:
 
 def extractor(state: IdentifyState) -> IdentifyState:
     candidates = state.get("candidate_urls") or []
-    # Prefer tier-1/2 regulator sources when Tavily returns vendor blogs first.
     candidates = sorted(
         candidates,
         key=lambda c: tier_for_domain(domain_from_url(c.get("url", ""))),
@@ -78,12 +76,17 @@ def extractor(state: IdentifyState) -> IdentifyState:
                     "chunk_id": chunk.id,
                     "extractor": extractor_name,
                     "extraction_source": raw.get("extraction_source"),
+                    "abstain_reason": raw.get("abstain_reason"),
                 }
             )
+            if raw.get("extraction_source") == "abstain" or raw.get("abstain"):
+                errors.append(f"extract_abstain:{url}:{raw.get('abstain_reason')}")
+                continue
             raw.setdefault("source_urls", [url])
+            raw["source_urls"] = [url]
             raw.setdefault("status", "proposed")
-            if raw.get("extraction_source") == "rules" and raw.get("groq_last_error"):
-                errors.append(f"groq_fallback:{url}:{raw['groq_last_error']}")
+            if raw.get("llm_last_error"):
+                errors.append(f"llm_fallback:{url}:{raw['llm_last_error']}")
             try:
                 AttackSpec.model_validate(raw)
                 proposed.append(raw)

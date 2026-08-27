@@ -1,15 +1,18 @@
-"""Qdrant osint_chunks collection + in-memory fallback."""
+"""Postgres pgvector store for OSINT chunks and catalog dedup embeddings."""
 
-import os
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import text
+
 from packages.agents.embeddings import embed_text
 
 COLLECTION_NAME = "osint_chunks"
-_MEMORY_STORE: list[dict[str, Any]] = []
+DEDUP_THRESHOLD = 0.92
 
 
 @dataclass
@@ -22,25 +25,11 @@ class ChunkRecord:
     date: str
 
 
-def _qdrant_url() -> str:
-    return os.getenv("QDRANT_URL", "http://localhost:6333")
+def _session():
+    from apps.api.db import SessionLocal, init_db
 
-
-def _use_qdrant() -> bool:
-    return os.getenv("QDRANT_DISABLED", "").lower() not in {"1", "true", "yes"}
-
-
-def _get_client():
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, PointStruct, VectorParams
-
-    client = QdrantClient(url=_qdrant_url(), check_compatibility=False)
-    if not client.collection_exists(COLLECTION_NAME):
-        client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=384, distance=Distance.COSINE),
-        )
-    return client
+    init_db()
+    return SessionLocal()
 
 
 def upsert_chunk(
@@ -50,33 +39,26 @@ def upsert_chunk(
     source_type: str = "osint",
     date: str | None = None,
 ) -> ChunkRecord:
-    """Embed and store a text chunk."""
+    from apps.api.models import OsintChunk
+
     chunk_id = str(uuid.uuid4())
     date_str = date or datetime.now(timezone.utc).isoformat()
     vector = embed_text(text[:2000])
-
-    payload = {
-        "url": url,
-        "date": date_str,
-        "source_type": source_type,
-        "domain": domain,
-        "text": text[:4000],
-    }
-
-    if _use_qdrant():
-        try:
-            client = _get_client()
-            from qdrant_client.models import PointStruct
-
-            client.upsert(
-                collection_name=COLLECTION_NAME,
-                points=[PointStruct(id=chunk_id, vector=vector, payload=payload)],
-            )
-        except Exception:
-            _MEMORY_STORE.append({"id": chunk_id, "vector": vector, "payload": payload})
-    else:
-        _MEMORY_STORE.append({"id": chunk_id, "vector": vector, "payload": payload})
-
+    db = _session()
+    try:
+        row = OsintChunk(
+            id=chunk_id,
+            url=url,
+            domain=domain,
+            source_type=source_type,
+            date=date_str,
+            text=text[:4000],
+            embedding=vector,
+        )
+        db.add(row)
+        db.commit()
+    finally:
+        db.close()
     return ChunkRecord(
         id=chunk_id,
         url=url,
@@ -88,39 +70,109 @@ def upsert_chunk(
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    return dot  # vectors are normalized
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 def max_catalog_similarity(name: str, rail: str, technique_id: str) -> float:
-    """Max cosine similarity vs in-memory catalog embedding keys."""
+    """Max cosine similarity vs catalog_embeddings (pgvector cosine distance)."""
+    from apps.api.db import engine, init_db
+
+    init_db()
     key = embed_text(f"{name}|{rail}|{technique_id}")
-    best = 0.0
-    for row in _MEMORY_STORE:
-        payload = row.get("payload", {})
-        if payload.get("source_type") != "catalog_dedup":
-            continue
-        sim = cosine_similarity(key, row["vector"])
-        if sim > best:
-            best = sim
-    return best
+    vec_literal = "[" + ",".join(str(float(x)) for x in key) + "]"
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT 1 - (embedding <=> CAST(:vec AS vector)) AS sim
+                FROM catalog_embeddings
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 1
+                """
+            ),
+            {"vec": vec_literal},
+        ).fetchone()
+    if not row or row[0] is None:
+        return 0.0
+    return float(row[0])
 
 
-def register_catalog_embedding(name: str, rail: str, technique_id: str) -> None:
+def nearest_catalog_row(name: str, rail: str, technique_id: str) -> dict[str, Any] | None:
+    from apps.api.db import engine, init_db
+
+    init_db()
+    key = embed_text(f"{name}|{rail}|{technique_id}")
+    vec_literal = "[" + ",".join(str(float(x)) for x in key) + "]"
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT vector_id, name, rail, technique_id,
+                       1 - (embedding <=> CAST(:vec AS vector)) AS sim
+                FROM catalog_embeddings
+                ORDER BY embedding <=> CAST(:vec AS vector)
+                LIMIT 1
+                """
+            ),
+            {"vec": vec_literal},
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "vector_id": row[0],
+        "name": row[1],
+        "rail": row[2],
+        "technique_id": row[3],
+        "similarity": float(row[4]),
+    }
+
+
+def register_catalog_embedding(
+    name: str,
+    rail: str,
+    technique_id: str,
+    vector_id: str | None = None,
+) -> None:
+    from apps.api.models import CatalogEmbedding
+
+    vid = vector_id or str(uuid.uuid4())
     vector = embed_text(f"{name}|{rail}|{technique_id}")
-    _MEMORY_STORE.append(
-        {
-            "id": str(uuid.uuid4()),
-            "vector": vector,
-            "payload": {
-                "source_type": "catalog_dedup",
-                "name": name,
-                "rail": rail,
-                "technique_id": technique_id,
-            },
-        }
-    )
+    db = _session()
+    try:
+        existing = db.get(CatalogEmbedding, vid)
+        if existing:
+            existing.name = name
+            existing.rail = rail
+            existing.technique_id = technique_id
+            existing.embedding = vector
+        else:
+            db.add(
+                CatalogEmbedding(
+                    vector_id=vid,
+                    name=name,
+                    rail=rail,
+                    technique_id=technique_id,
+                    embedding=vector,
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
 
 
+def clear_vector_tables() -> None:
+    """Test helper: wipe embedding tables (real SQL, not a mock)."""
+    from apps.api.models import CatalogEmbedding, OsintChunk
+
+    db = _session()
+    try:
+        db.query(OsintChunk).delete()
+        db.query(CatalogEmbedding).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+# Back-compat name used by older tests
 def clear_memory_store() -> None:
-    _MEMORY_STORE.clear()
+    clear_vector_tables()

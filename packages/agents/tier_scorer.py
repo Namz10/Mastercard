@@ -39,9 +39,11 @@ def score_spec_sources(spec: dict) -> dict:
     best_tier = min(tiers)
     spec["source_tier"] = best_tier
 
-    orgs = {org_for_url(str(u)) for u in urls}
-    tier3_or_better = [t for t in tiers if t <= 3]
+    orgs_with_tier3: set[str] = set()
+    for url, tier in zip(urls, tiers, strict=True):
+        if tier <= 3:
+            orgs_with_tier3.add(org_for_url(str(url)))
 
-    confirmed = best_tier <= 2 or (len(tier3_or_better) >= 2 and len(orgs) >= 2)
+    confirmed = best_tier <= 2 or len(orgs_with_tier3) >= 2
     spec["confidence_level"] = "confirmed" if confirmed else "reported-unverified"
     return spec

@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from apps.api.db import get_db
-from packages.catalog.query import get_spec_by_vector_id, set_atlas_status
+from packages.catalog.query import get_spec_by_vector_id
+from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
 from packages.policy.coverage import build_coverage_map, scout_topics_from_gaps
 from packages.policy.loop_i import draft_rule_from_spec
 from packages.policy.rules import load_v0_rules
@@ -67,9 +68,11 @@ def defend_miss(vector_id: str, db: Annotated[Session, Depends(get_db)]) -> dict
     Identify never calls AuthGate; this is the catalog handshake from Defend.
     """
     try:
-        row = set_atlas_status(db, vector_id, "open")
+        row = transition_atlas_status(db, vector_id, "open")
     except KeyError:
         raise HTTPException(status_code=404, detail="vector_id not found")
+    except IllegalStatusTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return {
         "vector_id": vector_id,
         "status": row.status,

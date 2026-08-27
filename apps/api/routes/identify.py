@@ -1,18 +1,20 @@
 """Identify / HITL API routes."""
 
-import os
-
 import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
-from apps.api.db import get_db
+from apps.api.db import get_db, init_db
 from apps.api.models import AtlasRow
 from packages.agents.identify_graph import run_identify_graph
-from packages.agents.librarian_db import hitl_payload_for_spec, merge_proposed_spec, set_atlas_status
+from packages.agents.librarian_db import hitl_payload_for_spec
+from packages.agents.llm import public_llm_status
+from packages.catalog.models import AttackSpec
+from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
+from packages.osint.settings import get_osint_settings
 
 router = APIRouter(prefix="/identify", tags=["identify"])
 
@@ -29,32 +31,20 @@ class HitlDecision(BaseModel):
 
 @router.get("/config")
 def identify_config() -> dict:
-    """Which keys are configured (booleans only — for local debugging)."""
-    from apps.api.env import env_configured
-    from packages.agents.llm import _groq_api_key, _groq_chat_url
-    from packages.agents.settings import get_agent_settings
-    from packages.osint.settings import get_osint_settings
-
+    """Safe config snapshot — booleans and profile names, never keys."""
     osint = get_osint_settings()
-    agent = get_agent_settings()
+    llm = public_llm_status()
     return {
         "identify_live_search": osint.identify_live_search,
         "tavily_configured": bool(osint.tavily_api_key),
-        "groq_configured": bool(_groq_api_key()),
-        "groq_disabled": os.getenv("GROQ_DISABLED", "").lower() in {"1", "true", "yes"}
-        or agent.groq_disabled,
-        "groq_env_var": env_configured("GROQ_API_KEY"),
-        "groq_model": agent.groq_model,
-        "groq_api_base": agent.groq_api_base,
-        "groq_chat_url": _groq_chat_url(),
-        "identify_max_docs": int(os.getenv("IDENTIFY_MAX_DOCS", "3")),
-        "qdrant_url": os.getenv("QDRANT_URL", "http://localhost:6333"),
-        "embeddings_disabled": os.getenv("EMBEDDINGS_DISABLED", "").lower() in {"1", "true", "yes"},
+        "llm": llm,
+        "vector_backend": "pgvector",
     }
 
 
 @router.post("/run")
 def identify_run(body: IdentifyRunRequest | None = None) -> dict:
+    init_db()
     req = body or IdentifyRunRequest()
     run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
     result = run_identify_graph(run_id=run_id, topic=req.topic)
@@ -84,37 +74,36 @@ def hitl_queue(db: Annotated[Session, Depends(get_db)]) -> dict:
     }
 
 
+def _transition(db: Session, vector_id: str, status: str, patch: dict | None = None) -> dict:
+    try:
+        row = transition_atlas_status(db, vector_id, status, patch, validate_spec=True)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="vector_id not found")
+    except IllegalStatusTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors())
+    return {"vector_id": vector_id, "status": row.status}
+
+
 @router.post("/approve/{vector_id}")
 def approve_vector(
     vector_id: str,
     db: Annotated[Session, Depends(get_db)],
     body: HitlDecision | None = None,
 ) -> dict:
-    row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="vector_id not found")
     patch = (body.spec_patch if body else None) or {}
-    patch["status"] = "open"
-    set_atlas_status(db, vector_id, "open", patch)
-    return {"vector_id": vector_id, "status": "open"}
+    return _transition(db, vector_id, "open", patch)
 
 
 @router.post("/reject/{vector_id}")
 def reject_vector(vector_id: str, db: Annotated[Session, Depends(get_db)]) -> dict:
-    try:
-        set_atlas_status(db, vector_id, "rejected")
-    except KeyError:
-        raise HTTPException(status_code=404, detail="vector_id not found")
-    return {"vector_id": vector_id, "status": "rejected"}
+    return _transition(db, vector_id, "rejected")
 
 
 @router.post("/reject-unsafe/{vector_id}")
 def reject_unsafe_vector(vector_id: str, db: Annotated[Session, Depends(get_db)]) -> dict:
-    try:
-        set_atlas_status(db, vector_id, "rejected_unsafe")
-    except KeyError:
-        raise HTTPException(status_code=404, detail="vector_id not found")
-    return {"vector_id": vector_id, "status": "rejected_unsafe"}
+    return _transition(db, vector_id, "rejected_unsafe")
 
 
 @router.post("/decision/{vector_id}")
@@ -135,6 +124,11 @@ def hitl_decision(
         if not row:
             raise HTTPException(status_code=404, detail="vector_id not found")
         patch = body.spec_patch or {}
-        set_atlas_status(db, vector_id, row.status, patch)
-        return {"vector_id": vector_id, "status": row.status, "patched": True}
+        merged = dict(row.spec or {})
+        merged.update(patch)
+        try:
+            AttackSpec.model_validate(merged)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=exc.errors())
+        return _transition(db, vector_id, row.status, patch)
     raise HTTPException(status_code=400, detail=f"unknown action: {action}")

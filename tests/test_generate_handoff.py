@@ -2,7 +2,7 @@
 
 import pytest
 
-from apps.api.db import Base, SessionLocal, engine
+from apps.api.db import SessionLocal, init_db
 from apps.api.seed import seed_catalog
 from packages.catalog.query import list_generate_eligible
 from packages.sim.runner import run_canary, run_population
@@ -10,7 +10,7 @@ from packages.sim.runner import run_canary, run_population
 
 @pytest.fixture()
 def db():
-    Base.metadata.create_all(bind=engine)
+    init_db()
     seed_catalog(reset=True)
     session = SessionLocal()
     try:

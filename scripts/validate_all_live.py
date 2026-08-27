@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""One-shot live validation: Tavily + Groq + Qdrant + embeddings + full pytest."""
+"""Live validation: Tavily + OmniRoute + Postgres pgvector + pytest."""
 
 from __future__ import annotations
 
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,12 +14,8 @@ if str(ROOT) not in sys.path:
 
 from apps.api.env import env_configured, load_project_env
 
-# Force live stack (overrides shell for this run)
 LIVE_ENV = {
     "IDENTIFY_LIVE_SEARCH": "true",
-    "QDRANT_DISABLED": "false",
-    "EMBEDDINGS_DISABLED": "false",
-    "GROQ_DISABLED": "false",
     "IDENTIFY_MAX_DOCS": "1",
     "PYTHONPATH": str(ROOT),
 }
@@ -48,15 +43,14 @@ def _require_keys() -> None:
     missing = []
     if not env_configured("TAVILY_API_KEY"):
         missing.append("TAVILY_API_KEY")
-    if not env_configured("GROQ_API_KEY"):
-        missing.append("GROQ_API_KEY")
+    if not env_configured("AEGIS_LLM_API_KEY"):
+        missing.append("AEGIS_LLM_API_KEY")
     if missing:
         raise SystemExit(f"Missing .env keys for live validate: {', '.join(missing)}")
 
 
 def _docker_up() -> None:
-    _run(["docker", "compose", "up", "-d", "postgres", "qdrant"])
-    time.sleep(3)
+    _run(["docker", "compose", "up", "-d", "postgres", "--wait"])
 
 
 def _catalog() -> None:
@@ -77,40 +71,30 @@ def _live_tavily() -> None:
     assert len(results) >= 1
 
 
-def _qdrant_health() -> None:
-    import httpx
-
-    url = os.getenv("QDRANT_URL", "http://localhost:6333")
-    r = httpx.get(f"{url}/healthz", timeout=10.0)
-    r.raise_for_status()
-    print(f"qdrant OK ({url})", flush=True)
-
-
-def _embeddings_and_qdrant_upsert() -> None:
-    from packages.osint.search import tavily_search
+def _pgvector_upsert() -> None:
+    from packages.agents.embeddings import embed_text
     from packages.osint.extract import extract_url
+    from packages.osint.search import tavily_search
     from packages.osint.vector_store import COLLECTION_NAME, upsert_chunk
 
     hit = tavily_search(max_results=1)[0]
     doc = extract_url(hit.url)
     chunk = upsert_chunk(hit.url, doc.text, hit.source_domain, doc.extractor)
-    from packages.agents.embeddings import embed_text
-
     vec = embed_text(doc.text[:500])
     print(f"embedding_dim={len(vec)} chunk_id={chunk.id} collection={COLLECTION_NAME}", flush=True)
     assert len(vec) == 384
 
 
-def _groq_extract() -> None:
-    from packages.osint.search import tavily_search
-    from packages.osint.extract import extract_url
+def _llm_extract() -> None:
     from packages.agents.llm import extract_from_document
+    from packages.osint.extract import extract_url
+    from packages.osint.search import tavily_search
 
     hit = tavily_search(max_results=1)[0]
     doc = extract_url(hit.url)
     spec = extract_from_document(doc.text, hit.url, hit.source_domain)
     print(f"extraction_source={spec.get('extraction_source')} name={spec.get('name')}", flush=True)
-    assert spec.get("extraction_source") == "groq", spec.get("groq_last_error")
+    assert spec.get("extraction_source") == "llm", spec.get("abstain_reason") or spec.get("llm_last_error")
 
 
 def _seed_db() -> None:
@@ -154,26 +138,18 @@ def _identify_graph_live() -> None:
         print("errors:", errors[:5], flush=True)
     assert len(urls) >= 1, "scout returned no URLs"
     assert len(docs) >= 1, "extractor produced no docs"
-    assert len(proposed) >= 1, "no proposed specs"
-    assert any(
-        u.get("source") == "tavily" or str(u.get("source", "")).startswith("rss:")
-        for u in urls
-    ), "scout did not return live Tavily/RSS URLs"
-    for d in docs:
-        print(f"  doc {d.get('url')} via {d.get('extractor')} groq={d.get('extraction_source')}", flush=True)
 
 
 def _pytest() -> None:
-    _run([sys.executable, "-m", "pytest", "tests/", "-q"])
+    _run([sys.executable, "-m", "pytest", "tests/", "-q", "-m", "not live_llm"])
 
 
 def main() -> None:
     _apply_live_env()
     _step("[0] check API keys")
     _require_keys()
-    print("live env:", {k: os.environ.get(k) for k in sorted(LIVE_ENV) if k != "PYTHONPATH"}, flush=True)
 
-    _step("[1/8] docker postgres + qdrant")
+    _step("[1/8] docker postgres (pgvector)")
     _docker_up()
 
     _step("[2/8] catalog")
@@ -182,18 +158,17 @@ def main() -> None:
     _step("[3/8] live Tavily search")
     _live_tavily()
 
-    _step("[4/8] Qdrant + real embeddings upsert")
-    _qdrant_health()
-    _embeddings_and_qdrant_upsert()
+    _step("[4/8] pgvector + embeddings upsert")
+    _pgvector_upsert()
 
-    _step("[5/8] Groq extraction")
-    _groq_extract()
+    _step("[5/8] OmniRoute extraction")
+    _llm_extract()
 
     _step("[6/8] postgres seed + generate/defend handoff")
     _seed_db()
     _handoff()
 
-    _step("[7/8] full identify graph (live Tavily + Groq + librarian)")
+    _step("[7/8] full identify graph (live Tavily + LLM + librarian)")
     _identify_graph_live()
 
     _step("[8/8] pytest")

@@ -1,0 +1,45 @@
+name: offline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: aegisloop
+          POSTGRES_PASSWORD: aegisloop
+          POSTGRES_DB: aegisloop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aegisloop -d aegisloop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://aegisloop:aegisloop@localhost:5432/aegisloop
+      IDENTIFY_LIVE_SEARCH: "false"
+      AEGIS_EMBEDDINGS: hash
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --extra dev
+      - name: Create extension
+        run: |
+          uv run python -c "from apps.api.db import init_db; init_db()"
+      - name: Seed
+        run: uv run python apps/api/seed.py --reset
+      - name: Validate
+        run: |
+          uv run python -c "from packages.catalog.loader import load_catalog_yaml, catalog_summary; s=catalog_summary(load_catalog_yaml()); assert s['count']>=28 and not s['missing_techniques']"
+          uv run python -c "from packages.agents.identify_graph import run_identify_graph; r=run_identify_graph('ci'); assert len(r.get('proposed_specs') or [])>=1"
+          uv run pytest tests/ -q -m "not live_llm and not live_identify"

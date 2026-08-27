@@ -2,7 +2,7 @@
 
 import pytest
 
-from apps.api.db import Base, SessionLocal, engine
+from apps.api.db import SessionLocal, init_db
 from apps.api.seed import seed_catalog
 from packages.catalog.features import derive_features_expected
 from packages.catalog.query import get_spec_by_vector_id, set_atlas_status
@@ -13,7 +13,7 @@ from packages.policy.rules import load_v0_rules, match_rules_to_features
 
 @pytest.fixture()
 def db():
-    Base.metadata.create_all(bind=engine)
+    init_db()
     seed_catalog(reset=True)
     session = SessionLocal()
     try:

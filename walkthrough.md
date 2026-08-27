@@ -21,8 +21,8 @@ Scout → Extractor        packages/sim/                   packages/policy/
 
 | Layer | Status | Your job next |
 |-------|--------|----------------|
-| **Catalog / Atlas** | 30 seed rows, all T01–T24 | Add rows via YAML + `make seed` |
-| **Identify graph** | Live Tavily + Groq + Qdrant | Optional: widen allowlist |
+| **Catalog / Atlas** | 29 seed rows, all T01–T24 | Add rows via YAML + `make seed` |
+| **Identify graph** | Fixtures + OmniRoute + Postgres pgvector | Optional: live Tavily |
 | **Generate handoff** | Injector **stubs** + API | Build real world sim + ledger |
 | **Defend handoff** | v0 rules + coverage map | AuthGate, Brake, scoring loop |
 
@@ -32,31 +32,19 @@ Scout → Extractor        packages/sim/                   packages/policy/
 
 ```bash
 cd /path/to/Mastercard
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+./run.sh --validate          # Postgres+pgvector, seed, Identify, pytest
+./run.sh                     # leave API running on :8000
 
-cp .env.example .env
-# Edit .env — see §3
-
-docker compose up -d postgres qdrant
-sleep 3
+# or piecewise
+uv sync --extra dev
+docker compose up -d postgres --wait
 make seed
-```
-
-**Verify (offline, no API keys):**
-
-```bash
 make validate-all
 ```
 
-**Verify (live Tavily + Groq + Qdrant + embeddings):**
+**Verify (offline, no paid LLM):** `./run.sh --validate` or `make validate-all`
 
-```bash
-make validate-all-live
-```
-
-Requires `TAVILY_API_KEY` and `GROQ_API_KEY` in `.env`.
+**Verify (live Tavily + OmniRoute + pgvector):** `make validate-all-live` — requires `TAVILY_API_KEY` and `AEGIS_LLM_API_KEY`.
 
 ---
 
@@ -64,18 +52,16 @@ Requires `TAVILY_API_KEY` and `GROQ_API_KEY` in `.env`.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `DATABASE_URL` | `postgresql://aegisloop:aegisloop@localhost:5432/aegisloop` | KillChain Atlas |
+| `DATABASE_URL` | `postgresql://aegisloop:aegisloop@localhost:5432/aegisloop` | Atlas + pgvector |
 | `TAVILY_API_KEY` | — | Live OSINT search/extract |
-| `GROQ_API_KEY` | — | LLM extraction in Identify |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` | Groq model (use lighter model for dev RPM) |
-| `GROQ_DISABLED` | `false` | Skip Groq → rules-only extraction |
-| `IDENTIFY_LIVE_SEARCH` | `false` | `true` = Tavily; `false` = fixtures only |
-| `IDENTIFY_MAX_DOCS` | `3` | URLs processed per Identify run (use `1` when testing Groq) |
-| `QDRANT_URL` | `http://localhost:6333` | OSINT embedding store |
-| `QDRANT_DISABLED` | `false` | In-memory vector fallback |
-| `EMBEDDINGS_DISABLED` | unset | `true` = hash vectors (tests); `false` = real HF model |
+| `AEGIS_LLM_PROFILE` | `omniroute` | `omniroute` (default) or `groq` |
+| `AEGIS_LLM_BASE_URL` | `http://127.0.0.1:20128/v1` | OpenAI-compatible base |
+| `AEGIS_LLM_MODEL` | `auto` | OmniRoute router model |
+| `AEGIS_LLM_API_KEY` | — | OmniRoute (or Groq if profile=groq) |
+| `IDENTIFY_LIVE_SEARCH` | `false` | `true` = Tavily; `false` = fixtures |
+| `IDENTIFY_MAX_DOCS` | `3` | URLs processed per Identify run |
 | `OSINT_EXTRACTOR` | `tavily` | `trafilatura` or `firecrawl` fallback |
-| `HF_TOKEN` | — | Optional Hugging Face download speedup |
+| `HF_TOKEN` | — | Optional Hugging Face download |
 | `GREYNOISE_API_KEY` | — | Optional network-footprint corroboration |
 
 Never commit `.env`. Keys stay server-side only.
@@ -109,7 +95,7 @@ packages/policy/          Defend (extend here)
   coverage.py             Loop C — 24× coverage map
 
 packages/agents/          Identify graph (mostly stable)
-packages/osint/           Tavily, allowlist, Qdrant chunks
+packages/osint/           Tavily, allowlist, pgvector chunks
 
 data/catalog/seed.yaml    30 catalog rows — handoff source of truth
 data/rules/v0_rules.yaml  v0 if-then rules
@@ -153,7 +139,7 @@ make seed
 ## 6. Running the API
 
 ```bash
-docker compose up -d postgres qdrant   # if not already up
+docker compose up -d postgres --wait   # if not already up
 make seed
 make api
 # → http://localhost:8000
@@ -385,7 +371,7 @@ Reference: [`Docs/defense_architecture.md`](Docs/defense_architecture.md), [`Doc
 
 ```bash
 # 1. Infrastructure
-docker compose up -d postgres qdrant && make seed && make api
+docker compose up -d postgres --wait && make seed && make api
 
 # 2. Identify → proposed (live or fixtures)
 curl -s -X POST http://localhost:8000/identify/run \
@@ -419,7 +405,7 @@ curl -s -X POST http://localhost:8000/defend/miss/t13-upi-impersonation-app
 |---------|------|
 | `make test` | All pytest |
 | `make validate-all` | Offline full stack (no keys) |
-| `make validate-all-live` | Tavily + Groq + Qdrant + embeddings |
+| `make validate-all-live` | Tavily + OmniRoute + pgvector + embeddings |
 | `make handoff-validate` | Generate + Defend only |
 | `pytest tests/test_generate_handoff.py` | Attack handoff |
 | `pytest tests/test_defend_handoff.py` | Defend handoff |
@@ -441,12 +427,12 @@ Live search only returns these domains. Expansion = edit `packages/osint/allowli
 
 | Problem | Fix |
 |---------|-----|
-| `No module named 'pydantic'` | `pip install -e ".[dev]"`; use `make` (uses `.venv/bin/python`) |
-| Groq rate limit | `GROQ_MODEL=llama-3.1-8b-instant`, `IDENTIFY_MAX_DOCS=1`, wait 60s |
+| `No module named 'pydantic'` | `uv sync --extra dev` or `./run.sh`; use `make` (uses `.venv/bin/python`) |
+| OmniRoute down | Identify uses fixture rules or abstains; start OmniRoute on :20128 |
 | Tavily 0 results | Query too narrow; check allowlist |
-| Qdrant connection error | `docker compose up -d qdrant` |
-| HF model slow first run | Set `HF_TOKEN`; or `EMBEDDINGS_DISABLED=true` for offline |
-| Postgres connection | `docker compose up -d postgres`, check `DATABASE_URL` |
+| pgvector / extension missing | `docker compose up -d postgres --wait`. If you previously used `postgres:16-alpine`, reset volume: `docker compose down -v` |
+| HF model slow first run | Set `HF_TOKEN`; hash embeddings are used if the model cannot load |
+| Postgres connection | `docker compose up -d postgres --wait`, check `DATABASE_URL` |
 | T13 coverage `case_only` | Reseed; primary row should be `t13-upi-impersonation-app` (canary) |
 | Identify uses fixtures | Set `IDENTIFY_LIVE_SEARCH=true` + `TAVILY_API_KEY` |
 

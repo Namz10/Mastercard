@@ -1,18 +1,18 @@
-"""Atlas embedding preload — optional; not used for grounder reject (see grounder.py)."""
+"""Atlas embedding preload into Postgres pgvector."""
 
 from packages.catalog.loader import load_catalog_yaml
-from packages.osint.vector_store import clear_memory_store, register_catalog_embedding
+from packages.osint.vector_store import register_catalog_embedding
 
 
 def preload_catalog_embeddings() -> int:
-    """Register seed catalog keys for librarian similarity helpers (optional)."""
-    clear_memory_store()
+    """Register seed catalog keys for librarian / grounder cosine dedup."""
     count = 0
     for spec in load_catalog_yaml():
         register_catalog_embedding(
             spec.name,
             spec.rail.value,
             spec.technique_id.value,
+            vector_id=spec.vector_id,
         )
         count += 1
     return count

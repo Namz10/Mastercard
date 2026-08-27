@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.models import AtlasRow
 from packages.catalog.models import AttackSpec, GenerateMode, Status
+from packages.catalog.status import transition_atlas_status
 
 GENERATE_STATUSES = frozenset({Status.open.value, Status.generating.value})
 
@@ -65,13 +66,4 @@ def specs_by_technique(db: Session) -> dict[str, list[AttackSpec]]:
 
 
 def set_atlas_status(db: Session, vector_id: str, status: str) -> AtlasRow:
-    row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
-    if not row:
-        raise KeyError(f"vector_id not found: {vector_id}")
-    row.status = status
-    merged = dict(row.spec or {})
-    merged["status"] = status
-    row.spec = merged
-    db.commit()
-    db.refresh(row)
-    return row
+    return transition_atlas_status(db, vector_id, status)
