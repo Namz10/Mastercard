@@ -1,0 +1,110 @@
+# v0 starter rules — defense_architecture §3.2, feedback-loop §2
+# Observable at payment auth time only.
+
+- id: call-and-paste-new-payee
+  kind: hard_flag
+  applies_to: APP
+  when:
+    call_active_flag: true
+    copy_paste_payee_flag: true
+    is_new_payee: true
+  min_score: 0.72
+  reason: "Possible coercion: call active + new payee pasted in"
+  technique_ids: [T13, T14, T15, T16, T17, T18, T19]
+  status: live
+
+- id: new-payee-large-new-device
+  kind: hard_flag
+  applies_to: ATO
+  when:
+    is_new_payee: true
+    is_new_device: true
+  min_score: 0.68
+  reason: "Takeover shape: new payee on new device"
+  technique_ids: [T12]
+  status: live
+
+- id: mule-fan-in-burst
+  kind: hard_flag
+  applies_to: mule
+  when:
+    fan_in_1h: true
+    mule_account_age_days: true
+  min_score: 0.65
+  reason: "Mule receiving: fan-in burst on young account"
+  technique_ids: [T01, T03, T05]
+  status: live
+
+- id: smurf-under-cap
+  kind: nudge
+  applies_to: mule
+  when:
+    smurf_cap_ratio: true
+    fan_in_1h: true
+  min_score: 0.45
+  reason: "Structuring: amounts clustered under cap"
+  technique_ids: [T03]
+  status: live
+
+- id: rail-hop-burst
+  kind: nudge
+  applies_to: mule
+  when:
+    fan_out_ttl_hours: true
+  min_score: 0.4
+  reason: "Rail hop with rapid fan-out TTL"
+  technique_ids: [T04]
+  status: live
+
+- id: seasoning-burst
+  kind: nudge
+  applies_to: ATO
+  when:
+    seasoning_days: true
+    seasoning_txn_count: true
+  min_score: 0.5
+  reason: "Quiet account then velocity jump"
+  technique_ids: [T11]
+  status: live
+
+- id: invoice-beneficiary-swap
+  kind: hard_flag
+  applies_to: BEC
+  when:
+    beneficiary_changed: true
+    gstin_checksum_ok: true
+  min_score: 0.7
+  reason: "Invoice valid but beneficiary changed"
+  technique_ids: [T24, T16, T18]
+  status: live
+
+- id: pause-paste-session
+  kind: nudge
+  applies_to: APP
+  when:
+    pause_ms: true
+    copy_paste_payee_flag: true
+  min_score: 0.4
+  reason: "Long pause then paste on payee field"
+  technique_ids: [T13, T19]
+  status: live
+
+- id: calm-down-known-payee
+  kind: calm_down
+  applies_to: genuine
+  when:
+    is_new_payee: false
+  min_score: -0.15
+  reason: "Known payee calm-down"
+  technique_ids: []
+  status: live
+
+- id: calm-down-old-device
+  kind: calm_down
+  applies_to: genuine
+  when:
+    is_new_device: false
+  min_score: -0.1
+  reason: "Same device calm-down"
+  technique_ids: []
+  status: live

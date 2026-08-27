@@ -1,0 +1,957 @@
+# KillChain Atlas seed — 30 rows, all T01–T24 (Plan 01 §9)
+# Transcribed from HACKATHON_RESEARCH §3 with allowlisted citations
+
+- vector_id: t01-mule-fan-in
+  technique_id: T01
+  name: Mule fan-in funnel
+  one_liner: Many senders funnel into a new or low-KYC mule account within hours.
+  category: 1
+  rail: upi_like
+  lifecycle_stage: disbursement_mule
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule, static_kyc]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: network_footprint
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    fan_in_1h: 18
+    fan_out_ttl_hours: 4.0
+    smurf_cap_ratio: 0.85
+    hop_rails: [upi_like]
+    mule_account_age_days: 3
+    cashout_mcc_or_sink: wallet_sink
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [fan_in_1h, mule_account_age_days]
+  entities: [mule, victim, device]
+  status: open
+
+- vector_id: t02-mule-fan-out
+  technique_id: T02
+  name: Mule fan-out cash-out
+  one_liner: Burst outbound transfers from mule to crypto, gaming, or high-risk MCC sinks.
+  category: 1
+  rail: upi_like
+  lifecycle_stage: disbursement_mule
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: network_footprint
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    fan_in_1h: 0
+    fan_out_ttl_hours: 1.5
+    smurf_cap_ratio: 1.0
+    hop_rails: [upi_like, crypto_offramp]
+    mule_account_age_days: 21
+    cashout_mcc_or_sink: crypto_offramp
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [fan_out_ttl_hours, cashout_mcc_or_sink]
+  entities: [mule, merchant]
+  novelty_notes: FinCEN FIN-2024-Alert004 cash-out stage after inbound APP credit.
+  status: open
+
+- vector_id: t03-upi-cap-smurfing
+  technique_id: T03
+  name: UPI-cap smurfing
+  one_liner: Structuring inbound amounts just under product velocity caps.
+  category: 1
+  rail: upi_like
+  lifecycle_stage: disbursement_mule
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: network_footprint
+  source_urls:
+    - https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx
+  simulatable_signals:
+    fan_in_1h: 25
+    fan_out_ttl_hours: 6.0
+    smurf_cap_ratio: 0.98
+    hop_rails: [upi_like]
+    mule_account_age_days: 30
+    cashout_mcc_or_sink: layering_sink
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [smurf_cap_ratio, fan_in_1h]
+  entities: [mule]
+  status: open
+
+- vector_id: t04-rail-hop
+  technique_id: T04
+  name: Rail hop UPI-IMPS-wallet
+  one_liner: Typed hops across instant payment rails within simulation window.
+  category: 1
+  rail: imps
+  lifecycle_stage: clearing_settlement
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://www.wipro.com/banking/genai-driven-fraud-confronting-a-new-risk-for-financial-institutions/
+  simulatable_signals:
+    fan_in_1h: 8
+    fan_out_ttl_hours: 3.0
+    smurf_cap_ratio: 0.9
+    hop_rails: [upi_like, imps, neft]
+    mule_account_age_days: 45
+    cashout_mcc_or_sink: wallet_sink
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [hop_rails]
+  entities: [mule, device]
+  status: open
+
+- vector_id: t05-dust-layering
+  technique_id: T05
+  name: Dust and layering
+  one_liner: Many tiny outbound edges to obscure funnel origin.
+  category: 1
+  rail: upi_like
+  lifecycle_stage: disbursement_mule
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 2
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: network_footprint
+  source_urls:
+    - https://arxiv.org/abs/2410.09066
+  simulatable_signals:
+    fan_in_1h: 40
+    fan_out_ttl_hours: 12.0
+    smurf_cap_ratio: 0.3
+    hop_rails: [upi_like]
+    mule_account_age_days: 60
+    cashout_mcc_or_sink: dust_sink
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [fan_in_1h]
+  entities: [mule]
+  status: open
+
+- vector_id: t06-synthetic-merchant
+  technique_id: T06
+  name: Synthetic merchant collusion
+  one_liner: Fake merchant cycle and refund burst after synthetic onboarding.
+  category: 1
+  rail: card_cnp
+  lifecycle_stage: clearing_settlement
+  genai_modality: document
+  social_surface: merchant
+  control_bypassed: [business_doc_kyc, mcc_classification]
+  actor_type: merchant
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: medium
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://www.feedzai.com/blog/genai-fraud-prevention/
+  features_expected: []
+  entities: [merchant, mule]
+  novelty_notes: Named gap until merchant graph nodes exist in sim.
+  status: open
+
+- vector_id: t07-card-testing
+  technique_id: T07
+  name: Card testing and BIN enumeration
+  one_liner: Auth-plane probing with human-like bot checkout patterns.
+  category: 1
+  rail: card_cnp
+  lifecycle_stage: authorization
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: CNP
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: high
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://paymentservices.amazon.com/blog/the-impact-of-generative-ai-on-security-in-the-payments-industry
+  features_expected: []
+  entities: [device, merchant]
+  novelty_notes: Auth-plane stretch injector after loop works.
+  status: open
+
+- vector_id: t08-synthetic-identity
+  technique_id: T08
+  name: Synthetic identity mix
+  one_liner: Real identifier fragments plus fabricated persona and GenAI documents.
+  category: 2
+  rail: onboarding
+  lifecycle_stage: onboarding_kyc
+  genai_modality: document
+  social_surface: none
+  control_bypassed: [static_kyc, liveness]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    seasoning_days: 0
+    seasoning_txn_count: 0
+    liveness_score: 0.72
+    doc_consistency: 0.65
+    device_hash_shift: false
+    kyc_tier: tier1
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [doc_consistency, liveness_score]
+  entities: [victim, device]
+  status: open
+
+- vector_id: t09-deepfake-vkyc
+  technique_id: T09
+  name: Deepfake VKYC liveness bypass
+  one_liner: Simulated low liveness score and channel-switch flags without media files.
+  category: 2
+  rail: onboarding
+  lifecycle_stage: onboarding_kyc
+  genai_modality: video
+  social_surface: video_call
+  control_bypassed: [liveness, static_kyc]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    seasoning_days: 0
+    seasoning_txn_count: 0
+    liveness_score: 0.35
+    doc_consistency: 0.8
+    device_hash_shift: false
+    kyc_tier: tier2
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [liveness_score]
+  entities: [victim, device]
+  novelty_notes: FinCEN chain stage 1 — deepfake KYC before seasoning.
+  status: open
+
+- vector_id: t10-kyc-doc-forgery
+  technique_id: T10
+  name: KYC document field forgery
+  one_liner: Text-field inconsistencies in onboarding documents without image payloads.
+  category: 2
+  rail: onboarding
+  lifecycle_stage: onboarding_kyc
+  genai_modality: document
+  social_surface: none
+  control_bypassed: [static_kyc]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 2
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://arxiv.org/abs/2410.09066
+  simulatable_signals:
+    seasoning_days: 7
+    seasoning_txn_count: 2
+    liveness_score: 0.85
+    doc_consistency: 0.4
+    device_hash_shift: false
+    kyc_tier: tier1
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [doc_consistency]
+  entities: [victim]
+  status: open
+
+- vector_id: t11-identity-farming
+  technique_id: T11
+  name: Identity farming seasoning
+  one_liner: Quiet account growth then burst after ~150d seasoning pattern.
+  category: 2
+  rail: upi_like
+  lifecycle_stage: account_access_ato
+  genai_modality: mixed
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    seasoning_days: 150
+    seasoning_txn_count: 45
+    liveness_score: 0.9
+    doc_consistency: 0.88
+    device_hash_shift: false
+    kyc_tier: tier2
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [seasoning_days, seasoning_txn_count]
+  entities: [mule, victim]
+  novelty_notes: FinCEN chain stage 2 — seasoning before inbound APP.
+  status: open
+
+- vector_id: t12-ato-device-shift
+  technique_id: T12
+  name: ATO device session shift
+  one_liner: New device hash with velocity spike after account takeover.
+  category: 2
+  rail: upi_like
+  lifecycle_stage: account_access_ato
+  genai_modality: text
+  social_surface: in_app
+  control_bypassed: [otp, velocity_rule]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.bny.com/corporate/global/en/insights/ai-and-payments-fraud-an-evolving-landscape.html
+  simulatable_signals:
+    seasoning_days: 90
+    seasoning_txn_count: 20
+    liveness_score: 0.75
+    doc_consistency: 0.9
+    device_hash_shift: true
+    kyc_tier: tier2
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [device_hash_shift]
+  entities: [victim, device]
+  status: open
+
+- vector_id: t13-upi-impersonation-app
+  technique_id: T13
+  name: UPI impersonation APP India
+  one_liner: Customer-authorized push to new or mule payee under bank impersonation pressure.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: payment_initiation
+  genai_modality: voice
+  social_surface: voice
+  control_bypassed: [human_callback, otp]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    persuasion_labels: [bank_impersonation, urgency]
+    call_active_flag: true
+    copy_paste_payee_flag: true
+    pause_ms: 4500
+    new_payee: true
+    urgency_pressure: 0.85
+    transcript_ref: null
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [call_active_flag, copy_paste_payee_flag, is_new_payee, urgency_pressure]
+  entities: [victim, mule]
+  novelty_notes: "Demo canary chain primary: T09 → T11 → T13 → T02 (FinCEN FIN-2024-Alert004)."
+  canary_eligible: true
+  status: open
+
+- vector_id: t14-family-emergency-voice
+  technique_id: T14
+  name: Family emergency voice-clone APP
+  one_liner: Voice-clone pressure for authorized family emergency transfers.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: payment_initiation
+  genai_modality: voice
+  social_surface: voice
+  control_bypassed: [voice_bio, human_callback]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.ftc.gov/news-events/news/press-releases
+  simulatable_signals:
+    persuasion_labels: [family_emergency, voice_clone]
+    call_active_flag: true
+    copy_paste_payee_flag: false
+    pause_ms: 2000
+    new_payee: true
+    urgency_pressure: 0.9
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [call_active_flag, urgency_pressure]
+  entities: [victim]
+  status: open
+
+- vector_id: T15-romance-long-con
+  technique_id: T15
+  name: Romance investment long-con APP
+  one_liner: Multi-week persuasion labels culminating in authorized outbound push.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: payment_initiation
+  genai_modality: text
+  social_surface: in_app
+  control_bypassed: [human_callback]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.feedzai.com/blog/genai-fraud-prevention/
+  simulatable_signals:
+    persuasion_labels: [romance, investment]
+    call_active_flag: false
+    copy_paste_payee_flag: false
+    pause_ms: 800
+    new_payee: true
+    urgency_pressure: 0.6
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [persuasion_labels, is_new_payee]
+  entities: [victim, mule]
+  status: open
+
+- vector_id: t16-voice-bec-cfo
+  technique_id: T16
+  name: Voice-clone BEC CFO
+  one_liner: Commercial voice impersonation targeting treasury outbound wires.
+  category: 3
+  rail: wire
+  lifecycle_stage: payment_initiation
+  genai_modality: voice
+  social_surface: voice
+  control_bypassed: [human_callback, business_doc_kyc]
+  actor_type: merchant
+  economic_class: BEC
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 4
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.reuters.com/technology/cybersecurity/
+  simulatable_signals:
+    persuasion_labels: [cfo_impersonation, wire_urgency]
+    call_active_flag: true
+    copy_paste_payee_flag: true
+    pause_ms: 3000
+    new_payee: true
+    urgency_pressure: 0.95
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [call_active_flag, copy_paste_payee_flag]
+  entities: [merchant, victim]
+  status: open
+
+- vector_id: t17-polymorphic-phishing
+  technique_id: T17
+  name: Polymorphic phishing smishing
+  one_liner: Session labels from fluent localized smishing without live send.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: payment_initiation
+  genai_modality: text
+  social_surface: sms
+  control_bypassed: [otp]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.wipro.com/banking/genai-driven-fraud-confronting-a-new-risk-for-financial-institutions/
+  simulatable_signals:
+    persuasion_labels: [smishing, qr_inversion]
+    call_active_flag: false
+    copy_paste_payee_flag: true
+    pause_ms: 1200
+    new_payee: true
+    urgency_pressure: 0.7
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [copy_paste_payee_flag]
+  entities: [victim, device]
+  status: open
+
+- vector_id: t18-invoice-impersonation
+  technique_id: T18
+  name: Invoice-timed impersonation
+  one_liner: Session pressure aligned with invoice payment windows.
+  category: 3
+  rail: wire
+  lifecycle_stage: payment_initiation
+  genai_modality: text
+  social_surface: email
+  control_bypassed: [human_callback]
+  actor_type: merchant
+  economic_class: BEC
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.deloitte.com/us/en/insights/industry/financial-services/deepfake-banking-fraud-risk-on-the-rise.html
+  simulatable_signals:
+    persuasion_labels: [invoice_urgency]
+    call_active_flag: false
+    copy_paste_payee_flag: true
+    pause_ms: 2500
+    new_payee: true
+    urgency_pressure: 0.8
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [urgency_pressure, is_new_payee]
+  entities: [merchant, victim]
+  status: open
+
+- vector_id: t19-mfa-relay-class
+  technique_id: T19
+  name: Live MFA-relay class
+  one_liner: Call plus paste plus new payee timing pattern without naming criminal tools.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: authorization
+  genai_modality: voice
+  social_surface: voice
+  control_bypassed: [otp, human_callback]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: name_only
+  dual_use_rating: high
+  source_tier: 4
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.bbc.com/news/technology
+  features_expected: [call_active_flag, copy_paste_payee_flag]
+  entities: [victim, device]
+  novelty_notes: Session flags generate in separate app_session rows; method card is name_only.
+  status: open
+
+- vector_id: t19-session-signals
+  technique_id: T19
+  name: MFA-relay session signal pattern
+  one_liner: Generate-mode session flags for MFA-relay class without tool names.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: authorization
+  genai_modality: voice
+  social_surface: voice
+  control_bypassed: [otp]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 4
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.bbc.com/news/technology
+  simulatable_signals:
+    persuasion_labels: [otp_timing]
+    call_active_flag: true
+    copy_paste_payee_flag: true
+    pause_ms: 500
+    new_payee: true
+    urgency_pressure: 0.75
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [call_active_flag, copy_paste_payee_flag]
+  entities: [victim]
+  status: open
+
+- vector_id: t20-detector-evasion
+  technique_id: T20
+  name: Detector evasion probing
+  one_liner: Masked adversarial perturbations within Loop A allowlist only.
+  category: 4
+  rail: upi_like
+  lifecycle_stage: authorization
+  genai_modality: poisoning
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: detector
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: medium
+  source_tier: 2
+  confidence_level: confirmed
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://arxiv.org/abs/2410.09066
+  features_expected: []
+  entities: [device]
+  novelty_notes: Cat 4 Loop A offline; x_adv allowlist only in Generate.
+  status: open
+
+- vector_id: t21-training-poisoning
+  technique_id: T21
+  name: Training-data poisoning
+  one_liner: Mislabeled mix cap in trust-tiered training pipelines.
+  category: 4
+  rail: card_cnp
+  lifecycle_stage: authorization
+  genai_modality: poisoning
+  social_surface: none
+  control_bypassed: []
+  actor_type: consumer
+  economic_class: detector
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: medium
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://paymentservices.amazon.com/blog/the-impact-of-generative-ai-on-security-in-the-payments-industry
+  features_expected: []
+  entities: []
+  novelty_notes: Canary = HoldoutVault veto in Loop M.
+  status: open
+
+- vector_id: t22-detector-fingerprint
+  technique_id: T22
+  name: Detector fingerprinting
+  one_liner: Oracle query cap class for model fingerprinting without public tooling.
+  category: 4
+  rail: card_cnp
+  lifecycle_stage: authorization
+  genai_modality: mixed
+  social_surface: none
+  control_bypassed: []
+  actor_type: consumer
+  economic_class: detector
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: high
+  source_tier: 2
+  confidence_level: confirmed
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://arxiv.org/abs/2410.09066
+  features_expected: []
+  entities: []
+  novelty_notes: Loop A query cap is the control; UI card name_only.
+  status: open
+
+- vector_id: t23-supply-chain-llm
+  technique_id: T23
+  name: KYC LLM supply-chain injection
+  one_liner: Third-party KYC or merchant-bot injection at Cat 3 intersect 4.
+  category: 4
+  rail: onboarding
+  lifecycle_stage: onboarding_kyc
+  genai_modality: mixed
+  social_surface: merchant
+  control_bypassed: [static_kyc, business_doc_kyc]
+  actor_type: merchant
+  economic_class: detector
+  is_authorized_push: false
+  generate_mode: name_only
+  dual_use_rating: high
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://paymentservices.amazon.com/blog/the-impact-of-generative-ai-on-security-in-the-payments-industry
+  features_expected: []
+  entities: [merchant]
+  novelty_notes: Do not simulate attacking third-party vendors in public repo.
+  status: open
+
+- vector_id: t24-beneficiary-invoice
+  technique_id: T24
+  name: Beneficiary invoice rewrite
+  one_liner: Genuine-looking tax math with wrong beneficiary account; checksum-pass cases.
+  category: 5
+  rail: wire
+  lifecycle_stage: payment_initiation
+  genai_modality: document
+  social_surface: email
+  control_bypassed: [business_doc_kyc, bank_account_ownership]
+  actor_type: merchant
+  economic_class: BEC
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.fincen.gov/news/news-releases/fincen-issues-alert-fraud-schemes-involving-deepfake-media-targeting-financial
+  simulatable_signals:
+    beneficiary_changed: true
+    gstin_checksum_ok: true
+    amount_vs_invoice_delta: 0.02
+    lookalike_domain_flag: true
+  simulator:
+    injector_id: doc_beneficiary
+    param_schema: {}
+  features_expected: [beneficiary_changed, gstin_checksum_ok]
+  entities: [merchant, victim]
+  status: open
+
+- vector_id: t13-rbi-app-scale
+  technique_id: T13
+  name: RBI-scale UPI APP surge
+  one_liner: India APP fraud scale context for UPI impersonation vectors.
+  category: 3
+  rail: upi_like
+  lifecycle_stage: payment_initiation
+  genai_modality: text
+  social_surface: sms
+  control_bypassed: [human_callback]
+  actor_type: consumer
+  economic_class: APP
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 1
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx
+  simulatable_signals:
+    persuasion_labels: [government_impersonation]
+    call_active_flag: false
+    copy_paste_payee_flag: true
+    pause_ms: 1800
+    new_payee: true
+    urgency_pressure: 0.82
+  simulator:
+    injector_id: app_session
+    param_schema: {}
+  features_expected: [copy_paste_payee_flag, is_new_payee]
+  entities: [victim, mule]
+  status: open
+
+- vector_id: t02-reuters-cashout
+  technique_id: T02
+  name: Rapid mule cash-out pattern
+  one_liner: Secondary citation for burst outbound after inbound scam credit.
+  category: 1
+  rail: crypto_offramp
+  lifecycle_stage: disbursement_mule
+  genai_modality: bot
+  social_surface: none
+  control_bypassed: [velocity_rule]
+  actor_type: consumer
+  economic_class: mule
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 4
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: network_footprint
+  source_urls:
+    - https://www.reuters.com/technology/cybersecurity/
+  simulatable_signals:
+    fan_in_1h: 2
+    fan_out_ttl_hours: 0.5
+    smurf_cap_ratio: 1.0
+    hop_rails: [upi_like, crypto_offramp]
+    mule_account_age_days: 10
+    cashout_mcc_or_sink: crypto_offramp
+  simulator:
+    injector_id: graph_mule
+    param_schema: {}
+  features_expected: [fan_out_ttl_hours]
+  entities: [mule]
+  status: open
+
+- vector_id: t11-kurshan-seasoned
+  technique_id: T11
+  name: Seasoned synthetic bust-out
+  one_liner: Kurshan et al. seasoned identity before mule funnel patterns.
+  category: 2
+  rail: upi_like
+  lifecycle_stage: account_access_ato
+  genai_modality: mixed
+  social_surface: none
+  control_bypassed: [velocity_rule, static_kyc]
+  actor_type: consumer
+  economic_class: ATO
+  is_authorized_push: false
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 2
+  confidence_level: confirmed
+  corroboration_type: documentary-case
+  vector_class: human_social
+  source_urls:
+    - https://arxiv.org/abs/2410.09066
+  simulatable_signals:
+    seasoning_days: 120
+    seasoning_txn_count: 35
+    liveness_score: 0.88
+    doc_consistency: 0.82
+    device_hash_shift: false
+    kyc_tier: tier2
+  simulator:
+    injector_id: identity_trajectory
+    param_schema: {}
+  features_expected: [seasoning_days]
+  entities: [mule, victim]
+  status: open
+
+- vector_id: t24-invoice-linked-t16
+  technique_id: T24
+  name: Invoice rewrite linked BEC
+  one_liner: Document beneficiary change timed with voice BEC CFO pressure.
+  category: 5
+  rail: wire
+  lifecycle_stage: payment_initiation
+  genai_modality: document
+  social_surface: email
+  control_bypassed: [bank_account_ownership]
+  actor_type: merchant
+  economic_class: BEC
+  is_authorized_push: true
+  generate_mode: generate
+  dual_use_rating: low
+  source_tier: 3
+  confidence_level: reported-unverified
+  corroboration_type: not-yet-corroborated
+  vector_class: human_social
+  source_urls:
+    - https://www.deloitte.com/us/en/insights/industry/financial-services/deepfake-banking-fraud-risk-on-the-rise.html
+  simulatable_signals:
+    beneficiary_changed: true
+    gstin_checksum_ok: false
+    amount_vs_invoice_delta: 0.15
+    lookalike_domain_flag: true
+  simulator:
+    injector_id: doc_beneficiary
+    param_schema: {}
+  features_expected: [beneficiary_changed, lookalike_domain_flag]
+  entities: [merchant]
+  novelty_notes: Linked to T16/T18 invoice-timed vectors.
+  status: open

@@ -1,8 +1,10 @@
 # Mastercard — AegisLoop (GFF 2026)
 
-Identify, Generate, and Defend as **one closed-loop** lab. Problem statement: [`MC_PS.md`](MC_PS.md). Landscape: [`HACKATHON_RESEARCH.md`](HACKATHON_RESEARCH.md).
+Identify, Generate, and Defend as **one closed-loop** lab. Problem statement: [`MC_PS.md`](MC_PS.md). Landscape: [`HACKATHON_RESEARCH.md`](Docs/HACKATHON_RESEARCH.md).
 
-**Planning is locked.** Start here: [`LOCKED.md`](LOCKED.md)
+**Start here for implementation:** [`walkthrough.md`](walkthrough.md) (Attack + Defend team handoff)
+
+**Planning is locked.** [`Docs/LOCKED.md`](Docs/LOCKED.md)
 
 | Plan | File |
 |---|---|

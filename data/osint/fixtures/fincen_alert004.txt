@@ -1,0 +1,29 @@
+FINCEN Alert Pattern — FIN-2024-Alert004 (fixture excerpt for lab / airplane mode)
+
+The Financial Crimes Enforcement Network (FinCEN) issued Alert FIN-2024-Alert004 on fraud schemes
+involving deepfake media targeting financial institutions and their customers.
+
+Key typology patterns documented in the alert and related SAR narratives:
+
+1. Deepfake video-KYC and liveness bypass during remote onboarding. Fraudsters use synthetic or
+   manipulated video to pass liveness checks, then open accounts that receive scam proceeds.
+
+2. Identity farming and seasoning. Accounts remain quiet for extended periods (often 90–150 days)
+   with low-velocity activity to build a trusted profile before a burst of inbound transfers.
+
+3. Authorized push payment (APP) impersonation. Victims authorize UPI-like transfers to new or
+   mule payees under bank impersonation pressure, often during active voice calls with copy-paste
+   payee details and elevated urgency.
+
+4. Mule fan-in and rapid cash-out. Multiple senders funnel credits into a new or low-KYC account
+   within hours, followed by burst outbound transfers to crypto off-ramps, gaming MCCs, or other
+   high-risk sinks.
+
+Controls commonly bypassed: liveness verification, static KYC document checks, velocity rules,
+and human callback procedures when victims are coached in real time.
+
+Economic class: authorized push fraud layered with mule disbursement. Rail: instant retail payments
+(UPI-like) with optional hop to crypto off-ramp.
+
+This fixture is synthetic prose aligned to public FinCEN alert themes for offline Identify demos.
+No exploit steps, criminal tooling instructions, or live payment identifiers are included.
