@@ -1,9 +1,11 @@
-.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live
+.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-slow
 
 PYTHONPATH ?= $(CURDIR)
 export PYTHONPATH
 
-ifneq (,$(wildcard $(CURDIR)/.venv/bin/python))
+ifneq (,$(wildcard $(CURDIR)/.venv/Scripts/python.exe))
+PY := $(CURDIR)/.venv/Scripts/python.exe
+else ifneq (,$(wildcard $(CURDIR)/.venv/bin/python))
 PY := $(CURDIR)/.venv/bin/python
 else
 PY := python3
@@ -45,10 +47,13 @@ batch3-validate:
 	$(VALIDATE_ENV) $(PY) -c 'from apps.api.db import init_db; from packages.agents.identify_graph import run_identify_graph; init_db(); r=run_identify_graph("make-b3"); print("proposed", len(r.get("proposed_specs") or [])); assert len(r.get("proposed_specs") or [])>=1'
 
 generate-validate:
-	$(PY) -c "from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app'); db.close(); assert r['injector_id']=='app_session'"
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app', n_customers=16, n_merchants=8, sim_days=40, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>1 and 'simulatable_signals' not in r and r['counts_by_label_family'].get('app_fraud',0)>=3; print(r['parquet_path'], r['counts_by_label_family'])"
+
+generate-slow:
+	$(PY) -m pytest tests/test_sim_calibrator.py tests/test_sim_slow.py -q --tb=short
 
 defend-validate:
-	$(PY) -c "from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.policy.coverage import build_coverage_map; init_db(); seed_catalog(reset=True); db=SessionLocal(); m=build_coverage_map(db); db.close(); assert m['technique_count']==24"
+	$(PY) -c "from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.policy.coverage import build_coverage_map; init_db(); seed_catalog(reset=True); db=SessionLocal(); m=build_coverage_map(db); db.close(); assert m['technique_count']==24"
 
 handoff-validate: generate-validate defend-validate
 

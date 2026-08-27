@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>UPI P2M product statistics — fixture snapshot</title>
+</head>
+<body>
+  <p>
+    Source (citation only, not fetched):
+    https://www.npci.org.in/what-we-do/upi/product-statistics
+  </p>
+  <p>This file is an in-repo HTML fixture. WorldCalibrator must not call the network.</p>
+
+  <table id="p2m-tickets" data-as-of="2024-06">
+    <caption>P2M mean ticket (value/volume) as_of 2024-06</caption>
+    <thead>
+      <tr>
+        <th>category</th>
+        <th>volume</th>
+        <th>value_rupees</th>
+        <th>avg_rupees</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>grocery</td>
+        <td>10000</td>
+        <td>2200000</td>
+        <td>220</td>
+      </tr>
+      <tr>
+        <td>fast food</td>
+        <td>8000</td>
+        <td>904000</td>
+        <td>113</td>
+      </tr>
+      <tr>
+        <td>utilities</td>
+        <td>2000</td>
+        <td>2690000</td>
+        <td>1345</td>
+      </tr>
+      <tr>
+        <td>salary</td>
+        <td>100</td>
+        <td>2800000</td>
+        <td>28000</td>
+      </tr>
+      <tr>
+        <td>rent</td>
+        <td>50</td>
+        <td>600000</td>
+        <td>12000</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table id="split">
+    <caption>P2M vs P2P transaction share</caption>
+    <thead>
+      <tr><th>field</th><th>value</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>p2m_share</td><td>0.65</td></tr>
+      <tr><td>txn_min_rupees</td><td>1</td></tr>
+      <tr><td>txn_max_rupees</td><td>100000</td></tr>
+      <tr><td>day_max_rupees</td><td>100000</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Must be ignored: hours stay seed assumptions. Not a cited public hourly table. -->
+  <table id="hours-from-nowhere">
+    <thead>
+      <tr><th>hour</th><th>share</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>2</td><td>0.40</td></tr>
+      <tr><td>3</td><td>0.35</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

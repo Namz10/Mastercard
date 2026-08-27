@@ -208,15 +208,26 @@ def _handoff() -> None:
             db,
             vector_id="t13-upi-impersonation-app",
             run_id="run-sh-population",
+            n_customers=16,
+            n_merchants=8,
+            sim_days=40,
+            world_seed=42,
+            pin=True,
         )
         canary = run_canary(
             db,
             campaign_id="fincen-fin-2024-alert004",
             run_id="run-sh-canary",
+            n_customers=12,
+            n_merchants=6,
+            sim_days=180,
+            world_seed=42,
         )
         coverage = build_coverage_map(db)
-        assert population["injector_id"] == "app_session"
-        assert canary["event_count"] == 4
+        assert population["event_count"] > 1
+        assert "simulatable_signals" not in population
+        assert canary["event_count"] > 4
+        assert len(canary["lifecycle_stages_logged"]) == 4
         assert coverage["technique_count"] == 24
         print(
             f"population_events={population['event_count']} "
