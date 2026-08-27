@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from packages.osint.allowlist import ALLOWLIST_DOMAINS, validate_search_query
+from packages.osint.allowlist import ALLOWLIST_DOMAINS, tier_for_domain, validate_search_query
 from packages.osint.settings import get_osint_settings
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
@@ -82,6 +82,7 @@ def search_candidate_urls(
             "fetched_at": now,
             "source": "tavily",
             "score": r.score,
+            "source_tier": tier_for_domain(r.source_domain),
         }
         for r in tavily_search(query=query, max_results=max_results, search_depth=search_depth)
     ]

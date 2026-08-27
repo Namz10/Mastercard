@@ -10,6 +10,7 @@ from packages.osint.allowlist import domain_from_url, is_allowlisted_url
 from packages.osint.extract import extract_fixture_text, extract_url
 from packages.osint.fixtures import FIXTURE_FILES
 from packages.osint.settings import get_osint_settings
+from packages.osint.telemetry.indicators import collect_network_indicators
 from packages.osint.vector_store import upsert_chunk
 
 
@@ -54,6 +55,12 @@ def extractor(state: IdentifyState) -> IdentifyState:
                 date=item.get("fetched_at"),
             )
             raw = extract_from_document(text, url, domain)
+            if raw.get("extraction_source") != "abstain" and not raw.get("abstain"):
+                raw["network_indicators"] = collect_network_indicators(
+                    text,
+                    raw.get("network_indicators"),
+                    url,
+                )
             extracted_docs.append(
                 {
                     "url": url,
