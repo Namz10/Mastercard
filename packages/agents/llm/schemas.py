@@ -29,7 +29,28 @@ ATTACK_EXTRACT_SCHEMA: dict = {
     },
 }
 
-_SCHEMAS = {"AttackExtract": ATTACK_EXTRACT_SCHEMA}
+CURATOR_RANK_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": True,
+    "required": ["rankings"],
+    "properties": {
+        "rankings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "url": {"type": "string"},
+                    "relevance_score": {"type": "integer"},
+                    "predicted_technique_id": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+_SCHEMAS = {"AttackExtract": ATTACK_EXTRACT_SCHEMA, "CuratorRank": CURATOR_RANK_SCHEMA}
 
 
 def get_json_schema(schema_name: str) -> dict:

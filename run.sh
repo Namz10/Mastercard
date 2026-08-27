@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# End-to-end AegisLoop: Postgres+pgvector, seed, Identify, API.
+# Single end-to-end AegisLoop entrypoint:
+# Postgres+pgvector → seed → Tavily → embeddings/RAG → OmniRoute →
+# Identify graph/Librarian → Generate/Defend handoff → FastAPI.
 # Usage:
-#   ./run.sh              start stack and leave the API running
-#   ./run.sh --validate   start stack, run gates, then exit
+#   ./run.sh              run live e2e, then leave the API running
+#   ./run.sh --check      run live e2e, then exit
 #   ./run.sh --down       stop compose
 
 set -euo pipefail
@@ -10,7 +12,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 export PYTHONPATH="${ROOT}"
-export IDENTIFY_LIVE_SEARCH="${IDENTIFY_LIVE_SEARCH:-false}"
 
 if [[ "${1:-}" == "--down" ]]; then
   docker compose down
@@ -36,39 +37,43 @@ else
   fi
 fi
 
+echo "==> Configuration"
+"${PY}" - <<'PY'
+from apps.api.env import load_project_env
+from packages.agents.llm.config import is_llm_configured, public_llm_status
+from packages.agents.settings import get_identify_settings
+from packages.osint.settings import get_osint_settings
+
+load_project_env()
+osint = get_osint_settings()
+identify = get_identify_settings()
+missing = []
+if not osint.identify_live_search:
+    missing.append("IDENTIFY_LIVE_SEARCH=true")
+if identify.identify_tavily_enabled and not osint.tavily_api_key:
+    missing.append("TAVILY_API_KEY (or set IDENTIFY_TAVILY_ENABLED=false)")
+if not is_llm_configured():
+    missing.append("AEGIS_LLM_API_KEY (or active-profile alias)")
+if missing:
+    raise SystemExit("Live e2e requires these .env settings: " + ", ".join(missing))
+
+llm = public_llm_status()
+print(
+    "config OK",
+    f"live_search={osint.identify_live_search}",
+    f"llm_profile={llm.get('profile')}",
+    f"llm_model={llm.get('model')}",
+)
+PY
+
 echo "==> Postgres (pgvector)"
 docker compose up -d postgres --wait
 
-echo "==> Seed KillChain Atlas + catalog embeddings"
-"${PY}" apps/api/seed.py --reset
+echo "==> Live end-to-end gates"
+"${PY}" scripts/validate_all_live.py
 
-echo "==> Identify (fixtures, real Librarian / pgvector)"
-"${PY}" - <<'PY'
-from apps.api.db import init_db
-from packages.agents.identify_graph import run_identify_graph
-
-init_db()
-result = run_identify_graph(run_id="run-sh")
-print(
-    "identify",
-    result["run_id"],
-    "urls",
-    len(result.get("candidate_urls") or []),
-    "proposed",
-    len(result.get("proposed_specs") or []),
-    "hitl",
-    result.get("hitl_required"),
-)
-assert len(result.get("candidate_urls") or []) >= 1
-assert len(result.get("proposed_specs") or []) >= 1
-PY
-
-if [[ "${1:-}" == "--validate" ]]; then
-  echo "==> pytest"
-  "${PY}" -m pytest tests/ -q -m "not live_llm"
-  echo "==> validate-all remainder"
-  make catalog-validate osint-validate handoff-validate
-  echo "=== RUN.SH VALIDATE PASSED ==="
+if [[ "${1:-}" == "--check" ]]; then
+  echo "=== AEGISLOOP LIVE E2E PASSED ==="
   exit 0
 fi
 

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from packages.agents.llm.config import is_llm_configured, load_provider_config
 from packages.agents.llm.errors import LlmError
 from packages.agents.llm.providers import build_provider
+from packages.agents.settings import get_identify_settings
 from packages.catalog.features import enrich_spec_features
 from packages.catalog.models import AttackSpec
 from packages.catalog.schemas import INJECTOR_SIGNAL_MODELS, validate_simulatable_signals
@@ -451,12 +452,40 @@ def _complete_from_llm(raw: dict[str, Any], source_url: str, source_domain: str)
     return enrich_spec_features(spec)
 
 
+def _is_survey_not_typology(article_text: str, source_url: str) -> bool:
+    head = article_text[:2500].lower()
+    url_lower = source_url.lower()
+    if "arxiv.org" not in url_lower:
+        return False
+    survey_markers = (
+        "global survey",
+        "we survey",
+        "literature review",
+        "systematic survey",
+        "a survey of",
+    )
+    return any(m in head for m in survey_markers)
+
+
 def extract_attack_json(article_text: str, source_url: str) -> dict[str, Any]:
     cfg = load_provider_config()
     provider = build_provider(cfg)
+    settings = get_identify_settings()
+    article_cap = settings.identify_llm_article_chars
+    brief = ""
+    try:
+        from packages.catalog.taxonomy_brief import build_taxonomy_brief
+
+        brief = build_taxonomy_brief()
+    except Exception:
+        brief = ""
+    taxonomy_block = f"\nTaxonomy reference (map to existing T01-T24 when possible):\n{brief}\n" if brief else ""
     prompt = (
         f"Extract one GenAI payment fraud attack vector from this allowlisted source.\n"
-        f"Source URL: {source_url}\n\nArticle:\n{article_text[:6000]}\n\n{_EXTRACTION_SCHEMA_HINT}"
+        f"Abstain for survey papers, generic vendor fluff, or non-payment typologies.\n"
+        f"Map to existing technique_id when the article matches a known typology.\n"
+        f"Source URL: {source_url}\n"
+        f"{taxonomy_block}\nArticle:\n{article_text[:article_cap]}\n\n{_EXTRACTION_SCHEMA_HINT}"
     )
     return provider.complete_json(
         system=(
@@ -474,6 +503,9 @@ def extract_from_document(
     source_domain: str,
     max_retries: int = 2,
 ) -> dict[str, Any]:
+    if _is_survey_not_typology(article_text, source_url):
+        return _abstain("survey_not_typology", source_url)
+
     last_error: str | None = None
     if is_llm_configured():
         for _ in range(max_retries):

@@ -15,7 +15,7 @@
 ## User verification (1a)
 
 1. `cp .env.example .env`
-2. `./run.sh --validate` (Postgres, 29 seed rows, Identify, pytest)
+2. `./run.sh --check` (live Tavily + OmniRoute + pgvector + product handoffs)
 3. `./run.sh` then:
    - `curl -s localhost:8000/ready`
    - `curl -s -X POST localhost:8000/identify/run -H 'content-type: application/json' -d '{}'`

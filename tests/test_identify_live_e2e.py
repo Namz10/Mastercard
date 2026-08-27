@@ -128,6 +128,7 @@ def test_05_full_graph_scout_to_librarian(postgres_required, live_env):
 
     assert NODE_ORDER == (
         "scout",
+        "curator",
         "extractor",
         "grounder",
         "tier_scorer",

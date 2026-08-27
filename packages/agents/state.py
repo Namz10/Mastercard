@@ -7,6 +7,8 @@ class IdentifyState(TypedDict, total=False):
     run_id: str
     topic: str
     candidate_urls: list[dict[str, Any]]
+    scout_candidate_count: int
+    curator_kept_count: int
     extracted_docs: list[dict[str, Any]]
     proposed_specs: list[dict[str, Any]]
     hitl_required: bool

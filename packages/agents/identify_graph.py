@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from packages.agents.nodes import (
     corroborator,
+    curator,
     extractor,
     grounder,
     librarian,
@@ -16,6 +17,7 @@ from packages.agents.state import IdentifyState, empty_identify_state
 
 NODE_ORDER = (
     "scout",
+    "curator",
     "extractor",
     "grounder",
     "tier_scorer",
@@ -27,6 +29,7 @@ NODE_ORDER = (
 def build_identify_graph() -> StateGraph:
     graph = StateGraph(IdentifyState)
     graph.add_node("scout", scout)
+    graph.add_node("curator", curator)
     graph.add_node("extractor", extractor)
     graph.add_node("grounder", grounder)
     graph.add_node("tier_scorer", tier_scorer)
@@ -34,7 +37,8 @@ def build_identify_graph() -> StateGraph:
     graph.add_node("librarian", librarian)
 
     graph.add_edge(START, "scout")
-    graph.add_edge("scout", "extractor")
+    graph.add_edge("scout", "curator")
+    graph.add_edge("curator", "extractor")
     graph.add_edge("extractor", "grounder")
     graph.add_edge("grounder", "tier_scorer")
     graph.add_edge("tier_scorer", "corroborator")

@@ -38,6 +38,7 @@ def test_invoke_with_empty_state(postgres_required):
 def test_node_order_locked():
     assert NODE_ORDER == (
         "scout",
+        "curator",
         "extractor",
         "grounder",
         "tier_scorer",
