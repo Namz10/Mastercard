@@ -72,6 +72,9 @@ docker compose up -d postgres --wait
 echo "==> Live end-to-end gates"
 "${PY}" scripts/validate_all_live.py
 
+echo "==> Telemetry corroboration gate (live Tavily + GreyNoise)"
+"${PY}" scripts/validate_telemetry.py
+
 if [[ "${1:-}" == "--check" ]]; then
   echo "=== AEGISLOOP LIVE E2E PASSED ==="
   exit 0

@@ -15,6 +15,10 @@ FIXTURE_FILES: dict[str, tuple[str, str]] = {
         "rbi_note.txt",
         "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx",
     ),
+    "vendor_ioc_report": (
+        "vendor_ioc_report.txt",
+        "https://www.reuters.com/technology/cybersecurity/card-testing-botnet-payment-apis-2024-01-15/",
+    ),
 }
 
 

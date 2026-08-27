@@ -11,6 +11,7 @@ from packages.agents.llm.errors import LlmError
 from packages.agents.llm.providers import build_provider
 from packages.agents.settings import get_identify_settings
 from packages.catalog.taxonomy_brief import build_taxonomy_brief
+from packages.osint.priority import collector_priority
 
 
 def _tier_sort_key(c: dict[str, Any]) -> tuple:
@@ -113,8 +114,9 @@ def rank_candidates(
 
         scored.sort(
             key=lambda r: (
-                -int(r.get("rank_score") or 0),
                 int(r.get("source_tier") or 5),
+                -int(r.get("rank_score") or 0),
+                collector_priority(str(r.get("source") or "")),
                 -float(r.get("score") or 0.0),
             ),
         )
