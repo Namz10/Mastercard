@@ -67,27 +67,20 @@ def _seed_db() -> None:
 
 
 def _discover_document() -> tuple[Any, Any]:
-    """Try collectors and optional Tavily; return one extractable hit."""
-    from packages.osint.arxiv_api import arxiv_api_candidate_urls
+    """Try all enabled collectors; prefer tier-1 Tavily/regulator hits."""
     from packages.osint.extract import extract_url
-    from packages.osint.gnews_rss import gnews_candidate_urls
-    from packages.osint.rss import rss_candidate_urls
-    from packages.osint.search import DEFAULT_QUERY, tavily_search
-    from packages.osint.query_expand import expand_search_queries
+    from packages.osint.search import DEFAULT_QUERY
+    from packages.osint.collect import gather_live_candidates
     from packages.osint.settings import get_osint_settings
     from packages.agents.settings import get_identify_settings
 
     topic = os.getenv("IDENTIFY_TOPIC", DEFAULT_QUERY).strip() or DEFAULT_QUERY
     identify = get_identify_settings()
     osint = get_osint_settings()
-
-    candidates: list[Any] = []
-    if identify.identify_rss_enabled:
-        candidates.extend(rss_candidate_urls(topic=topic, max_entries=5))
-    if identify.identify_arxiv_api_enabled:
-        candidates.extend(arxiv_api_candidate_urls(max_results=5))
-    if identify.identify_gnews_enabled:
-        candidates.extend(gnews_candidate_urls(max_entries=10))
+    errors: list[str] = []
+    candidates = gather_live_candidates(topic, identify=identify, osint=osint, errors=errors)
+    for error in errors[:3]:
+        print(f"collect_warning={error}", flush=True)
 
     for hit in candidates:
         try:
@@ -95,34 +88,19 @@ def _discover_document() -> tuple[Any, Any]:
         except Exception as exc:
             print(f"extract_error url={hit.get('url')} error={type(exc).__name__}", flush=True)
             continue
-        if doc.text.strip():
-            print(f"selected source={hit.get('source')} domain={hit.get('source_domain')} chars={len(doc.text)}", flush=True)
-            class _Hit:
-                url = hit["url"]
-                source_domain = hit["source_domain"]
-            return _Hit(), doc
+        if not doc.text.strip():
+            continue
+        print(
+            f"selected source={hit.get('source')} domain={hit.get('source_domain')} "
+            f"extractor={doc.extractor} chars={len(doc.text)} url={hit.get('url')}",
+            flush=True,
+        )
 
-    if identify.identify_tavily_enabled and osint.tavily_api_key:
-        for query in expand_search_queries(topic, max_queries=3):
-            started = time.perf_counter()
-            hits = tavily_search(query=query, max_results=4, search_depth="basic")
-            elapsed = time.perf_counter() - started
-            print(f"query={query!r} hits={len(hits)} seconds={elapsed:.2f}", flush=True)
-            for hit in hits:
-                try:
-                    doc = extract_url(hit.url)
-                except Exception as exc:
-                    print(
-                        f"extract_error domain={hit.source_domain} error={type(exc).__name__}",
-                        flush=True,
-                    )
-                    continue
-                print(
-                    f"selected domain={hit.source_domain} extractor={doc.extractor} "
-                    f"chars={len(doc.text)} url={hit.url}",
-                    flush=True,
-                )
-                return hit, doc
+        class _Hit:
+            url = hit["url"]
+            source_domain = hit["source_domain"]
+
+        return _Hit(), doc
 
     raise AssertionError("Collectors returned no extractable allowlisted document")
 

@@ -1,0 +1,14 @@
+Reuters Cybersecurity — Card-testing botnet targets payment authorization APIs (fixture excerpt)
+
+Security researchers documented a GenAI-assisted card-testing campaign in which bots
+probe card-not-present authorization endpoints with human-like checkout timing.
+
+The campaign used distributed scanner hosts, including 185.220.101.45, to run
+low-value authorization attempts against merchant payment APIs before routing
+successful BIN patterns to cash-out mule accounts.
+
+Typology: card testing and BIN enumeration against CNP rails. Controls bypassed
+include velocity rules and static fraud scoring tuned for human shoppers.
+
+This fixture is synthetic lab prose aligned to public incident-reporting style.
+It names attack infrastructure for offline telemetry-corroboration demos only.

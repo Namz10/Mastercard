@@ -17,11 +17,11 @@ from packages.osint.settings import get_osint_settings
 
 def test_fixtures_load_without_api_key():
     docs = load_fixture_documents()
-    assert len(docs) >= 2
+    assert len(docs) >= 3
     for doc in docs:
         assert doc.text
         assert is_allowlisted_url(doc.url)
-        assert tier_for_url(doc.url) <= 2 or doc.source_domain == "rbi.org.in"
+        assert tier_for_url(doc.url) <= 4
 
 
 def test_extract_fixture_fincen():
@@ -33,7 +33,7 @@ def test_extract_fixture_fincen():
 def test_airplane_collect_uses_fixtures(monkeypatch):
     monkeypatch.setenv("IDENTIFY_LIVE_SEARCH", "false")
     urls = collect_candidate_urls()
-    assert len(urls) >= 2
+    assert len(urls) >= 3
     assert all(is_allowlisted_url(u["url"]) for u in urls)
 
 

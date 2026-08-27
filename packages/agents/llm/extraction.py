@@ -15,6 +15,7 @@ from packages.catalog.features import enrich_spec_features
 from packages.catalog.models import AttackSpec
 from packages.catalog.schemas import INJECTOR_SIGNAL_MODELS, validate_simulatable_signals
 from packages.osint.allowlist import tier_for_domain
+from packages.osint.telemetry.indicators import propose_indicators_from_text
 
 _VALID_INJECTORS = frozenset(INJECTOR_SIGNAL_MODELS.keys())
 
@@ -37,6 +38,10 @@ vector_id (slug string), technique_id (T01-T24), name, one_liner, category (1-5)
 lifecycle_stage, genai_modality, social_surface, control_bypassed (list), actor_type,
 economic_class, is_authorized_push (bool), generate_mode (generate|name_only),
 source_urls (list of https URLs), simulatable_signals (object), simulator (object with injector_id).
+network_indicators (optional list): only when the article explicitly names attack infrastructure —
+each item: type (ip|domain), value, role (scanner|botnet|c2|card_testing|stuffing_source|credential_stuffing),
+evidence_span (verbatim quote from the article containing the indicator, max 200 chars).
+Use [] or omit if no attack infrastructure is named. Never invent indicators. Exclude victim/bank/CDN IPs.
 Do not include exploit steps, payloads, or criminal tooling instructions.
 If the article is not a payment-fraud typology, return {"abstain": true, "reason": "..."}.
 """
@@ -256,6 +261,17 @@ def _slug_vector_id(name: str) -> str:
     return f"identify-{slug}"
 
 
+def _coerce_network_indicators(raw_value: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw_value, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw_value:
+        if not isinstance(item, dict):
+            continue
+        out.append(dict(item))
+    return out
+
+
 def _default_signals(injector: str) -> dict[str, Any]:
     if injector == "identity_trajectory":
         return {
@@ -314,6 +330,17 @@ def rule_based_extract(article_text: str, source_url: str, source_domain: str) -
         economic = "ATO"
         injector = "identity_trajectory"
         name = "Deepfake VKYC liveness bypass (identified)"
+        network_indicators: list[dict[str, Any]] = []
+    elif "card testing" in text or "card-testing" in text or "credential stuffing" in text:
+        technique_id = "T07"
+        category = 1
+        rail = "card_cnp"
+        lifecycle = "authorization"
+        modality = "bot"
+        economic = "CNP"
+        injector = "graph_mule"
+        name = "Card-testing botnet on payment APIs (identified)"
+        network_indicators = propose_indicators_from_text(article_text)
     elif "upi" in text or "impersonation" in text or "authorized push" in text:
         technique_id = "T13"
         category = 3
@@ -323,6 +350,7 @@ def rule_based_extract(article_text: str, source_url: str, source_domain: str) -
         economic = "APP"
         injector = "app_session"
         name = "UPI impersonation APP (identified)"
+        network_indicators = []
     elif "mule" in text or "fan-in" in text or "cash-out" in text:
         technique_id = "T01"
         category = 1
@@ -332,6 +360,7 @@ def rule_based_extract(article_text: str, source_url: str, source_domain: str) -
         economic = "mule"
         injector = "graph_mule"
         name = "Mule fan-in funnel (identified)"
+        network_indicators = []
     else:
         return None
 
@@ -377,6 +406,7 @@ def rule_based_extract(article_text: str, source_url: str, source_domain: str) -
         "entities": ["victim", "mule"],
         "status": "proposed",
         "extraction_source": "rules",
+        "network_indicators": network_indicators,
     }
     return enrich_spec_features(spec)
 
@@ -437,6 +467,7 @@ def _complete_from_llm(raw: dict[str, Any], source_url: str, source_domain: str)
         "entities": raw.get("entities") or ["victim"],
         "status": "proposed",
         "extraction_source": "llm",
+        "network_indicators": _coerce_network_indicators(raw.get("network_indicators")),
     }
     if spec["generate_mode"] == "generate":
         try:
