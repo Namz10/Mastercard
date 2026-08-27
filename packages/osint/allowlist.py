@@ -8,6 +8,8 @@ DOMAIN_TIER: dict[str, int] = {
     "ftc.gov": 1,
     "rbi.org.in": 1,
     "treasury.gov": 1,
+    "npci.org.in": 1,
+    "ic3.gov": 1,
     "arxiv.org": 2,
     "dhs.gov": 2,
     "feedzai.com": 3,

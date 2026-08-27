@@ -14,7 +14,7 @@
 - Librarian persists proposed rows; `make validate-all` does not patch `merge_proposed_spec`.
 - Default LLM profile is OmniRoute; without `AEGIS_LLM_API_KEY`, fixture rules or abstain.
 - Weak articles abstain. RBI fixture is not FinCEN body.
-- `./run.sh` / `./run.sh --validate` is the end-to-end entrypoint.
+- `./run.sh` / `./run.sh --check` is the single live end-to-end entrypoint.
 
 ## Deferred (1b)
 

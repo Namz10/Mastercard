@@ -69,6 +69,38 @@ def grounder_reject_reason(spec: dict[str, Any], body_text: str = "") -> str | N
     return None
 
 
+def apply_technique_reroute(spec: dict[str, Any], body_text: str = "") -> dict[str, Any]:
+    """Deterministic technique_id correction before duplicate checks."""
+    out = dict(spec)
+    old_tid = str(out.get("technique_id") or "")
+    text = (
+        (out.get("name") or "")
+        + " "
+        + (out.get("one_liner") or "")
+        + " "
+        + body_text
+    ).lower()
+    lifecycle = str(out.get("lifecycle_stage") or "")
+
+    if lifecycle == "onboarding_kyc" and any(
+        m in text for m in ("deepfake", "liveness", "vkyc", "kyc")
+    ):
+        out["technique_id"] = "T09"
+        out["category"] = 2
+        out["rail"] = "onboarding"
+        out.setdefault("simulator", {"injector_id": "identity_trajectory", "param_schema": {}})
+        out["simulator"] = {"injector_id": "identity_trajectory", "param_schema": {}}
+    elif lifecycle == "account_access_ato" and any(
+        m in text for m in ("voice", "call center", "call centre")
+    ):
+        out["technique_id"] = "T12"
+        out["category"] = 2
+
+    if old_tid != out.get("technique_id"):
+        out["_reroute_from"] = old_tid
+    return out
+
+
 def filter_proposed_specs(
     specs: list[dict[str, Any]],
     body_by_url: dict[str, str],
@@ -77,7 +109,14 @@ def filter_proposed_specs(
     errors: list[str] = []
     for spec in specs:
         url = (spec.get("source_urls") or ["unknown"])[0]
-        reason = grounder_reject_reason(spec, body_by_url.get(str(url), ""))
+        body = body_by_url.get(str(url), "")
+        spec = apply_technique_reroute(spec, body)
+        if spec.get("_reroute_from"):
+            errors.append(
+                f"technique_reroute:{spec.get('vector_id')}:{spec['_reroute_from']}->{spec.get('technique_id')}"
+            )
+            spec = {k: v for k, v in spec.items() if k != "_reroute_from"}
+        reason = grounder_reject_reason(spec, body)
         if reason:
             errors.append(f"grounder_reject:{spec.get('vector_id')}:{reason}")
             continue

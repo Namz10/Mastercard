@@ -16,10 +16,15 @@ Identify, Generate, and Defend as **one closed-loop** lab. Problem statement: [`
 | Platform, demo, build order | [`Docs/plans/03-platform-demo-build-lock.md`](Docs/plans/03-platform-demo-build-lock.md) |
 | Phase 1a (OmniRoute, pgvector, Identify) | [`Docs/plans/04-phase-1-provider-baseline-identify.md`](Docs/plans/04-phase-1-provider-baseline-identify.md) |
 
-Default Identify uses fixtures (`IDENTIFY_LIVE_SEARCH=false`). LLM default is OmniRoute at `http://127.0.0.1:20128/v1`. Catalog and embeddings live in **Postgres + pgvector** (no Qdrant). 29 seed AttackSpec rows cover T01–T24.
+`./run.sh` is the single product entrypoint. It reads `.env` (without shell-sourcing it), requires live Tavily + OmniRoute configuration, starts Postgres/pgvector, runs every product gate, then serves FastAPI. Catalog and embeddings live in **Postgres + pgvector** (no Qdrant). 29 seed AttackSpec rows cover T01–T24.
 
 ```bash
-./run.sh                 # API on :8000
-./run.sh --validate      # seed + Identify + pytest
-make validate-all        # same gates via Make
+./run.sh                 # live e2e, then API on :8000
+./run.sh --check         # live e2e, then exit
+./run.sh --down          # stop Postgres
 ```
+
+Required `.env`: `IDENTIFY_LIVE_SEARCH=true`, `TAVILY_API_KEY`,
+`AEGIS_LLM_PROFILE=omniroute`, `AEGIS_LLM_BASE_URL`,
+`AEGIS_LLM_MODEL`, `AEGIS_LLM_API_KEY`, and `DATABASE_URL`.
+OmniRoute must already be listening at the configured URL.

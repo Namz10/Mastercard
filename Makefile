@@ -62,6 +62,6 @@ validate-all:
 	@echo "=== ALL GATES PASSED ==="
 
 validate-all-live:
-	$(PY) scripts/validate_all_live.py
+	./run.sh --check
 
 demo: up seed api

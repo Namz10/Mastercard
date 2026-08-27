@@ -12,6 +12,8 @@ RSS_FEEDS: dict[str, str] = {
     "fincen": "https://www.fincen.gov/news/rss.xml",
     "ftc": "https://www.ftc.gov/feeds/press-release.xml",
     "arxiv_cs_cr": "https://rss.arxiv.org/rss/cs.CR",
+    "bbc_business": "https://feeds.bbci.co.uk/news/business/rss.xml",
+    "bbc_technology": "https://feeds.bbci.co.uk/news/technology/rss.xml",
 }
 
 
@@ -26,14 +28,17 @@ class RssEntry:
     source_tier: int
 
 
-def poll_rss_feeds(timeout: float = 20.0) -> list[RssEntry]:
+def poll_rss_feeds(timeout: float = 20.0, max_entries_per_feed: int | None = None) -> list[RssEntry]:
     """Fetch RSS feeds and return allowlisted entries only."""
     entries: list[RssEntry] = []
     for feed_id, feed_url in RSS_FEEDS.items():
         parsed = feedparser.parse(feed_url, request_headers={"User-Agent": "AegisLoop-OSINT/0.1"})
         if parsed.bozo and not parsed.entries:
             continue
-        for item in parsed.entries[:15]:
+        feed_items = parsed.entries
+        if max_entries_per_feed is not None and max_entries_per_feed > 0:
+            feed_items = feed_items[:max_entries_per_feed]
+        for item in feed_items:
             link = item.get("link") or ""
             if not link or not is_allowlisted_url(link):
                 continue
@@ -80,12 +85,17 @@ def _rss_matches_topic(entry: RssEntry, topic: str) -> bool:
     return hits >= 2
 
 
-def rss_candidate_urls(topic: str = "", max_entries: int = 15, timeout: float = 20.0) -> list[dict]:
+def rss_candidate_urls(topic: str = "", max_entries: int | None = None, timeout: float = 20.0) -> list[dict]:
     """Map RSS entries to Scout-style candidate URL dicts."""
     now = datetime.now(timezone.utc).isoformat()
-    entries = poll_rss_feeds(timeout=timeout)
+    per_feed = None
+    if max_entries is not None and max_entries > 0:
+        per_feed = max(max_entries // len(RSS_FEEDS), 5)
+    entries = poll_rss_feeds(timeout=timeout, max_entries_per_feed=per_feed)
     if topic.strip():
         entries = [e for e in entries if _rss_matches_topic(e, topic)]
+    if max_entries is not None and max_entries > 0:
+        entries = entries[:max_entries]
     return [
         {
             "url": e.url,
@@ -95,5 +105,5 @@ def rss_candidate_urls(topic: str = "", max_entries: int = 15, timeout: float = 
             "source": f"rss:{e.feed_id}",
             "source_tier": e.source_tier,
         }
-        for e in entries[:max_entries]
+        for e in entries
     ]

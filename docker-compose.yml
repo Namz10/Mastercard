@@ -24,7 +24,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://aegisloop:aegisloop@postgres:5432/aegisloop
-      IDENTIFY_LIVE_SEARCH: "false"
+      IDENTIFY_LIVE_SEARCH: ${IDENTIFY_LIVE_SEARCH}
       AEGIS_LLM_PROFILE: omniroute
       AEGIS_LLM_BASE_URL: http://127.0.0.1:20128/v1
       AEGIS_LLM_MODEL: auto

@@ -11,7 +11,7 @@ Handoff guide for **Attack (Generate)** and **Defend** teams. Identify + catalog
 ```
 Identify (done)          Attack / Generate (stubs)       Defend (stubs + rules)
 ─────────────────        ─────────────────────────       ─────────────────────
-Scout → Extractor        packages/sim/                   packages/policy/
+Scout → Curator → Extractor        packages/sim/                   packages/policy/
 → Grounder → …           population + canary_mode        v0 rules + Loop I/C
 → Librarian → HITL       injector stubs                  coverage map API
                            ↑                               ↑
@@ -32,7 +32,7 @@ Scout → Extractor        packages/sim/                   packages/policy/
 
 ```bash
 cd /path/to/Mastercard
-./run.sh --validate          # Postgres+pgvector, seed, Identify, pytest
+./run.sh --check             # live Tavily+LLM+pgvector+handoffs, then exit
 ./run.sh                     # leave API running on :8000
 
 # or piecewise
@@ -42,7 +42,7 @@ make seed
 make validate-all
 ```
 
-**Verify (offline, no paid LLM):** `./run.sh --validate` or `make validate-all`
+**Verify offline:** `make validate-all`. **Verify live product:** `./run.sh --check`.
 
 **Verify (live Tavily + OmniRoute + pgvector):** `make validate-all-live` — requires `TAVILY_API_KEY` and `AEGIS_LLM_API_KEY`.
 
@@ -58,8 +58,12 @@ make validate-all
 | `AEGIS_LLM_BASE_URL` | `http://127.0.0.1:20128/v1` | OpenAI-compatible base |
 | `AEGIS_LLM_MODEL` | `auto` | OmniRoute router model |
 | `AEGIS_LLM_API_KEY` | — | OmniRoute (or Groq if profile=groq) |
-| `IDENTIFY_LIVE_SEARCH` | `false` | `true` = Tavily; `false` = fixtures |
-| `IDENTIFY_MAX_DOCS` | `3` | URLs processed per Identify run |
+| `IDENTIFY_LIVE_SEARCH` | `false` (code); `true` in `.env.example` | `true` = live collectors + Tavily; `false` = fixtures (CI) |
+| `IDENTIFY_MAX_DOCS` | `0` | Max URLs after curator (`0` = unlimited) |
+| `IDENTIFY_MAX_HITL` | `0` | Max HITL rows staged per run (`0` = unlimited) |
+| `IDENTIFY_MAX_CANDIDATES` | `0` | Scout pool cap before curator (`0` = unlimited) |
+| `IDENTIFY_TAVILY_MAX_CALLS_PER_RUN` | `12` | Tavily query budget per run |
+| `IDENTIFY_CURATOR_ENABLED` | `true` | LLM rank before extract (tier fallback if off/unconfigured) |
 | `OSINT_EXTRACTOR` | `tavily` | `trafilatura` or `firecrawl` fallback |
 | `HF_TOKEN` | — | Optional Hugging Face download |
 | `GREYNOISE_API_KEY` | — | Optional network-footprint corroboration |

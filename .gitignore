@@ -214,6 +214,7 @@ tempCodeRunnerFile.py
 # Generate ledgers / local run dumps (not training artifacts in git)
 data/runs/
 data/priors_history/
+logs/
 
 # OS
 .DS_Store
