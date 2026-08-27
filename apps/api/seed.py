@@ -3,6 +3,10 @@
 import argparse
 from pathlib import Path
 
+from apps.api.env import load_project_env
+
+load_project_env()
+
 from apps.api.db import SessionLocal, init_db
 from apps.api.models import AtlasRow
 from packages.agents.catalog_embeddings import preload_catalog_embeddings

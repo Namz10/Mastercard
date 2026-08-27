@@ -5,6 +5,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import text
 
+from apps.api.env import load_project_env
+
+load_project_env()
+
 
 @pytest.fixture(autouse=True)
 def _isolate_llm_env(monkeypatch):
