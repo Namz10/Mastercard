@@ -12,9 +12,11 @@ from apps.api.models import AtlasRow
 from packages.agents.identify_graph import run_identify_graph
 from packages.agents.librarian_db import hitl_payload_for_spec
 from packages.agents.llm import public_llm_status
+from packages.agents.settings import get_identify_settings
 from packages.catalog.models import AttackSpec
 from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
 from packages.osint.settings import get_osint_settings
+from packages.osint.vector_store import nearest_catalog_row
 
 router = APIRouter(prefix="/identify", tags=["identify"])
 
@@ -33,12 +35,27 @@ class HitlDecision(BaseModel):
 def identify_config() -> dict:
     """Safe config snapshot — booleans and profile names, never keys."""
     osint = get_osint_settings()
+    identify = get_identify_settings()
     llm = public_llm_status()
     return {
         "identify_live_search": osint.identify_live_search,
         "tavily_configured": bool(osint.tavily_api_key),
         "llm": llm,
         "vector_backend": "pgvector",
+        "limits": {
+            "identify_max_candidates": identify.identify_max_candidates,
+            "identify_max_queries": identify.identify_max_queries,
+            "identify_tavily_max_results": identify.identify_tavily_max_results,
+            "identify_tavily_max_calls_per_run": identify.identify_tavily_max_calls_per_run,
+            "identify_max_docs": identify.identify_max_docs,
+            "identify_max_hitl": identify.identify_max_hitl,
+            "identify_curator_enabled": identify.identify_curator_enabled,
+            "identify_curator_batch_size": identify.identify_curator_batch_size,
+            "identify_tavily_enabled": identify.identify_tavily_enabled,
+            "identify_rss_enabled": identify.identify_rss_enabled,
+            "identify_arxiv_api_enabled": identify.identify_arxiv_api_enabled,
+            "identify_gnews_enabled": identify.identify_gnews_enabled,
+        },
     }
 
 
@@ -48,8 +65,17 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
     req = body or IdentifyRunRequest()
     run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
     result = run_identify_graph(run_id=run_id, topic=req.topic)
+    candidates = result.get("candidate_urls") or []
+    scout_count = result.get("scout_candidate_count")
+    curator_kept = result.get("curator_kept_count")
+    if scout_count is None:
+        scout_count = len(candidates)
+    if curator_kept is None:
+        curator_kept = len(candidates)
     return {
         "run_id": result.get("run_id", run_id),
+        "scout_candidate_count": scout_count,
+        "curator_kept_count": curator_kept,
         "candidate_urls": result.get("candidate_urls", []),
         "extracted_docs": result.get("extracted_docs", []),
         "proposed_count": len(result.get("proposed_specs") or []),
@@ -68,9 +94,29 @@ def hitl_queue(db: Annotated[Session, Depends(get_db)]) -> dict:
         .order_by(AtlasRow.updated_at.desc())
         .all()
     )
+    items = []
+    for row in rows:
+        spec = dict(row.spec or {})
+        nearest = nearest_catalog_row(
+            str(spec.get("name") or ""),
+            str(spec.get("rail") or ""),
+            str(spec.get("technique_id") or ""),
+        )
+        nearest_spec = None
+        if nearest:
+            nrow = db.query(AtlasRow).filter(AtlasRow.vector_id == nearest["vector_id"]).one_or_none()
+            if nrow and nrow.spec:
+                nearest_spec = dict(nrow.spec)
+        items.append(
+            hitl_payload_for_spec(
+                spec,
+                nearest_technique=str((nearest_spec or spec).get("technique_id", "")),
+                nearest_spec=nearest_spec,
+            )
+        )
     return {
         "count": len(rows),
-        "items": [hitl_payload_for_spec(row.spec) for row in rows],
+        "items": items,
     }
 
 

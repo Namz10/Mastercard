@@ -1,27 +1,16 @@
 """Extractor node — fetch body, LLM/rule extract, pgvector chunk."""
 
-import os
-
 from pydantic import ValidationError
 
 from packages.agents.llm import extract_from_document
+from packages.agents.settings import get_identify_settings
 from packages.agents.state import IdentifyState
 from packages.catalog.models import AttackSpec
-from packages.osint.allowlist import domain_from_url, is_allowlisted_url, tier_for_domain
+from packages.osint.allowlist import domain_from_url, is_allowlisted_url
 from packages.osint.extract import extract_fixture_text, extract_url
 from packages.osint.fixtures import FIXTURE_FILES
 from packages.osint.settings import get_osint_settings
 from packages.osint.vector_store import upsert_chunk
-
-DEFAULT_MAX_DOCS = 3
-
-
-def _max_docs() -> int:
-    raw = os.getenv("IDENTIFY_MAX_DOCS", str(DEFAULT_MAX_DOCS))
-    try:
-        return max(1, min(int(raw), 8))
-    except ValueError:
-        return DEFAULT_MAX_DOCS
 
 
 def _body_for_url(url: str) -> tuple[str, str]:
@@ -40,16 +29,14 @@ def _body_for_url(url: str) -> tuple[str, str]:
 
 
 def extractor(state: IdentifyState) -> IdentifyState:
+    identify = get_identify_settings()
     candidates = state.get("candidate_urls") or []
-    candidates = sorted(
-        candidates,
-        key=lambda c: tier_for_domain(domain_from_url(c.get("url", ""))),
-    )
     extracted_docs: list[dict] = []
     proposed: list[dict] = []
     errors = list(state.get("errors") or [])
+    max_chars = identify.identify_max_extract_chars
 
-    for item in candidates[:_max_docs()]:
+    for item in candidates:
         url = item.get("url", "")
         if not url or not is_allowlisted_url(url):
             continue
@@ -71,7 +58,7 @@ def extractor(state: IdentifyState) -> IdentifyState:
                 {
                     "url": url,
                     "domain": domain,
-                    "text": text[:8000],
+                    "text": text[:max_chars],
                     "text_len": len(text),
                     "chunk_id": chunk.id,
                     "extractor": extractor_name,
@@ -96,6 +83,6 @@ def extractor(state: IdentifyState) -> IdentifyState:
             errors.append(f"extract_fail:{url}:{exc}")
 
     state["extracted_docs"] = extracted_docs
-    state["proposed_specs"] = proposed[:_max_docs()]
+    state["proposed_specs"] = proposed
     state["errors"] = errors
     return state

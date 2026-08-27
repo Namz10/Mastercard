@@ -17,6 +17,8 @@ _ORG_BY_DOMAIN: dict[str, str] = {
     "paymentservices.amazon.com": "amazon",
     "reuters.com": "reuters",
     "bbc.com": "bbc",
+    "npci.org.in": "npci",
+    "ic3.gov": "ic3",
 }
 
 
@@ -46,4 +48,6 @@ def score_spec_sources(spec: dict) -> dict:
 
     confirmed = best_tier <= 2 or len(orgs_with_tier3) >= 2
     spec["confidence_level"] = "confirmed" if confirmed else "reported-unverified"
+    if best_tier >= 3:
+        spec["confidence_level"] = "reported-unverified"
     return spec

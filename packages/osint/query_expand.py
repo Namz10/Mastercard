@@ -21,16 +21,22 @@ def _keywords(text: str) -> set[str]:
     return {w.lower() for w in text.replace(",", " ").split() if len(w) > 2}
 
 
-def expand_search_queries(topic: str, max_queries: int = 3) -> list[str]:
+def expand_search_queries(topic: str, max_queries: int | None = 3) -> list[str]:
     """
-    Turn a generic analyst prompt into 1–3 Tavily queries with payment-fraud context.
+    Turn a generic analyst prompt into Tavily queries with payment-fraud context.
+    max_queries=0 or None → unlimited deduped list.
     """
     topic = (topic or "").strip()
+    unlimited = max_queries is None or max_queries <= 0
+
     if not topic:
-        return [
+        queries = [
             DEFAULT_QUERY,
             "UPI authorized push payment impersonation India regulator",
-        ][:max_queries]
+        ]
+        if unlimited:
+            return queries
+        return queries[:max_queries]
 
     lowered = topic.lower()
     queries: list[str] = [topic]
@@ -43,9 +49,9 @@ def expand_search_queries(topic: str, max_queries: int = 3) -> list[str]:
         if topic_kw & set(hints):
             queries.append(f"{template} {topic}")
 
-    # Prefer regulator/research phrasing for broad prompts
-    if len(queries) < max_queries and "fincen" not in lowered:
-        queries.append(f"FinCEN OR RBI payment fraud {topic}")
+    if unlimited or len(queries) < (max_queries or 999):
+        if "fincen" not in lowered:
+            queries.append(f"FinCEN OR RBI payment fraud {topic}")
 
     seen: set[str] = set()
     out: list[str] = []
@@ -56,5 +62,8 @@ def expand_search_queries(topic: str, max_queries: int = 3) -> list[str]:
             continue
         seen.add(key)
         out.append(q)
+
+    if unlimited:
+        return out
     return out[:max_queries]
 

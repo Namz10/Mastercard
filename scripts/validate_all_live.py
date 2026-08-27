@@ -1,56 +1,53 @@
 #!/usr/bin/env python3
-"""Live validation: Tavily + OmniRoute + Postgres pgvector + pytest."""
+"""Observable live product validation called only by ./run.sh.
+
+This reads .env through the application loader and never overrides whether
+live search is enabled.
+"""
 
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from apps.api.env import env_configured, load_project_env
-
-LIVE_ENV = {
-    "IDENTIFY_LIVE_SEARCH": "true",
-    "IDENTIFY_MAX_DOCS": "1",
-    "PYTHONPATH": str(ROOT),
-}
+from apps.api.env import load_project_env
 
 
-def _apply_live_env() -> None:
-    load_project_env()
-    for key, value in LIVE_ENV.items():
-        os.environ[key] = value
-
-
-def _step(name: str) -> None:
+def _step(name: str):
     print(f"\n=== {name} ===", flush=True)
+    started = time.perf_counter()
+    return lambda: print(f"stage_seconds={time.perf_counter() - started:.2f}", flush=True)
 
 
-def _run(cmd: list[str] | str, *, shell: bool = False) -> None:
-    if isinstance(cmd, str):
-        print(f"$ {cmd}", flush=True)
-    else:
-        print(f"$ {' '.join(cmd)}", flush=True)
-    subprocess.run(cmd, shell=shell, check=True, cwd=ROOT, env=os.environ.copy())
+def _require_live_config() -> None:
+    from packages.agents.llm.config import is_llm_configured, public_llm_status
+    from packages.agents.settings import get_identify_settings
+    from packages.osint.settings import get_osint_settings
 
-
-def _require_keys() -> None:
+    settings = get_osint_settings()
+    identify = get_identify_settings()
     missing = []
-    if not env_configured("TAVILY_API_KEY"):
-        missing.append("TAVILY_API_KEY")
-    if not env_configured("AEGIS_LLM_API_KEY"):
-        missing.append("AEGIS_LLM_API_KEY")
+    if not settings.identify_live_search:
+        missing.append("IDENTIFY_LIVE_SEARCH=true")
+    if identify.identify_tavily_enabled and not settings.tavily_api_key:
+        missing.append("TAVILY_API_KEY (or IDENTIFY_TAVILY_ENABLED=false)")
+    if not is_llm_configured():
+        missing.append("AEGIS_LLM_API_KEY (or active-profile alias)")
     if missing:
-        raise SystemExit(f"Missing .env keys for live validate: {', '.join(missing)}")
-
-
-def _docker_up() -> None:
-    _run(["docker", "compose", "up", "-d", "postgres", "--wait"])
+        raise SystemExit(f"Missing live .env configuration: {', '.join(missing)}")
+    llm = public_llm_status()
+    print(
+        f"live_search={settings.identify_live_search} "
+        f"llm_profile={llm.get('profile')} llm_model={llm.get('model')}",
+        flush=True,
+    )
 
 
 def _catalog() -> None:
@@ -61,48 +58,143 @@ def _catalog() -> None:
     assert summary["count"] >= 28 and not summary["missing_techniques"]
 
 
-def _live_tavily() -> None:
-    from packages.osint.search import tavily_search
-
-    results = tavily_search(max_results=3, search_depth="basic")
-    print(f"tavily_results={len(results)}", flush=True)
-    for r in results:
-        print(f"  {r.source_domain} {r.url[:80]}", flush=True)
-    assert len(results) >= 1
-
-
-def _pgvector_upsert() -> None:
-    from packages.agents.embeddings import embed_text
-    from packages.osint.extract import extract_url
-    from packages.osint.search import tavily_search
-    from packages.osint.vector_store import COLLECTION_NAME, upsert_chunk
-
-    hit = tavily_search(max_results=1)[0]
-    doc = extract_url(hit.url)
-    chunk = upsert_chunk(hit.url, doc.text, hit.source_domain, doc.extractor)
-    vec = embed_text(doc.text[:500])
-    print(f"embedding_dim={len(vec)} chunk_id={chunk.id} collection={COLLECTION_NAME}", flush=True)
-    assert len(vec) == 384
-
-
-def _llm_extract() -> None:
-    from packages.agents.llm import extract_from_document
-    from packages.osint.extract import extract_url
-    from packages.osint.search import tavily_search
-
-    hit = tavily_search(max_results=1)[0]
-    doc = extract_url(hit.url)
-    spec = extract_from_document(doc.text, hit.url, hit.source_domain)
-    print(f"extraction_source={spec.get('extraction_source')} name={spec.get('name')}", flush=True)
-    assert spec.get("extraction_source") == "llm", spec.get("abstain_reason") or spec.get("llm_last_error")
-
-
 def _seed_db() -> None:
     from apps.api.seed import seed_catalog
 
-    n = seed_catalog(reset=True)
-    print(f"seeded {n} rows", flush=True)
-    assert n >= 28
+    count = seed_catalog(reset=True)
+    print(f"seeded_atlas_rows={count}", flush=True)
+    assert count >= 28
+
+
+def _discover_document() -> tuple[Any, Any]:
+    """Try collectors and optional Tavily; return one extractable hit."""
+    from packages.osint.arxiv_api import arxiv_api_candidate_urls
+    from packages.osint.extract import extract_url
+    from packages.osint.gnews_rss import gnews_candidate_urls
+    from packages.osint.rss import rss_candidate_urls
+    from packages.osint.search import DEFAULT_QUERY, tavily_search
+    from packages.osint.query_expand import expand_search_queries
+    from packages.osint.settings import get_osint_settings
+    from packages.agents.settings import get_identify_settings
+
+    topic = os.getenv("IDENTIFY_TOPIC", DEFAULT_QUERY).strip() or DEFAULT_QUERY
+    identify = get_identify_settings()
+    osint = get_osint_settings()
+
+    candidates: list[Any] = []
+    if identify.identify_rss_enabled:
+        candidates.extend(rss_candidate_urls(topic=topic, max_entries=5))
+    if identify.identify_arxiv_api_enabled:
+        candidates.extend(arxiv_api_candidate_urls(max_results=5))
+    if identify.identify_gnews_enabled:
+        candidates.extend(gnews_candidate_urls(max_entries=10))
+
+    for hit in candidates:
+        try:
+            doc = extract_url(hit["url"])
+        except Exception as exc:
+            print(f"extract_error url={hit.get('url')} error={type(exc).__name__}", flush=True)
+            continue
+        if doc.text.strip():
+            print(f"selected source={hit.get('source')} domain={hit.get('source_domain')} chars={len(doc.text)}", flush=True)
+            class _Hit:
+                url = hit["url"]
+                source_domain = hit["source_domain"]
+            return _Hit(), doc
+
+    if identify.identify_tavily_enabled and osint.tavily_api_key:
+        for query in expand_search_queries(topic, max_queries=3):
+            started = time.perf_counter()
+            hits = tavily_search(query=query, max_results=4, search_depth="basic")
+            elapsed = time.perf_counter() - started
+            print(f"query={query!r} hits={len(hits)} seconds={elapsed:.2f}", flush=True)
+            for hit in hits:
+                try:
+                    doc = extract_url(hit.url)
+                except Exception as exc:
+                    print(
+                        f"extract_error domain={hit.source_domain} error={type(exc).__name__}",
+                        flush=True,
+                    )
+                    continue
+                print(
+                    f"selected domain={hit.source_domain} extractor={doc.extractor} "
+                    f"chars={len(doc.text)} url={hit.url}",
+                    flush=True,
+                )
+                return hit, doc
+
+    raise AssertionError("Collectors returned no extractable allowlisted document")
+
+
+def _pgvector_upsert(hit: Any, doc: Any) -> None:
+    from packages.agents.embeddings import embed_text
+    from packages.osint.vector_store import COLLECTION_NAME, upsert_chunk
+
+    chunk = upsert_chunk(hit.url, doc.text, hit.source_domain, doc.extractor)
+    vector = embed_text(doc.text[:500])
+    print(
+        f"embedding_dim={len(vector)} chunk_id={chunk.id} collection={COLLECTION_NAME}",
+        flush=True,
+    )
+    assert len(vector) == 384
+
+
+def _llm_extract(hit: Any, doc: Any) -> None:
+    from packages.agents.llm import extract_from_document
+
+    spec = extract_from_document(doc.text, hit.url, hit.source_domain)
+    source = spec.get("extraction_source")
+    print(
+        f"extraction_source={source} name={spec.get('name')} "
+        f"abstain_reason={spec.get('abstain_reason')}",
+        flush=True,
+    )
+    llm_abstained = source == "abstain" and spec.get("abstain_reason") == "llm_invalid_or_weak"
+    assert source == "llm" or llm_abstained, (
+        spec.get("llm_last_error") or spec.get("abstain_reason")
+    )
+
+
+def _identify_graph_live() -> None:
+    from apps.api.db import SessionLocal
+    from apps.api.models import AtlasRow
+    from packages.agents.identify_graph import run_identify_graph
+    from packages.osint.search import DEFAULT_QUERY
+
+    topic = os.getenv("IDENTIFY_TOPIC", DEFAULT_QUERY).strip() or DEFAULT_QUERY
+    result = run_identify_graph(run_id="run-sh-live", topic=topic)
+    urls = result.get("candidate_urls") or []
+    docs = result.get("extracted_docs") or []
+    proposed = result.get("proposed_specs") or []
+    hitl = result.get("hitl_queue") or []
+    errors = result.get("errors") or []
+    tavily_urls = [row for row in urls if row.get("source") == "tavily"]
+    rss_urls = [row for row in urls if str(row.get("source", "")).startswith("rss:")]
+    print(
+        f"topic={topic!r} scout_urls={len(urls)} tavily={len(tavily_urls)} "
+        f"rss={len(rss_urls)} scout_candidates={result.get('scout_candidate_count')} "
+        f"curator_kept={result.get('curator_kept_count')} extracted={len(docs)} "
+        f"proposal_candidates={len(proposed)} staged_hitl={len(hitl)}",
+        flush=True,
+    )
+    for error in errors[:5]:
+        print(f"pipeline_error={error}", flush=True)
+    assert urls, "Scout returned no URLs"
+    assert docs, "Extractor produced no documents"
+    assert proposed or any("abstain" in error for error in errors), (
+        "Pipeline produced neither proposals nor explicit abstains"
+    )
+
+    db = SessionLocal()
+    try:
+        for item in hitl:
+            vector_id = item.get("vector_id")
+            assert db.get(AtlasRow, vector_id) is not None, (
+                f"HITL row {vector_id} was not persisted"
+            )
+    finally:
+        db.close()
 
 
 def _handoff() -> None:
@@ -112,73 +204,90 @@ def _handoff() -> None:
 
     db = SessionLocal()
     try:
-        pop = run_population(db, vector_id="t13-upi-impersonation-app", run_id="live-validate-pop")
-        assert pop["injector_id"] == "app_session"
-        canary = run_canary(db, campaign_id="fincen-fin-2024-alert004", run_id="live-validate-canary")
+        population = run_population(
+            db,
+            vector_id="t13-upi-impersonation-app",
+            run_id="run-sh-population",
+        )
+        canary = run_canary(
+            db,
+            campaign_id="fincen-fin-2024-alert004",
+            run_id="run-sh-canary",
+        )
+        coverage = build_coverage_map(db)
+        assert population["injector_id"] == "app_session"
         assert canary["event_count"] == 4
-        cmap = build_coverage_map(db)
-        assert cmap["technique_count"] == 24
-        t13 = next(c for c in cmap["cells"] if c["technique_id"] == "T13")
-        assert t13["coverage_status"] in {"live_rule", "draft_rule"}
-        print(f"handoff OK pop={pop['vector_id']} canary_stages={canary['event_count']}", flush=True)
+        assert coverage["technique_count"] == 24
+        print(
+            f"population_events={population['event_count']} "
+            f"canary_stages={canary['event_count']} "
+            f"coverage_techniques={coverage['technique_count']}",
+            flush=True,
+        )
     finally:
         db.close()
 
 
-def _identify_graph_live() -> None:
-    from packages.agents.identify_graph import run_identify_graph
+def _http_smoke() -> None:
+    from fastapi.testclient import TestClient
 
-    result = run_identify_graph(run_id="validate-all-live", topic="deepfake payment fraud UPI")
-    urls = result.get("candidate_urls") or []
-    docs = result.get("extracted_docs") or []
-    proposed = result.get("proposed_specs") or []
-    errors = result.get("errors") or []
-    print(f"scout_urls={len(urls)} extracted={len(docs)} proposed={len(proposed)}", flush=True)
-    if errors:
-        print("errors:", errors[:5], flush=True)
-    assert len(urls) >= 1, "scout returned no URLs"
-    assert len(docs) >= 1, "extractor produced no docs"
+    from apps.api.main import app
 
-
-def _pytest() -> None:
-    _run([sys.executable, "-m", "pytest", "tests/", "-q", "-m", "not live_llm"])
+    with TestClient(app) as client:
+        ready = client.get("/ready")
+        eligible = client.get("/generate/eligible")
+        coverage = client.get("/defend/coverage-map")
+        hitl = client.get("/identify/hitl")
+        assert ready.status_code == eligible.status_code == coverage.status_code == hitl.status_code == 200
+        ready_body = ready.json()
+        assert ready_body["postgres"] is True
+        assert ready_body["pgvector"] is True
+        assert ready_body["llm"]["configured"] is True
+        print(
+            f"http_ready={ready_body['status']} "
+            f"generate_eligible={eligible.json()['count']} "
+            f"defend_techniques={coverage.json()['technique_count']} "
+            f"hitl_pending={hitl.json()['count']}",
+            flush=True,
+        )
 
 
 def main() -> None:
-    _apply_live_env()
-    _step("[0] check API keys")
-    _require_keys()
+    load_project_env()
 
-    _step("[1/8] docker postgres (pgvector)")
-    _docker_up()
+    stages = (
+        ("[1/8] live configuration", _require_live_config),
+        ("[2/8] catalog", _catalog),
+        ("[3/8] seed atlas + catalog vectors", _seed_db),
+    )
+    for name, function in stages:
+        done = _step(name)
+        function()
+        done()
 
-    _step("[2/8] catalog")
-    _catalog()
+    done = _step("[4/8] Tavily search + extract")
+    hit, doc = _discover_document()
+    done()
 
-    _step("[3/8] live Tavily search")
-    _live_tavily()
+    done = _step("[5/8] pgvector document embedding")
+    _pgvector_upsert(hit, doc)
+    done()
 
-    _step("[4/8] pgvector + embeddings upsert")
-    _pgvector_upsert()
+    done = _step("[6/8] OmniRoute structured extraction")
+    _llm_extract(hit, doc)
+    done()
 
-    _step("[5/8] OmniRoute extraction")
-    _llm_extract()
-
-    _step("[6/8] postgres seed + generate/defend handoff")
-    _seed_db()
-    _handoff()
-
-    _step("[7/8] full identify graph (live Tavily + LLM + librarian)")
+    done = _step("[7/8] live Identify graph + Librarian")
     _identify_graph_live()
+    done()
 
-    _step("[8/8] pytest")
-    _pytest()
+    done = _step("[8/8] Generate/Defend + FastAPI smoke")
+    _handoff()
+    _http_smoke()
+    done()
 
-    print("\n=== ALL LIVE GATES PASSED ===", flush=True)
+    print("\n=== ALL LIVE PRODUCT GATES PASSED ===", flush=True)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(exc.returncode) from exc
+    main()

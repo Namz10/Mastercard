@@ -63,7 +63,8 @@ def test_confidence_two_urls_same_org_not_confirmed():
     assert scored["confidence_level"] == "reported-unverified"
 
 
-def test_confidence_two_orgs_tier3_confirmed():
+def test_confidence_two_orgs_tier3_not_confirmed():
+    """Tier ≥3 sources cannot reach confirmed even with two independent orgs."""
     spec = {
         "source_urls": [
             "https://www.feedzai.com/a",
@@ -71,7 +72,7 @@ def test_confidence_two_orgs_tier3_confirmed():
         ]
     }
     scored = score_spec_sources(spec)
-    assert scored["confidence_level"] == "confirmed"
+    assert scored["confidence_level"] == "reported-unverified"
 
 
 def test_confidence_tier1_confirmed():

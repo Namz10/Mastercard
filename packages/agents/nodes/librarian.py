@@ -1,19 +1,24 @@
 """Librarian node — stage proposed rows in Postgres for HITL."""
 
 from apps.api.db import SessionLocal, init_db
+from packages.agents.limits import resolve_limit, take
 from packages.agents.librarian_db import find_merge_target, hitl_payload_for_spec, merge_proposed_spec
+from packages.agents.settings import get_identify_settings
 from packages.agents.state import IdentifyState
 from packages.osint.vector_store import nearest_catalog_row
 
 
 def librarian(state: IdentifyState) -> IdentifyState:
     init_db()
+    settings = get_identify_settings()
     specs = state.get("proposed_specs") or []
+    hitl_limit = resolve_limit(settings.identify_max_hitl)
+    specs_to_stage = take(specs, hitl_limit)
     hitl_queue: list[dict] = []
     errors = list(state.get("errors") or [])
     db = SessionLocal()
     try:
-        for spec in specs[:3]:
+        for spec in specs_to_stage:
             nearest = nearest_catalog_row(
                 str(spec.get("name") or ""),
                 str(spec.get("rail") or ""),
