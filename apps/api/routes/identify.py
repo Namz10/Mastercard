@@ -41,10 +41,13 @@ def identify_config() -> dict:
         "identify_live_search": osint.identify_live_search,
         "tavily_configured": bool(osint.tavily_api_key),
         "groq_configured": bool(_groq_api_key()),
+        "groq_disabled": os.getenv("GROQ_DISABLED", "").lower() in {"1", "true", "yes"}
+        or agent.groq_disabled,
         "groq_env_var": env_configured("GROQ_API_KEY"),
         "groq_model": agent.groq_model,
         "groq_api_base": agent.groq_api_base,
         "groq_chat_url": _groq_chat_url(),
+        "identify_max_docs": int(os.getenv("IDENTIFY_MAX_DOCS", "3")),
         "qdrant_url": os.getenv("QDRANT_URL", "http://localhost:6333"),
         "embeddings_disabled": os.getenv("EMBEDDINGS_DISABLED", "").lower() in {"1", "true", "yes"},
     }

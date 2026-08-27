@@ -31,6 +31,7 @@ class AgentSettings(BaseSettings):
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
     groq_model: str = Field(default=DEFAULT_GROQ_MODEL, alias="GROQ_MODEL")
     groq_api_base: str = Field(default=DEFAULT_GROQ_API_BASE, alias="GROQ_API_BASE")
+    groq_disabled: bool = Field(default=False, alias="GROQ_DISABLED")
 
 
 def get_agent_settings() -> AgentSettings:

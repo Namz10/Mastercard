@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -322,7 +323,18 @@ def _env_file_path() -> Path:
     return Path(__file__).resolve().parents[2] / ".env"
 
 
+def _groq_disabled() -> bool:
+    from packages.agents.settings import get_agent_settings
+
+    settings = get_agent_settings()
+    if settings.groq_disabled:
+        return True
+    return os.getenv("GROQ_DISABLED", "").lower() in {"1", "true", "yes"}
+
+
 def _groq_api_key() -> str:
+    if _groq_disabled():
+        return ""
     from packages.agents.settings import get_agent_settings
 
     settings = get_agent_settings()
@@ -358,35 +370,50 @@ def _groq_models_to_try() -> list[str]:
     return ordered
 
 
+def _groq_retry_wait_seconds(response: httpx.Response, attempt: int) -> float:
+    """Honor Retry-After when present; otherwise short exponential backoff."""
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return min(float(retry_after), 60.0)
+        except ValueError:
+            pass
+    return min(5.0 * (2 ** attempt), 30.0)
+
+
 def _groq_chat_completion(
     api_key: str,
     payload: dict[str, Any],
     models: list[str] | None = None,
 ) -> dict[str, Any]:
-    """POST chat/completions; retry alternate models on 404 model_not_found."""
+    """POST chat/completions; retry alternate models on 404; backoff on 429."""
     url = _groq_chat_url()
     last_error: str | None = None
+    max_rate_retries = 3
     for model in models or _groq_models_to_try():
-        attempt = {**payload, "model": model}
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(
-                url,
-                headers={"Authorization": f"Bearer {api_key}"},
-                json=attempt,
-            )
-        if response.status_code < 400:
-            return response.json()
+        for rate_attempt in range(max_rate_retries):
+            attempt = {**payload, "model": model}
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json=attempt,
+                )
+            if response.status_code < 400:
+                return response.json()
 
-        body = response.text[:500]
-        last_error = f"model={model} status={response.status_code} body={body}"
-        # Groq returns 404 when a model id is wrong or deprecated.
-        if response.status_code == 404:
-            continue
-        raise httpx.HTTPStatusError(
-            f"Groq API error: {last_error}",
-            request=response.request,
-            response=response,
-        )
+            body = response.text[:500]
+            last_error = f"model={model} status={response.status_code} body={body}"
+            if response.status_code == 404:
+                break  # try next model id
+            if response.status_code == 429 and rate_attempt < max_rate_retries - 1:
+                time.sleep(_groq_retry_wait_seconds(response, rate_attempt))
+                continue
+            raise httpx.HTTPStatusError(
+                f"Groq API error: {last_error}",
+                request=response.request,
+                response=response,
+            )
 
     raise RuntimeError(f"Groq API error (no model worked): {last_error}")
 
@@ -593,7 +620,9 @@ def rule_based_extract(article_text: str, source_url: str, source_domain: str) -
         "entities": ["victim", "mule"],
         "status": "proposed",
     }
-    return spec
+    from packages.catalog.features import enrich_spec_features
+
+    return enrich_spec_features(spec)
 
 
 def _slug_vector_id(name: str) -> str:
@@ -659,7 +688,9 @@ def enrich_groq_extract(
 
     merged["source_urls"] = raw.get("source_urls") or [source_url]
     merged["status"] = "proposed"
-    return merged
+    from packages.catalog.features import enrich_spec_features
+
+    return enrich_spec_features(merged)
 
 
 def extract_from_document(
@@ -683,6 +714,12 @@ def extract_from_document(
                 enriched["extraction_source"] = "groq"
                 AttackSpec.model_validate(enriched)
                 return enriched
+            except httpx.HTTPStatusError as exc:
+                groq_last_error = str(exc)[:240]
+                if exc.response is not None and exc.response.status_code == 429:
+                    time.sleep(_groq_retry_wait_seconds(exc.response, 0))
+                    continue
+                continue
             except (httpx.HTTPError, json.JSONDecodeError, KeyError, ValueError, RuntimeError) as exc:
                 groq_last_error = str(exc)[:240]
                 continue

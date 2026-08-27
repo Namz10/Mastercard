@@ -1,5 +1,7 @@
 """Extractor node — fetch body, LLM/rule extract, Qdrant chunk."""
 
+import os
+
 from pydantic import ValidationError
 
 from packages.agents.llm import extract_from_document
@@ -11,7 +13,15 @@ from packages.osint.fixtures import FIXTURE_FILES
 from packages.osint.settings import get_osint_settings
 from packages.osint.vector_store import upsert_chunk
 
-MAX_DOCS = 3
+DEFAULT_MAX_DOCS = 3
+
+
+def _max_docs() -> int:
+    raw = os.getenv("IDENTIFY_MAX_DOCS", str(DEFAULT_MAX_DOCS))
+    try:
+        return max(1, min(int(raw), 8))
+    except ValueError:
+        return DEFAULT_MAX_DOCS
 
 
 def _body_for_url(url: str) -> tuple[str, str]:
@@ -41,7 +51,7 @@ def extractor(state: IdentifyState) -> IdentifyState:
     proposed: list[dict] = []
     errors = list(state.get("errors") or [])
 
-    for item in candidates[:MAX_DOCS]:
+    for item in candidates[:_max_docs()]:
         url = item.get("url", "")
         if not url or not is_allowlisted_url(url):
             continue
@@ -83,6 +93,6 @@ def extractor(state: IdentifyState) -> IdentifyState:
             errors.append(f"extract_fail:{url}:{exc}")
 
     state["extracted_docs"] = extracted_docs
-    state["proposed_specs"] = proposed[:MAX_DOCS]
+    state["proposed_specs"] = proposed[:_max_docs()]
     state["errors"] = errors
     return state

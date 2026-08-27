@@ -510,7 +510,7 @@
   simulator:
     injector_id: app_session
     param_schema: {}
-  features_expected: [persuasion_labels, new_payee]
+  features_expected: [persuasion_labels, is_new_payee]
   entities: [victim, mule]
   status: open
 
@@ -615,7 +615,7 @@
   simulator:
     injector_id: app_session
     param_schema: {}
-  features_expected: [urgency_pressure, new_payee]
+  features_expected: [urgency_pressure, is_new_payee]
   entities: [merchant, victim]
   status: open
 
@@ -848,7 +848,7 @@
   simulator:
     injector_id: app_session
     param_schema: {}
-  features_expected: [copy_paste_payee_flag, new_payee]
+  features_expected: [copy_paste_payee_flag, is_new_payee]
   entities: [victim, mule]
   status: open
 
