@@ -5,6 +5,7 @@ from typing import Any
 
 from packages.agents.embeddings import embed_text
 
+# Within-run clone threshold (catalog cosine is applied in the librarian).
 DEDUP_THRESHOLD = 0.92
 
 EXPLOIT_PATTERNS = [

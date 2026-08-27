@@ -3,13 +3,14 @@
 import argparse
 from pathlib import Path
 
-from apps.api.db import Base, SessionLocal, engine
+from apps.api.db import SessionLocal, init_db
 from apps.api.models import AtlasRow
+from packages.agents.catalog_embeddings import preload_catalog_embeddings
 from packages.catalog.loader import DEFAULT_SEED_PATH, load_catalog_yaml
 
 
 def seed_catalog(path: Path | None = None, reset: bool = False) -> int:
-    Base.metadata.create_all(bind=engine)
+    init_db()
     specs = load_catalog_yaml(path)
 
     db = SessionLocal()
@@ -34,6 +35,7 @@ def seed_catalog(path: Path | None = None, reset: bool = False) -> int:
             db.merge(row)
             count += 1
         db.commit()
+        preload_catalog_embeddings()
         return count
     finally:
         db.close()

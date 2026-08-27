@@ -1,8 +1,4 @@
-"""Batch 3 — Scout through HITL pipeline tests."""
-
-import os
-
-import pytest
+"""Batch 3 — Scout through HITL pipeline tests (real Postgres)."""
 
 from packages.agents.corroborator import apply_corroboration
 from packages.agents.grounder import grounder_reject_reason
@@ -11,18 +7,9 @@ from packages.agents.nodes.scout import scout
 from packages.agents.state import empty_identify_state
 from packages.agents.tier_scorer import score_spec_sources
 from packages.osint.fixtures import load_fixture_documents
-from packages.osint.vector_store import clear_memory_store
 
 
-@pytest.fixture(autouse=True)
-def _clear_vector_memory():
-    clear_memory_store()
-    yield
-    clear_memory_store()
-
-
-def test_scout_airplane_returns_urls(monkeypatch):
-    monkeypatch.setenv("IDENTIFY_LIVE_SEARCH", "false")
+def test_scout_airplane_returns_urls():
     state = scout(empty_identify_state(run_id="scout-test"))
     assert len(state["candidate_urls"]) >= 2
 
@@ -72,22 +59,11 @@ def test_grounder_rejects_buzzword():
     assert reason == "buzzword_only"
 
 
-@pytest.mark.skipif(
-    os.getenv("IDENTIFY_SKIP_GRAPH_TEST") == "1",
-    reason="Skip heavy graph test",
-)
-def test_identify_graph_airplane_proposes(monkeypatch):
-    from unittest.mock import patch
-
-    monkeypatch.setenv("IDENTIFY_LIVE_SEARCH", "false")
-    monkeypatch.setenv("QDRANT_DISABLED", "true")
-    monkeypatch.setenv("EMBEDDINGS_DISABLED", "true")
-
-    with patch("packages.agents.nodes.librarian.merge_proposed_spec"), patch(
-        "packages.agents.nodes.librarian.find_merge_target", return_value=None
-    ):
-        result = run_identify_graph(run_id="batch3-airplane")
-
+def test_identify_graph_airplane_proposes(postgres_required):
+    result = run_identify_graph(run_id="batch3-airplane")
     assert len(result.get("candidate_urls") or []) >= 2
     assert len(result.get("proposed_specs") or []) >= 1
     assert result.get("hitl_required")
+    for spec in result["proposed_specs"]:
+        assert spec.get("status") == "proposed"
+        assert spec.get("extraction_source") != "abstain"

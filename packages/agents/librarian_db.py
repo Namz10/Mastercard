@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from apps.api.models import AtlasRow
 from packages.catalog.models import AttackSpec
+from packages.catalog.status import transition_atlas_status
+from packages.osint.vector_store import DEDUP_THRESHOLD, nearest_catalog_row, register_catalog_embedding
 
 
 def merge_proposed_spec(
@@ -18,10 +20,8 @@ def merge_proposed_spec(
     if target_vector_id:
         spec_dict = {**spec_dict, "vector_id": target_vector_id}
 
+    spec_dict = {**spec_dict, "status": "proposed"}
     spec = AttackSpec.model_validate(spec_dict)
-    if spec.status.value != "proposed":
-        spec_dict = {**spec_dict, "status": "proposed"}
-        spec = AttackSpec.model_validate(spec_dict)
 
     row = db.query(AtlasRow).filter(AtlasRow.vector_id == spec.vector_id).one_or_none()
     if row and depth_bump:
@@ -55,45 +55,75 @@ def merge_proposed_spec(
         db.add(row)
     db.commit()
     db.refresh(row)
+    register_catalog_embedding(
+        spec.name,
+        spec.rail.value,
+        spec.technique_id.value,
+        vector_id=spec.vector_id,
+    )
     return row
 
 
 def set_atlas_status(db: Session, vector_id: str, status: str, spec_patch: dict | None = None) -> AtlasRow:
-    row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
-    if not row:
-        raise KeyError(f"vector_id not found: {vector_id}")
-    row.status = status
-    merged = dict(row.spec or {})
-    merged["status"] = status
-    if spec_patch:
-        merged.update(spec_patch)
-    row.spec = merged
-    if "name" in merged:
-        row.name = merged["name"]
-    if "confidence_level" in merged:
-        row.confidence_level = merged["confidence_level"]
-    db.commit()
-    db.refresh(row)
-    return row
+    return transition_atlas_status(db, vector_id, status, spec_patch, validate_spec=True)
 
 
-def find_merge_target(db: Session, technique_id: str) -> AtlasRow | None:
-    """Prefer merging new OSINT evidence into an existing catalog row (depth bump)."""
-    rows = (
-        db.query(AtlasRow)
-        .filter(AtlasRow.technique_id == technique_id)
-        .order_by(AtlasRow.status)
-        .all()
-    )
-    if not rows:
-        return None
-    for row in rows:
-        if row.status == "open":
+def find_merge_target(
+    db: Session,
+    spec: dict[str, Any],
+) -> AtlasRow | None:
+    """Exact vector_id / name+rail+technique, then pgvector cosine ≥ 0.92."""
+    vector_id = spec.get("vector_id")
+    if vector_id:
+        row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
+        if row:
             return row
-    return rows[0]
+
+    name = str(spec.get("name") or "")
+    rail = str(spec.get("rail") or "")
+    technique_id = str(spec.get("technique_id") or "")
+    if name and rail and technique_id:
+        exact = (
+            db.query(AtlasRow)
+            .filter(AtlasRow.technique_id == technique_id)
+            .all()
+        )
+        for row in exact:
+            payload = row.spec or {}
+            if payload.get("name") == name and str(payload.get("rail")) == rail:
+                return row
+
+    nearest = nearest_catalog_row(name, rail, technique_id)
+    if nearest and nearest["similarity"] >= DEDUP_THRESHOLD:
+        return db.query(AtlasRow).filter(AtlasRow.vector_id == nearest["vector_id"]).one_or_none()
+    return None
 
 
-def hitl_payload_for_spec(spec: dict[str, Any], nearest_technique: str | None = None) -> dict[str, Any]:
+def spec_field_diff(proposed: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
+    if not existing:
+        return {}
+    keys = (
+        "name",
+        "technique_id",
+        "rail",
+        "generate_mode",
+        "confidence_level",
+        "source_tier",
+        "one_liner",
+    )
+    diff: dict[str, Any] = {}
+    for key in keys:
+        left, right = proposed.get(key), existing.get(key)
+        if left != right:
+            diff[key] = {"existing": right, "proposed": left}
+    return diff
+
+
+def hitl_payload_for_spec(
+    spec: dict[str, Any],
+    nearest_technique: str | None = None,
+    nearest_spec: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "vector_id": spec.get("vector_id"),
         "technique_id": spec.get("technique_id"),
@@ -106,4 +136,5 @@ def hitl_payload_for_spec(spec: dict[str, Any], nearest_technique: str | None = 
         "confidence_level": spec.get("confidence_level"),
         "corroboration_type": spec.get("corroboration_type"),
         "name": spec.get("name"),
+        "field_diff": spec_field_diff(spec, nearest_spec),
     }

@@ -40,7 +40,9 @@ Checkpoint after every node. Demo uses one `thread_id` so judges can replay.
 
 ## 3. Docker Compose
 
-**Always on:** `web`, `api`, `worker`, `postgres`, `redis`, `qdrant`.
+**Always on (Phase 1a):** `postgres` with **pgvector**. API optional via `./run.sh`.
+
+Qdrant is **not** used. Vectors (OSINT chunks + catalog dedup) are `vector(384)` columns in Postgres.
 
 **Optional profiles:** `ollama`; Langfuse + extra stores **only if RAM allows**. Target **16 GB**. Do not start Neo4j + Langfuse + Ollama 70B together.
 
@@ -54,9 +56,10 @@ Commands: `make up` / `make seed` / `make demo`.
 
 `.env.example`:
 
-- `GROQ_API_KEY` — Scout/Extractor/GapAnalyst (Llama 3.3 70B class structured JSON)
+- `AEGIS_LLM_PROFILE` / `AEGIS_LLM_BASE_URL` / `AEGIS_LLM_MODEL` / `AEGIS_LLM_API_KEY` — Identify extraction (default profile **omniroute** at `http://127.0.0.1:20128/v1`). Groq only if `AEGIS_LLM_PROFILE=groq`.
 - `TAVILY_API_KEY` — live Identify only
-- `DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`
+- `DATABASE_URL` — catalog, HITL, and pgvector embeddings
+- `REDIS_URL` — later phases
 - `KAGGLE_USERNAME` / `KAGGLE_KEY` optional
 - `IDENTIFY_LIVE_SEARCH=false` default
 - `GREYNOISE_API_KEY` optional

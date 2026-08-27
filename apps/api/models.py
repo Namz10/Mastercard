@@ -1,12 +1,15 @@
-"""KillChain Atlas SQLAlchemy model."""
+"""KillChain Atlas and pgvector embedding models."""
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from apps.api.db import Base
+
+VECTOR_DIM = 384
 
 
 class AtlasRow(Base):
@@ -27,3 +30,25 @@ class AtlasRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class OsintChunk(Base):
+    __tablename__ = "osint_chunks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    url: Mapped[str] = mapped_column(Text)
+    domain: Mapped[str] = mapped_column(String(256), index=True)
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    date: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(VECTOR_DIM))
+
+
+class CatalogEmbedding(Base):
+    __tablename__ = "catalog_embeddings"
+
+    vector_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    name: Mapped[str] = mapped_column(String(512))
+    rail: Mapped[str] = mapped_column(String(64))
+    technique_id: Mapped[str] = mapped_column(String(8), index=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(VECTOR_DIM))

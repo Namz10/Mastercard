@@ -12,8 +12,8 @@ dependencies = [
     "httpx>=0.27",
     "trafilatura>=1.6",
     "feedparser>=6.0",
-    "sentence-transformers>=3.0",
-    "qdrant-client>=1.12.0,<1.13.0",
+    "fastembed>=0.4.0",
+    "pgvector>=0.3.0",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
@@ -26,6 +26,9 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "mypy>=1.11",
+]
+embeddings-st = [
+    "sentence-transformers>=3.0",
 ]
 
 [build-system]
@@ -42,3 +45,7 @@ target-version = "py311"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "live_llm: requires a running OmniRoute (or configured) LLM endpoint",
+    "live_identify: requires TAVILY_API_KEY and a configured LLM (skip in CI)",
+]

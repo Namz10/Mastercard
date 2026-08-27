@@ -160,7 +160,7 @@ class AttackSpec(BaseModel):
     features_expected: list[str] = Field(default_factory=list)
     entities: list[str] = Field(default_factory=list)
     novelty_notes: str | None = None
-    status: Status = Status.open
+    status: Status = Status.proposed
 
     @field_validator("source_urls", mode="before")
     @classmethod
