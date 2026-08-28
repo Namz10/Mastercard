@@ -40,15 +40,16 @@ def inject_app_sessions(
     }
     written: list[dict[str, Any]] = []
     for i, victim in enumerate(eligible[: max(3, n_victims)]):
-        hist = [
-            e["amount_minor"]
-            for e in world.events
-            if e["party_ids"]["payer"] == victim.party_id and e["label_family"] == "normal"
-        ]
-        p30 = (sum(hist[-12:]) / max(len(hist[-12:]), 1)) if hist else 50_000
+        ts = start + timedelta(hours=i)
+        acc = world.computer.accounts.get(victim.party_id)
+        if acc is not None:
+            acc.prune(ts)
+            amounts = [a for _, a in acc.amount_history]
+        else:
+            amounts = []
+        p30 = (sum(amounts) / len(amounts)) if amounts else 50_000
         amount = int(max(p30 * 3.5, 150_000))
         amount = min(amount, world.priors.caps.txn_max_minor)
-        ts = start + timedelta(hours=i)
         ev = append_event(
             world,
             ts=ts,

@@ -155,7 +155,7 @@ Keep `apps/api/routes/generate.py` paths.
 `POST /generate/population` **always** builds one world from current priors, then runs **all** generate-eligible injectors (mix budget).  
 `vector_id` **optional filter**: only that recipe family is injected; world still full quiet life.
 
-Defaults: `world_seed=42`, `n_customers=800`, `n_merchants=80`, `sim_days=90`.
+Defaults: `world_seed=42`, `n_customers=2400`, `n_merchants=120`, `sim_days=90`.
 
 Response: `run_id`, Parquet path, fidelity pass/fail, **row counts by `label_family`**. HTTP body must **not** dump `simulatable_signals` into anything Defend might train on.
 
@@ -261,7 +261,7 @@ Each phase: implement → **phase tests must pass** before the next. Full `pytes
 
 ### Phase B — Quiet world + O(n) features
 
-Defaults 800 customers × 80 merchants, seed 42, event-driven, `amount_minor`, `VID-SIM-…`.
+Defaults 2400 customers × 120 merchants, seed 42, event-driven, `amount_minor`, `VID-SIM-…`.
 
 **Tests:** all `label_family=normal`; no future leakage on `payee_history_count` / `is_new_payee`; never pay before create; 1k-row microbench uses running state not O(n²).
 

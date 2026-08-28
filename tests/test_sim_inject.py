@@ -76,6 +76,32 @@ def test_fan_in_computed_not_copied_from_catalog(mixed_world):
     assert max(values) >= 5
 
 
+def test_app_inject_does_not_scan_ledger():
+    rng = np.random.default_rng(42)
+    world = generate_quiet_world(world_seed=42, n_customers=56, n_merchants=12, sim_days=36)
+    apply_mix(world, rng, target_rate=0.02, pin=True)
+    from packages.sim.inject.app_session import inject_app_sessions
+
+    class NoScan(list):
+        def __iter__(self):
+            raise AssertionError("APP inject must not iterate world.events")
+
+    world.events = NoScan(world.events)
+    written = inject_app_sessions(
+        world,
+        np.random.default_rng(99),
+        n_victims=3,
+        signals={
+            "call_active_flag": True,
+            "copy_paste_payee_flag": True,
+            "pause_ms": 1800,
+            "urgency_pressure": 0.85,
+        },
+        after_day=30,
+    )
+    assert len(written) >= 1
+
+
 def test_app_flags_only_on_app_rows(mixed_world):
     world, _ = mixed_world
     apps = [e for e in world.events if e["label_family"] == "app_fraud"]
