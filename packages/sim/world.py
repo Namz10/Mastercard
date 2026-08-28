@@ -93,8 +93,8 @@ def _pick_persona(rng: np.random.Generator, priors: WorldPriors) -> str:
 def generate_quiet_world(
     *,
     world_seed: int = 42,
-    n_customers: int = 800,
-    n_merchants: int = 80,
+    n_customers: int = 2400,
+    n_merchants: int = 120,
     sim_days: int = 90,
     priors: WorldPriors | None = None,
     t0: datetime | None = None,
@@ -157,6 +157,7 @@ def generate_quiet_world(
         fc.ensure(pid, m["created_ts"], m["device_hash"], m["kyc_tier"], m["opening_balance_minor"])
 
     cust_by_id = {c.party_id: c for c in customers}
+    merchants_by_id = {m.party_id: m for m in merchants}
     day_spend: dict[tuple[str, str], int] = {}
     events: list[dict[str, Any]] = []
     seq = 0
@@ -185,7 +186,8 @@ def generate_quiet_world(
             if payee not in meta:
                 continue
             if payee.startswith("VID-SIM-M-"):
-                cat = next((m.category for m in merchants if m.party_id == payee), "grocery") or "grocery"
+                merch = merchants_by_id.get(payee)
+                cat = (merch.category if merch else None) or "grocery"
             else:
                 cat = "p2p"
             amount = sample_amount_minor(rng, priors, cat)
