@@ -1,0 +1,27 @@
+{
+  "estimator": "HistGradientBoostingClassifier",
+  "objective": "average_precision",
+  "random_state": 42,
+  "max_depth": 3,
+  "max_iter": 80,
+  "learning_rate": 0.08,
+  "class_weight": "balanced_from_this_run",
+  "y": "label_family",
+  "split": "time_cut_2_3_plus_entity_holdout",
+  "rule_hit_prefix": "rule__",
+  "app_flag_cols": [
+    "call_active_flag",
+    "copy_paste_payee_flag",
+    "pause_ms",
+    "urgency_pressure"
+  ],
+  "operating_point_fpr": 0.01,
+  "tpr_at_fpr": [0.001, 0.005, 0.01],
+  "hang_guard_seconds_1k": 120,
+  "loop_m": {
+    "ap_equal_eps": 0.05,
+    "genuine_fpr_eps": 0.02,
+    "extra_row_cap_frac": 0.15
+  },
+  "note": "Laptop GBDT AuthGate. Not an issuer SLA. No AutoGluon on the demo path. Synthetic session flags are not an SDK."
+}

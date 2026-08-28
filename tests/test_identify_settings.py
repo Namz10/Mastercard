@@ -14,6 +14,7 @@ def test_defaults_are_unlimited(monkeypatch):
     assert s.identify_max_hitl == 0
     assert s.identify_max_candidates == 0
     assert s.identify_catalog_queries_enabled is False
+    assert s.identify_extract_sleep_ms == 0
 
 
 def test_env_override(monkeypatch):

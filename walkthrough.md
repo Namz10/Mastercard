@@ -2,18 +2,18 @@
 
 Handoff guide for **Attack (Generate)** and **Defend** teams. Identify + catalog + handoff layers are implemented through FinalIdentify steps 0–11.
 
-**Planning SSOT:** [`Docs/LOCKED.md`](Docs/LOCKED.md) · **Identify runbook:** [`Docs/Identify Docs/FinalIdentify.md`](Docs/Identify%20Docs/FinalIdentify.md) · **Generate/Defend:** [`Docs/plans/02-generate-defend-loop-lock.md`](Docs/plans/02-generate-defend-loop-lock.md)
+**Planning SSOT:** [`Docs/LOCKED.md`](Docs/LOCKED.md) · **Identify runbook:** [`Docs/Identify Docs/FinalIdentify.md`](Docs/Identify%20Docs/FinalIdentify.md) · **Generate (built):** [`Docs/plans/08-generate-world-build.md`](Docs/plans/08-generate-world-build.md) · **Defend (next build):** [`Docs/plans/02-defend-build.md`](Docs/plans/02-defend-build.md) · Plan 02 architecture lock: [`Docs/plans/02-generate-defend-loop-lock.md`](Docs/plans/02-generate-defend-loop-lock.md)
 
 ---
 
 ## 1. What exists today
 
 ```
-Identify (done)          Attack / Generate (stubs)       Defend (stubs + rules)
+Identify (done)          Generate (Plan 08 done)         Defend (next: Plan 12)
 ─────────────────        ─────────────────────────       ─────────────────────
-Scout → Curator → Extractor        packages/sim/                   packages/policy/
-→ Grounder → …           population + canary_mode        v0 rules + Loop I/C
-→ Librarian → HITL       injector stubs                  coverage map API
+Scout → … → HITL         quiet world + injectors         packages/policy/ coverage
+                         train.parquet + sidecar         v0 rules (row engine in 12)
+                         POST /generate/*                AuthGate/Brake not built yet
                            ↑                               ↑
                     KillChain Atlas (Postgres)      features_expected
                     data/catalog/seed.yaml          data/rules/v0_rules.yaml

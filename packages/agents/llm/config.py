@@ -170,7 +170,10 @@ def load_provider_config() -> ProviderConfig:
         raise LlmConfigurationError("AEGIS_LLM_API_KEY is required for this profile (or GROQ_API_KEY when profile=groq)")
 
     timeout_sec = float(_env("AEGIS_LLM_TIMEOUT_SEC") or "60")
-    max_retries = int(_env("AEGIS_LLM_MAX_RETRIES") or "1")
+    retry_default = "2" if profile == "groq" else "1"
+    max_retries = int(_env("AEGIS_LLM_MAX_RETRIES") or retry_default)
+    if profile == "groq" and not _env_present("AEGIS_LLM_MAX_RETRIES"):
+        max_retries = max(max_retries, 2)
     retry_base_ms = int(_env("AEGIS_LLM_RETRY_BASE_MS") or "500")
     max_tokens = int(_env("AEGIS_LLM_MAX_COMPLETION_TOKENS") or "2048")
     extra = {**recipe.default_headers, **_parse_extra_headers(_env("AEGIS_LLM_EXTRA_HEADERS_JSON"))}

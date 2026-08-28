@@ -2,7 +2,7 @@
 
 **Status:** LOCKED.
 
-**Depends on:** [`00-correct-planning-defects.md`](00-correct-planning-defects.md), [`01-identify-catalog-lock.md`](01-identify-catalog-lock.md), [`02-generate-defend-loop-lock.md`](02-generate-defend-loop-lock.md).
+**Depends on:** [`00-correct-planning-defects.md`](00-correct-planning-defects.md), [`01-identify-catalog-lock.md`](01-identify-catalog-lock.md), [`02-generate-defend-loop-lock.md`](02-generate-defend-loop-lock.md). **Defend v1 implementation:** [`02-defend-build.md`](02-defend-build.md) (no `defend_graph` / Redis / AutoGluon on the demo path in that pass).
 
 **SSOT:** MC_PS submission = public GitHub `TeamName`, `TeamName.docx`, **working web prototype** that shows the closed loop. HACKATHON_RESEARCH §6.3 UI screens; §6.4 feasibility (latency, HITL, ethics, explainability). V1_MASTERPLAN §3.2 layout and §12 ops, except where Plan 00 overrode forks.
 

@@ -1,5 +1,7 @@
 """Extractor node — fetch body, LLM/rule extract, pgvector chunk."""
 
+import time
+
 from pydantic import ValidationError
 
 from packages.agents.llm import extract_from_document
@@ -36,12 +38,16 @@ def extractor(state: IdentifyState) -> IdentifyState:
     proposed: list[dict] = []
     errors = list(state.get("errors") or [])
     max_chars = identify.identify_max_extract_chars
+    sleep_s = max(0, identify.identify_extract_sleep_ms) / 1000.0
+    extracts_done = 0
 
     for item in candidates:
         url = item.get("url", "")
         if not url or not is_allowlisted_url(url):
             continue
         try:
+            if extracts_done and sleep_s > 0:
+                time.sleep(sleep_s)
             text, extractor_name = _body_for_url(url)
             if not text.strip():
                 errors.append(f"extract_empty:{url}")
@@ -55,6 +61,7 @@ def extractor(state: IdentifyState) -> IdentifyState:
                 date=item.get("fetched_at"),
             )
             raw = extract_from_document(text, url, domain)
+            extracts_done += 1
             if raw.get("extraction_source") != "abstain" and not raw.get("abstain"):
                 raw["network_indicators"] = collect_network_indicators(
                     text,

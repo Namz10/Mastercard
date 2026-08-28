@@ -1,0 +1,3 @@
+# APP flag ablation (lab smoke — paste into the later Generate .docx)
+
+Synthetic session flags (call active, copy-paste payee, pause, urgency) are **not** an SDK. The Phase G smoke trains the **same** sklearn histogram gradient booster twice on one seeded ShadowRail ledger: once with those four columns, once with them zeroed. The APP metric (ROC-AUC and average precision on a time cut, last third of **that run’s** calendar) is always **reported**. If APP detection collapses without the flags, that is a documented lab result, not a silent cheat. `is_authorized_push` and `label_family` are not train inputs. This is not Defend, not India prevalence, and not proof of live UPI.

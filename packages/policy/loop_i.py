@@ -65,11 +65,11 @@ def draft_rule_from_spec(spec: AttackSpec) -> dict[str, Any]:
                 "id": "call-and-paste-new-payee",
                 "kind": "hard_flag",
                 "applies_to": economic,
-                "when": {
-                    "call_active_flag": True,
-                    "copy_paste_payee_flag": True,
-                    "is_new_payee": True,
-                },
+                "when": [
+                    "call_active_flag == true",
+                    "copy_paste_payee_flag == true",
+                    "is_new_payee == true",
+                ],
                 "min_score": 0.72,
                 "reason": "Possible coercion: call active + payee pasted + new payee",
                 "technique_ids": [spec.technique_id.value],
@@ -89,10 +89,9 @@ def draft_rule_from_spec(spec: AttackSpec) -> dict[str, Any]:
                 "id": "mule-fan-in-burst",
                 "kind": "hard_flag",
                 "applies_to": "mule",
-                "when": {
-                    "fan_in_1h": True,
-                    "mule_account_age_days": True,
-                },
+                "when": [
+                    "fan_in_1h >= 6",
+                ],
                 "min_score": 0.65,
                 "reason": "Mule receiving burst: high fan-in on young account",
                 "technique_ids": [spec.technique_id.value],
@@ -112,10 +111,10 @@ def draft_rule_from_spec(spec: AttackSpec) -> dict[str, Any]:
                 "id": "invoice-beneficiary-swap",
                 "kind": "hard_flag",
                 "applies_to": "BEC",
-                "when": {
-                    "beneficiary_changed": True,
-                    "gstin_checksum_ok": True,
-                },
+                "when": [
+                    "beneficiary_changed == true",
+                    "gstin_checksum_ok == true",
+                ],
                 "min_score": 0.7,
                 "reason": "Invoice tax ID valid but beneficiary account changed",
                 "technique_ids": [spec.technique_id.value],

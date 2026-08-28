@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -94,6 +95,10 @@ class SafeHttpTransport:
                     last_error = exc
                     if attempt >= max_attempts:
                         raise
+                    delay = (self.retry_base_ms / 1000.0) * (2 ** (attempt - 1))
+                    if isinstance(exc, LlmRateLimitError) and exc.retry_after_sec > 0:
+                        delay = exc.retry_after_sec
+                    time.sleep(min(max(delay, 0.0), 30.0))
                     continue
             assert last_error is not None
             raise last_error

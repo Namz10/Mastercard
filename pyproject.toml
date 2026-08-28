@@ -19,6 +19,9 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg2-binary>=2.9",
     "python-multipart>=0.0.9",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=16.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +29,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "mypy>=1.11",
+    "scikit-learn>=1.4",
 ]
 embeddings-st = [
     "sentence-transformers>=3.0",
@@ -48,4 +52,5 @@ pythonpath = ["."]
 markers = [
     "live_llm: requires a running OmniRoute (or configured) LLM endpoint",
     "live_identify: requires TAVILY_API_KEY and a configured LLM (skip in CI)",
+    "slow: 50k-row world smoke and APP ablation (Plan 08 Phase G)",
 ]
