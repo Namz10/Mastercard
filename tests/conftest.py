@@ -11,7 +11,15 @@ load_project_env()
 
 
 @pytest.fixture(autouse=True)
-def _isolate_llm_env(monkeypatch):
+def _isolate_llm_env(request, monkeypatch):
+    """Offline tests cannot see the operator's Groq/OmniRoute keys.
+
+    Tests marked live_llm / live_identify keep the process .env so a configured
+    provider actually runs (Plan 12 Phase 0.6).
+    """
+    markers = {m.name for m in request.node.iter_markers()}
+    if markers & {"live_llm", "live_identify"}:
+        return
     monkeypatch.setenv("IDENTIFY_LIVE_SEARCH", "false")
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.delenv("AEGIS_LLM_API_KEY", raising=False)

@@ -213,6 +213,9 @@ tempCodeRunnerFile.py
 
 # Generate ledgers / local run dumps (not training artifacts in git)
 data/runs/
+
+# Per-run champion dumps; tracked recipe is models/features.json
+models/*/
 data/priors_history/
 logs/
 

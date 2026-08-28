@@ -1,13 +1,14 @@
-# v0 starter rules — defense_architecture §3.2, feedback-loop §2
-# Observable at payment auth time only.
+# v0 starter rules — predicates on computed auth columns (Plan 12 Phase B).
+# Forbidden as inputs: smurf_cap_ratio, seasoning_days, fan_out_ttl_hours,
+# mule_account_age_days, gstin string, is_authorized_push.
 
 - id: call-and-paste-new-payee
   kind: hard_flag
   applies_to: APP
   when:
-    call_active_flag: true
-    copy_paste_payee_flag: true
-    is_new_payee: true
+    - call_active_flag == true
+    - copy_paste_payee_flag == true
+    - is_new_payee == true
   min_score: 0.72
   reason: "Possible coercion: call active + new payee pasted in"
   technique_ids: [T13, T14, T15, T16, T17, T18, T19]
@@ -17,10 +18,11 @@
   kind: hard_flag
   applies_to: ATO
   when:
-    is_new_payee: true
-    is_new_device: true
+    - is_new_payee == true
+    - is_new_device == true
+    - amount_vs_p30 >= 2.0
   min_score: 0.68
-  reason: "Takeover shape: new payee on new device"
+  reason: "Takeover shape: new payee on new device, amount vs usual"
   technique_ids: [T12]
   status: live
 
@@ -28,10 +30,9 @@
   kind: hard_flag
   applies_to: mule
   when:
-    fan_in_1h: true
-    mule_account_age_days: true
+    - fan_in_1h >= 6
   min_score: 0.65
-  reason: "Mule receiving: fan-in burst on young account"
+  reason: "Mule receiving: inbound fan-in in the last hour"
   technique_ids: [T01, T03, T05]
   status: live
 
@@ -39,10 +40,10 @@
   kind: nudge
   applies_to: mule
   when:
-    smurf_cap_ratio: true
-    fan_in_1h: true
+    - fan_in_1h >= 4
+    - amount_vs_p30 <= 1.0
   min_score: 0.45
-  reason: "Structuring: amounts clustered under cap"
+  reason: "Structuring-like: repeated inbound near usual/small amounts"
   technique_ids: [T03]
   status: live
 
@@ -50,20 +51,20 @@
   kind: nudge
   applies_to: mule
   when:
-    fan_out_ttl_hours: true
+    - fan_out_1h >= 4
   min_score: 0.4
-  reason: "Rail hop with rapid fan-out TTL"
-  technique_ids: [T04]
+  reason: "Rapid outbound burst (rail-hop / dust proxy)"
+  technique_ids: [T04, T02]
   status: live
 
 - id: seasoning-burst
   kind: nudge
   applies_to: ATO
   when:
-    seasoning_days: true
-    seasoning_txn_count: true
+    - burst_velocity >= 4
+    - account_age_days >= 7
   min_score: 0.5
-  reason: "Quiet account then velocity jump"
+  reason: "Quiet-then-burst velocity on a seasoned account"
   technique_ids: [T11]
   status: live
 
@@ -71,10 +72,10 @@
   kind: hard_flag
   applies_to: BEC
   when:
-    beneficiary_changed: true
-    gstin_checksum_ok: true
+    - beneficiary_changed == true
+    - gstin_checksum_ok == true
   min_score: 0.7
-  reason: "Invoice valid but beneficiary changed"
+  reason: "Invoice checksum passes but beneficiary changed"
   technique_ids: [T24, T16, T18]
   status: live
 
@@ -82,29 +83,22 @@
   kind: nudge
   applies_to: APP
   when:
-    pause_ms: true
-    copy_paste_payee_flag: true
+    - pause_ms >= 1500
+    - copy_paste_payee_flag == true
   min_score: 0.4
   reason: "Long pause then paste on payee field"
   technique_ids: [T13, T19]
   status: live
 
-- id: calm-down-known-payee
+- id: calm-down-known-usual-device
   kind: calm_down
   applies_to: genuine
   when:
-    is_new_payee: false
-  min_score: -0.15
-  reason: "Known payee calm-down"
-  technique_ids: []
-  status: live
-
-- id: calm-down-old-device
-  kind: calm_down
-  applies_to: genuine
-  when:
-    is_new_device: false
-  min_score: -0.1
-  reason: "Same device calm-down"
+    - is_new_payee == false
+    - is_new_device == false
+    - amount_vs_p30 >= 0.4
+    - amount_vs_p30 <= 2.5
+  min_score: -0.2
+  reason: "Known payee, usual amount, same device"
   technique_ids: []
   status: live

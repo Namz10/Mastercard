@@ -30,6 +30,7 @@ class IdentifySettings(BaseSettings):
     identify_search_pack_enabled: bool = Field(default=True, alias="IDENTIFY_SEARCH_PACK_ENABLED")
     identify_catalog_queries_enabled: bool = Field(default=False, alias="IDENTIFY_CATALOG_QUERIES_ENABLED")
     identify_tavily_advanced_on_topic: bool = Field(default=True, alias="IDENTIFY_TAVILY_ADVANCED_ON_TOPIC")
+    identify_extract_sleep_ms: int = Field(default=0, alias="IDENTIFY_EXTRACT_SLEEP_MS")
 
 
 def get_identify_settings() -> IdentifySettings:

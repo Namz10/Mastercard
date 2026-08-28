@@ -143,12 +143,24 @@ def _try_document(
     else:
         print("greynoise_skipped=no_api_key", flush=True)
 
-    assert spec.get("vector_class") == "network_footprint", spec.get("vector_class")
+    vector_class = spec.get("vector_class")
+    assert len(sanitized) >= 1
     assert corroboration in {
         "network-telemetry",
         "documentary-case",
         "not-yet-corroborated",
     }
+    # Do not coerce T13/APP advisories to network_footprint. IPs on a social
+    # engineering CSA are documentary indicators, not a mule-botnet class.
+    if vector_class == "human_social":
+        print(
+            "telemetry_class=human_social indicators_kept_as_documentary",
+            flush=True,
+        )
+    elif vector_class == "network_footprint":
+        print("telemetry_class=network_footprint", flush=True)
+    else:
+        raise AssertionError(f"unexpected vector_class={vector_class}")
     print("=== TELEMETRY GATE PASSED (live) ===", flush=True)
     return True
 

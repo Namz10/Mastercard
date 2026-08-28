@@ -44,6 +44,16 @@ TRAIN_DENYLIST = (
     "payload",
 )
 
+# Eval join only — never concatenated into model X (Plan 12 Lock 1).
+SPLIT_COLUMNS = (
+    "event_id",
+    "event_ts",
+    "payer",
+    "payee",
+    "amount_minor",
+    "label_family",
+)
+
 
 def train_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -71,6 +81,23 @@ def train_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def split_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for ev in events:
+        parties = ev.get("party_ids") or {}
+        rows.append(
+            {
+                "event_id": ev["event_id"],
+                "event_ts": ev["event_ts"],
+                "payer": parties["payer"],
+                "payee": parties["payee"],
+                "amount_minor": int(ev["amount_minor"]),
+                "label_family": ev["label_family"],
+            }
+        )
+    return rows
+
+
 def export_run(
     events: list[dict[str, Any]],
     sidecar: dict[str, Any],
@@ -85,11 +112,23 @@ def export_run(
     extra = [c for c in df.columns if c not in TRAIN_ALLOWLIST]
     if extra:
         raise ValueError(f"train columns not in allowlist: {extra}")
+    sdf = pd.DataFrame(split_rows(events))
+    split_extra = [c for c in sdf.columns if c not in SPLIT_COLUMNS]
+    if split_extra:
+        raise ValueError(f"split columns not in schema: {split_extra}")
+    if len(df) != len(sdf):
+        raise ValueError("train/split row count mismatch")
     parquet_path = folder / "train.parquet"
+    split_path = folder / "split.parquet"
     sidecar_path = folder / "sidecar.json"
     df.to_parquet(parquet_path, index=False)
+    sdf.to_parquet(split_path, index=False)
     sidecar_path.write_text(json.dumps(sidecar, indent=2, default=str), encoding="utf-8")
-    return {"parquet_path": str(parquet_path), "sidecar_path": str(sidecar_path)}
+    return {
+        "parquet_path": str(parquet_path),
+        "split_path": str(split_path),
+        "sidecar_path": str(sidecar_path),
+    }
 
 
 def assert_train_schema(parquet_path: str | Path) -> None:
@@ -100,3 +139,16 @@ def assert_train_schema(parquet_path: str | Path) -> None:
     for banned in TRAIN_DENYLIST:
         if banned in cols:
             raise AssertionError(f"denylist column present: {banned}")
+    for leak in ("event_ts", "event_id", "payer", "payee"):
+        if leak in cols:
+            raise AssertionError(f"split-only column leaked into train: {leak}")
+
+
+def assert_split_schema(split_path: str | Path) -> None:
+    df = pd.read_parquet(split_path)
+    cols = set(df.columns)
+    if cols != set(SPLIT_COLUMNS):
+        raise AssertionError(f"split schema mismatch: {cols} vs {set(SPLIT_COLUMNS)}")
+    for banned in TRAIN_DENYLIST:
+        if banned in cols:
+            raise AssertionError(f"denylist column present on split: {banned}")

@@ -204,12 +204,25 @@ def _handoff() -> None:
         coverage = build_coverage_map(db)
         assert population["event_count"] > 1
         assert "simulatable_signals" not in population
+        assert population["fidelity"]["pass"] is True, population["fidelity"]
         assert canary["event_count"] > 4
-        assert len(canary["lifecycle_stages_logged"]) == 4
+        assert "simulatable_signals" not in canary
+        stages = canary["lifecycle_stages_logged"]
+        assert len(stages) == 4
+        assert [s["lifecycle_stage"] for s in stages] == [
+            "onboarding_kyc",
+            "account_access_ato",
+            "payment_initiation",
+            "disbursement_mule",
+        ]
+        # Canary runner already skips mix-rate; still require non-flood (folded into fidelity.pass).
+        assert canary["fidelity"]["pass"] is True, canary["fidelity"]
         assert coverage["technique_count"] == 24
         print(
             f"population_events={population['event_count']} "
-            f"canary_stages={canary['event_count']} "
+            f"population_fidelity={population['fidelity']['pass']} "
+            f"canary_events={canary['event_count']} "
+            f"canary_fidelity={canary['fidelity']['pass']} "
             f"coverage_techniques={coverage['technique_count']}",
             flush=True,
         )

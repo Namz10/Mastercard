@@ -28,6 +28,7 @@ class PopulationRunRequest(BaseModel):
     n_customers: int | None = None
     n_merchants: int | None = None
     sim_days: int | None = None
+    pin: bool = False
 
 
 class CalibrateWorldRequest(BaseModel):
@@ -104,7 +105,12 @@ def generate_population(
 ) -> dict:
     req = body or PopulationRunRequest()
     try:
-        kwargs: dict = {"vector_id": req.vector_id, "run_id": req.run_id, "world_seed": req.world_seed}
+        kwargs: dict = {
+            "vector_id": req.vector_id,
+            "run_id": req.run_id,
+            "world_seed": req.world_seed,
+            "pin": req.pin,
+        }
         if req.n_customers is not None:
             kwargs["n_customers"] = req.n_customers
         if req.n_merchants is not None:

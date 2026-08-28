@@ -110,6 +110,37 @@ def test_http_200_json():
     assert transport.post_json("http://127.0.0.1:20128/v1/x", {}, {}) == {"ok": True}
 
 
+def test_retry_after_429_then_success():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(429, headers={"Retry-After": "0"}, json={"error": "tpm"})
+        return httpx.Response(200, json={"ok": True})
+
+    transport = SafeHttpTransport(
+        client=_client(handler),
+        max_retries=1,
+        retry_base_ms=1,
+        allow_loopback_http=True,
+    )
+    assert transport.post_json("http://127.0.0.1:20128/v1/x", {}, {}) == {"ok": True}
+    assert calls["n"] == 2
+
+
+def test_groq_default_retries_at_least_two(monkeypatch):
+    monkeypatch.setenv("AEGIS_LLM_PROFILE", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test")
+    monkeypatch.setenv("AEGIS_LLM_MODEL", "openai/gpt-oss-20b")
+    monkeypatch.delenv("AEGIS_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("AEGIS_LLM_MAX_RETRIES", raising=False)
+    monkeypatch.delenv("AEGIS_LLM_BASE_URL", raising=False)
+    cfg = load_provider_config()
+    assert cfg.profile == "groq"
+    assert cfg.max_retries >= 2
+
+
 def test_malformed_json_body():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text="not-json")
@@ -171,11 +202,12 @@ def test_parse_json_content_fences():
 
 
 @pytest.mark.live_llm
-def test_live_omniroute_optional():
+def test_live_provider_optional():
+    """Live provider (Groq or OmniRoute) — skip if not configured."""
     from packages.agents.llm.config import is_llm_configured
     from packages.agents.llm.extraction import extract_attack_json
 
     if not is_llm_configured():
-        pytest.skip("OmniRoute not configured")
+        pytest.skip("live LLM provider not configured")
     data = extract_attack_json("Deepfake KYC liveness bypass on UPI onboarding.", "https://www.fincen.gov/x")
     assert isinstance(data, dict)

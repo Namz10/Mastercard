@@ -305,6 +305,8 @@ Mark `slow`; write one paragraph for the later `.docx`.
 
 **Not done if:** knobs in train columns; WorldCalibrator fills hours from fraud news; `label_family` is `T13`; liveness copied onto every payment; T12 collapsed into `identity_burst`; model only wins because `is_authorized_push` or `label_family` leaked in; canary still four independent stub JSONs.
 
+**After Generate:** implement Defend from [`02-defend-build.md`](02-defend-build.md) (split artifact, champion, Brake, Loop M). Phase 0 of that plan hardens `fidelity.pass` + `POST /generate/*` tests without reopening injectors.
+
 ---
 
 ## Gaps (docx — say out loud)

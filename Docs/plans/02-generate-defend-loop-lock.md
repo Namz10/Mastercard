@@ -1,6 +1,8 @@
 # Plan 02 — Generate, Defend, and the closed loop (locked)
 
-**Status:** LOCKED.
+**Status:** LOCKED — **architecture** (no LLM on auth, Brake typology, PR-AUC, Cat 4 offline, HoldoutVault *protocol*, loop *names*).
+
+**Implement Defend from [`02-defend-build.md`](02-defend-build.md)** (Plan 12). That file overrides this one for v1 files, tests, APIs, splits, and non-goals the same way Plan 08 overrides Generate injectors here. **Do not code AuthGate/Brake/train from this document as if Generate were still a one-event stub.**
 
 **Depends on:** [`00-correct-planning-defects.md`](00-correct-planning-defects.md), [`01-identify-catalog-lock.md`](01-identify-catalog-lock.md) (`AttackSpec`, T01–T24, `simulatable_signals`).
 

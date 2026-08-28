@@ -60,6 +60,7 @@ def _public_payload(
         "run_id": run_id,
         "mode": mode,
         "parquet_path": paths["parquet_path"],
+        "split_path": paths.get("split_path"),
         "sidecar_path": paths["sidecar_path"],
         "fidelity": {
             "pass": bool(fidelity.get("pass") and verify.get("pass")),
@@ -89,9 +90,9 @@ def run_population(
     sim_days: int = 90,
     pin: bool = False,
     runs_dir: Path | None = None,
+    families: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     rid = run_id or f"pop-{uuid.uuid4().hex[:12]}"
-    families: frozenset[str] | None = None
     spec: AttackSpec | None = None
     if vector_id:
         if db is None:
@@ -136,7 +137,10 @@ def run_population(
         "run_id": rid,
         "mode": "population",
         "world_seed": world_seed,
+        "n_customers": n_customers,
+        "n_merchants": n_merchants,
         "sim_days": sim_days,
+        "pin": pin,
         "vector_id": vector_id,
         "technique_id": spec.technique_id.value if spec else None,
         "injector_id": spec.simulator.injector_id if spec and spec.simulator else None,
@@ -150,6 +154,8 @@ def run_population(
         "vector_id": vector_id,
         "sim_days": sim_days,
         "world_seed": world_seed,
+        "n_customers": n_customers,
+        "n_merchants": n_merchants,
         "seasoning_clamped": sidecar["seasoning_clamped"],
         "seasoning_days_effective": sidecar["seasoning_days_effective"],
         "injector_id": sidecar["injector_id"],

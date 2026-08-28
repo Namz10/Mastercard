@@ -47,7 +47,7 @@ batch3-validate:
 	$(VALIDATE_ENV) $(PY) -c 'from apps.api.db import init_db; from packages.agents.identify_graph import run_identify_graph; init_db(); r=run_identify_graph("make-b3"); print("proposed", len(r.get("proposed_specs") or [])); assert len(r.get("proposed_specs") or [])>=1'
 
 generate-validate:
-	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app', n_customers=16, n_merchants=8, sim_days=40, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>1 and 'simulatable_signals' not in r and r['counts_by_label_family'].get('app_fraud',0)>=3; print(r['parquet_path'], r['counts_by_label_family'])"
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app', n_customers=16, n_merchants=8, sim_days=40, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>1 and 'simulatable_signals' not in r and r['counts_by_label_family'].get('app_fraud',0)>=3; assert r['fidelity']['pass'] is True, r['fidelity']; print(r['parquet_path'], r.get('split_path'), r['counts_by_label_family'], r['fidelity']['pass'])"
 
 generate-slow:
 	$(PY) -m pytest tests/test_sim_calibrator.py tests/test_sim_slow.py -q --tb=short
@@ -66,7 +66,13 @@ validate-all:
 	@echo "=== [6/6] pytest ===" && $(VALIDATE_ENV) $(PY) -m pytest tests/ -q -m "not live_llm and not live_identify"
 	@echo "=== ALL GATES PASSED ==="
 
+# Unix: ./run.sh --check. Windows PowerShell: pwsh -File scripts/run.ps1 --check
+ifeq ($(OS),Windows_NT)
+validate-all-live:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run.ps1 --check
+else
 validate-all-live:
 	./run.sh --check
+endif
 
 demo: up seed api

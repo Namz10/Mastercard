@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from packages.sim.export import TRAIN_ALLOWLIST, TRAIN_DENYLIST, assert_train_schema
+from packages.sim.export import TRAIN_ALLOWLIST, TRAIN_DENYLIST, assert_split_schema, assert_train_schema
 from packages.sim.inject.mix import apply_mix
 from packages.sim.ledger import TECHNIQUE_IDS
 from packages.sim.runner import run_canary, run_population
@@ -48,7 +48,13 @@ def test_population_full_mix_parquet_and_seasoning(runs: Path):
     assert result["event_count"] > 1
     assert "simulatable_signals" not in result
     assert_train_schema(result["parquet_path"])
+    assert_split_schema(result["split_path"])
     df = pd.read_parquet(result["parquet_path"])
+    split = pd.read_parquet(result["split_path"])
+    assert len(df) == len(split)
+    assert "event_ts" in split.columns
+    assert "payer" in split.columns and "payee" in split.columns
+    assert "event_ts" not in df.columns
     assert set(df.columns) <= set(TRAIN_ALLOWLIST)
     for banned in TRAIN_DENYLIST:
         assert banned not in df.columns
