@@ -396,3 +396,17 @@ Tuned `v1-train-46__fpr-v2` (25 Optuna trials, inner_val FPR objective). **Keep 
 | `cost_sketch` | **0.002** | 0.663 |
 
 Artifact: [`h5c_fpr_v2_eval.json`](data/validation/v1/h5c_fpr_v2_eval.json). Lesson: FPR-only tuning ≠ Pareto win; same trap as H6.
+
+---
+
+## Wave 1 iteration 8 — H5d + H7-R1 + H9 parallel (2026-08-29, ACCEPT)
+
+Champion unchanged: **`v1-train-46__loopm-train`** (v1, post-loop — not v0 Stage 1).
+
+| Track | Artifact | Conclusion |
+|-------|----------|------------|
+| H5d | [`pareto_operational_v1.json`](data/validation/v1/pareto_operational_v1.json) | Deploy Pareto @1% FPR on frozen v1 — ~8× lower FP burden, identity ≥99.8% |
+| H7-R1 | [`h7_round1_diagnosis.json`](data/validation/v1/h7_round1_diagnosis.json) | Weakest family **ato** (gdev AP 0.54); round 2 = targeted ato + filtered HN |
+| H9 | [`h9_ablation_audit.json`](data/validation/v1/h9_ablation_audit.json) | **Temporal/graph** −0.31 AP each; stamps alone only −0.04 |
+
+Commits `51b3b29`, `5a4d925`.
