@@ -333,8 +333,16 @@ Pre-fix **0.579** is deprecated. Artifact: [`data/validation/v1/photography_day.
 
 [`data/validation/v1/hub_gate_report.json`](data/validation/v1/hub_gate_report.json): 34,052 hub rows; `fan_in_1h≥6` → 21,233; **31** received `mule_credit_restrict` / hard_flag (Loop M champion). Wave 1 gate would fail — Brake unchanged in Wave 0.
 
-### 0.6 SAML-D Loop M
+### 0.6 SAML-D Loop M (complete)
 
-Stream-score `v1-train-46__loopm-train` → [`data/validation/v1/stage4_saml_d_loopm.json`](data/validation/v1/stage4_saml_d_loopm.json) (pending run completion). Stage 1 holdout unchanged in [`holdout_metrics.json`](data/validation/v1/holdout_metrics.json).
+Stream-scored `v1-train-46__loopm-train` (~18 min, peak RSS ~4.1 GB). Artifact: [`stage4_saml_d_loopm.json`](data/validation/v1/stage4_saml_d_loopm.json).
+
+| FPR target | Stage 1 TPR | Loop M TPR |
+|---|---|---|
+| 0.1% | 1.09% | **1.96%** |
+| 0.5% | 1.47% | **3.05%** |
+| 1% | 2.27% | **3.91%** |
+
+Still weak absolute transfer; lead metric only. `binary_ap` ~0.002 (both).
 
 **Ledger:** [`data/validation/v1/agent/`](data/validation/v1/agent/), [`docs/agent/final_validation_report.md`](docs/agent/final_validation_report.md).

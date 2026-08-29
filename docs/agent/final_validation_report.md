@@ -50,9 +50,9 @@
 | Model | 0.1% FPR | 0.5% FPR | 1% FPR |
 |-------|----------|----------|--------|
 | Stage 1 (`holdout_metrics.json`) | 1.09% | 1.47% | 2.27% |
-| Loop M (`stage4_saml_d_loopm.json`) | see sidecar | see sidecar | see sidecar |
+| Loop M (`stage4_saml_d_loopm.json`) | **1.96%** | **3.05%** | **3.91%** |
 
-Do **not** compare SAML-D `binary_ap` (~0.002) to lab 0.879.
+Loop M improves TPR@FPR vs Stage 1 on the same SAML-D eval slice but remains far from lab transfer. `binary_ap` ~0.0021 (both models). Do **not** compare to lab 0.879.
 
 ## Remaining limitations
 

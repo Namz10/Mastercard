@@ -33,8 +33,8 @@
       "causal_plausibility": 0.9,
       "implementation_feasibility": 0.5,
       "falsifiable_experiment": "Loop M stream-score on SAML-D; compare TPR@FPR only",
-      "status": "testing",
-      "wave0_outcome": "Stage 1 scored; Loop M scoring in Wave 0.6"
+      "status": "accepted",
+      "wave0_outcome": "Stage 1 + Loop M scored; Loop M TPR@FPR ~1.8× Stage 1 at 0.1% FPR but still << lab"
     }
   ]
 }
