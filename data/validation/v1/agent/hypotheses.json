@@ -1,0 +1,40 @@
+{
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "Stamp and APP session features inflate lab AP without portable external signal",
+      "priority": 0.0,
+      "expected_external_gain": 0.3,
+      "evidence_strength": 0.9,
+      "causal_plausibility": 0.85,
+      "implementation_feasibility": 0.9,
+      "falsifiable_experiment": "Frozen-champion WITHOUT_STAMPS on gtest-48; stream-score on SAML-D after instrumentation fix",
+      "status": "accepted",
+      "wave0_outcome": "Instrumentation fixed (0.1); WITHOUT_STAMPS now 0.717/0.549/0.844 per model"
+    },
+    {
+      "id": "H2",
+      "statement": "Hub fan-in rule fires on legitimate high-volume merchants",
+      "priority": 0.5,
+      "expected_external_gain": 0.1,
+      "evidence_strength": 0.7,
+      "causal_plausibility": 0.8,
+      "implementation_feasibility": 0.6,
+      "falsifiable_experiment": "Hub gate report on gtest-48; any fan_in>=6 hub with mule restrict fails Wave 1",
+      "status": "open",
+      "wave0_outcome": "31 hub rows restricted; Wave 1 Brake change deferred to seed 49"
+    },
+    {
+      "id": "H3",
+      "statement": "SAML-D transfer requires portable features and ontology alignment, not threshold retuning on external labels",
+      "priority": 0.2,
+      "expected_external_gain": 0.5,
+      "evidence_strength": 0.85,
+      "causal_plausibility": 0.9,
+      "implementation_feasibility": 0.5,
+      "falsifiable_experiment": "Loop M stream-score on SAML-D; compare TPR@FPR only",
+      "status": "testing",
+      "wave0_outcome": "Stage 1 scored; Loop M scoring in Wave 0.6"
+    }
+  ]
+}

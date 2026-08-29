@@ -54,6 +54,8 @@ Latency p50/p99 ms                  Cost sketch (₹)              "Lab fraud ra
 | **Loop-M row** | Evasion / miss added to G-train only; never to G-test or Canary Vault |
 | **PR-AUC** | Average Precision (area under the Precision-Recall curve); unaffected by true-negative count; appropriate for low fraud rates |
 | **FPR** | False Positive Rate on **genuine** rows (label\_family == `normal`); not the same as 1 − Precision |
+| **genuine_fp** | **Lead FPR metric:** `FP / n_normal` on the scored population |
+| **genuine_fp_over_eval** | Legacy name: `(TP+FP) / n_eval` — **predicted-positive rate** over all eval rows, not genuine FPR. Fit-time Stage 1 (~4.84%) is seed-46 **eval fold**; G-test seed 48 (~8.79%) is a different population. Always pair with `genuine_fp` when reporting. |
 
 ---
 

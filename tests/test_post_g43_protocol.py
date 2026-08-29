@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -76,3 +77,16 @@ def test_champion_manifest_has_detect_and_act_thr(fitted: dict):
     metrics = fitted["body"]["metrics"]
     assert "detect_thr" in metrics or "op_threshold" in metrics
     assert "act_thr" in metrics or "op_threshold" in metrics
+
+
+@pytest.mark.skipif(
+    not Path("data/runs/v1-gtest-48/split.parquet").is_file()
+    or not Path("data/runs/v1-train-46__gtest/split.parquet").is_file(),
+    reason="v1 gtest worlds not generated",
+)
+def test_v1_gtest_alias_event_ids_equal():
+    """Wave 0.2 — Loop M __gtest is not an independent holdout."""
+    a = pd.read_parquet("data/runs/v1-gtest-48/split.parquet")["event_id"]
+    b = pd.read_parquet("data/runs/v1-train-46__gtest/split.parquet")["event_id"]
+    assert len(a) == len(b) == 394954
+    assert a.equals(b)

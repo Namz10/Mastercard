@@ -297,3 +297,44 @@ Eval n_pos: mule **3,084** (family AP 0.00096), invoice_fraud **22** (AP withhel
 | IBM HI-Small | CSV not fetched — PSI not run |
 | BAF | Overlap matrix only; no champion transfer (CC BY-NC-ND) |
 | APP/invoice | Public gap confirmed. Over-Invoicing n=22 in eval — too few for family AP. |
+
+---
+
+## Wave 0 — autonomous validation loop (2026-08-29)
+
+**Branch:** `agent/wave0-validation`  
+**Scope:** measurement / instrumentation only on frozen `v1-gtest-48`. No generator, Brake, or model-recipe changes.
+
+### 0.1 Frozen-champion ablation (P0 closed)
+
+**Defect:** `_app_ablation` refit a toy APP HGB; all three Photography rows showed identical `without_stamps` **0.579** (unconfirmed per model).
+
+**Fix:** zero columns on encoded matrix → score frozen `champ.model` / `_fraud_score`; tag `app_ablation_source: frozen_champion`; seed-43 cache checks `gtest_run_id` on read.
+
+**Re-scored WITHOUT_STAMPS (binary AP, frozen champion) on `v1-gtest-48`:**
+
+| Model | with_app_flags (APP AP) | without_app_flags | **without_stamps** |
+|---|---|---|---|
+| Stage 1 | 0.980 | 0.222 | **0.717** |
+| Stage 2 | 0.977 | 0.174 | **0.549** |
+| Loop M | 0.983 | 0.242 | **0.844** |
+
+Pre-fix **0.579** is deprecated. Artifact: [`data/validation/v1/photography_day.json`](data/validation/v1/photography_day.json) (`champion_model_run_id`: `v1-train-46__loopm-train`).
+
+### 0.2 G-test alias
+
+`v1-train-46__gtest` ≡ `v1-gtest-48` (394,954 identical `event_id`s). Documented in [`data/validation/v1/loop_m_result.json`](data/validation/v1/loop_m_result.json). Not independent holdout.
+
+### 0.3 genuine_fp naming
+
+`genuine_fp` = FP/n_normal (lead). `genuine_fp_over_eval` = predicted-positive rate — see [`VALIDATION.md`](VALIDATION.md) §0.3.
+
+### 0.4 Hub gate (report-only)
+
+[`data/validation/v1/hub_gate_report.json`](data/validation/v1/hub_gate_report.json): 34,052 hub rows; `fan_in_1h≥6` → 21,233; **31** received `mule_credit_restrict` / hard_flag (Loop M champion). Wave 1 gate would fail — Brake unchanged in Wave 0.
+
+### 0.6 SAML-D Loop M
+
+Stream-score `v1-train-46__loopm-train` → [`data/validation/v1/stage4_saml_d_loopm.json`](data/validation/v1/stage4_saml_d_loopm.json) (pending run completion). Stage 1 holdout unchanged in [`holdout_metrics.json`](data/validation/v1/holdout_metrics.json).
+
+**Ledger:** [`data/validation/v1/agent/`](data/validation/v1/agent/), [`docs/agent/final_validation_report.md`](docs/agent/final_validation_report.md).

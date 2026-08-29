@@ -1,0 +1,25 @@
+{
+  "run_id": "v1-gtest-48",
+  "model_run_id": "v1-train-46__loopm-train",
+  "hub_payee_prefix": "VID-SIM-HUB-",
+  "n_hub_rows": 34052,
+  "n_unique_hub_payees": 3,
+  "fan_in_1h": {
+    "min": 0,
+    "p50": 8.0,
+    "p90": 16.0,
+    "max": 28,
+    "ge_6": 21233
+  },
+  "hub_actions": {
+    "allow": 34021,
+    "mule_credit_restrict": 31
+  },
+  "hub_mule_credit_restrict": 31,
+  "hub_hard_flag_rows": 31,
+  "hub_mule_rule_rows": 31,
+  "hub_fan_in_ge6_with_restrict": 31,
+  "hub_fan_in_ge6_with_hard_flag": 31,
+  "wave1_gate_spec": "any hub with fan_in_1h>=6 hard-flagged as mule \u2192 fail (measure only in Wave 0)",
+  "note": "Report-only; Brake unchanged in Wave 0."
+}
