@@ -162,3 +162,24 @@ while maintaining acceptable:
 * no test contamination
 
 If an experiment produces a prettier single metric but violates these conditions, **reject it.**
+
+
+I'm sure about the strategic conclusion, but not about saying there are zero huge wins left.
+
+Based strictly on everything you've shown me:
+
+Loop M is genuinely strong internally.
+The 0.1% FPR / 98.7% recall result is very promising.
+The failed H6 and H5c experiments show that blindly optimizing FPR can damage the classifier.
+SAML-D transfer is still the major weakness.
+So I would not risk the current champion with random new training changes right before submission.
+
+The one thing I would absolutely finish is:
+
+Select the 0.1% FPR threshold on inner validation → freeze it → evaluate once on untouched test.
+
+If that holds near 98%+ recall, that's a substantially cleaner headline than the current default 8.07% FPR.
+
+After that: stop unless you have time for one targeted experiment. You already have enough strong evidence for a hackathon submission.
+
+One correction to my earlier wording: 98.7% @ 0.1% FPR is not yet a guaranteed production operating point because your current Pareto number was measured from the evaluation curve. The threshold-selection protocol is what makes that claim defensible.
