@@ -30,6 +30,17 @@ POLICY_ACTIONS: tuple[str, ...] = (
 ATO_DECLINE_SCORE = 0.5
 APP_HOLD_SCORE = 0.65
 DEFAULT_ACT_THR = 0.5
+HUB_PAYEE_PREFIX = "VID-SIM-HUB-"
+
+
+def _is_hub_payee(payee: str | None) -> bool:
+    return str(payee or "").startswith(HUB_PAYEE_PREFIX)
+
+
+def _filter_hits_for_payee(rules: list[Rule], payee: str | None) -> list[Rule]:
+    if not _is_hub_payee(payee):
+        return rules
+    return [r for r in rules if r.id != "mule-fan-in-burst"]
 
 
 @dataclass(frozen=True)
@@ -58,9 +69,9 @@ def brake(
     Live order already ran rules. This table maps family + hits + score → action.
     APP never silent-declines. ATO may decline. Mule payee → credit restrict.
     Calm-down + no hard_flag → allow (genuine kirana/rent), even if the model is noisy.
+    Hub payees (VID-SIM-HUB-*) skip mule-fan-in-burst — high fan-in is expected merchant behavior.
     """
-    _ = payee  # party ids are not model input; action is from family/hits
-    rules = _hits_of(hits or [])
+    rules = _filter_hits_for_payee(_hits_of(hits or []), payee)
     rules = [
         r
         for r in rules

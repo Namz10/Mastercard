@@ -77,6 +77,9 @@ generate-v1-gdev-47:
 generate-v1-gtest-48:
 	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='v1-gtest-48', n_customers=2400, n_merchants=120, sim_days=90, world_seed=48, pin=True, runs_dir=Path('data/runs')); db.close(); print('v1 gtest 48 OK', r['event_count'])"
 
+generate-v1-gtest-49:
+	$(PY) -c "from pathlib import Path; from packages.sim.runner import run_population; r=run_population(None, run_id='v1-gtest-49', n_customers=2400, n_merchants=120, sim_days=90, world_seed=49, pin=True, runs_dir=Path('data/runs')); print('v1 gtest 49 OK', r['event_count'])"
+
 stage4-saml-d:
 	OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONUNBUFFERED=1 nice -n 15 $(PY) -c "from packages.eval.saml_d import score_saml_d, write_stage4_artifacts; b=score_saml_d(); p=write_stage4_artifacts(b); print(b.get('status'), p, b.get('tpr_at_fpr'))"
 

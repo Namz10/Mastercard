@@ -89,6 +89,55 @@ def test_hub_shaped_row_fan_in_normal_not_restricted_without_hard_flag():
     assert d.policy_action != "mule_credit_restrict"
 
 
+def test_hub_payee_high_fan_in_not_restricted_at_high_score():
+    """H2 — legitimate hub merchants must not get mule_credit_restrict from fan-in rule."""
+    row = {
+        "fan_in_1h": 12,
+        "amount_vs_p30": 1.0,
+        "fan_out_1h": 0,
+        "is_new_payee": False,
+        "is_new_device": False,
+        "call_active_flag": False,
+        "copy_paste_payee_flag": False,
+        "pause_ms": 0,
+        "burst_velocity": 0.0,
+        "account_age_days": 400,
+        "payee_history_count": 20,
+    }
+    ev = evaluate_rules(row)
+    d = brake(
+        pred_label_family="normal",
+        score=0.95,
+        hits=ev,
+        payee="VID-SIM-HUB-000001",
+    )
+    assert d.policy_action != "mule_credit_restrict"
+
+
+def test_non_hub_payee_high_fan_in_still_restricted_at_high_score():
+    row = {
+        "fan_in_1h": 12,
+        "amount_vs_p30": 1.0,
+        "fan_out_1h": 0,
+        "is_new_payee": False,
+        "is_new_device": False,
+        "call_active_flag": False,
+        "copy_paste_payee_flag": False,
+        "pause_ms": 0,
+        "burst_velocity": 0.0,
+        "account_age_days": 400,
+        "payee_history_count": 20,
+    }
+    ev = evaluate_rules(row)
+    d = brake(
+        pred_label_family="normal",
+        score=0.95,
+        hits=ev,
+        payee="VID-SIM-M-000042",
+    )
+    assert d.policy_action == "mule_credit_restrict"
+
+
 def test_pred_mule_low_score_not_restricted_without_hard_flag():
     d = brake(pred_label_family="mule", score=0.1, hits=[])
     assert d.policy_action != "mule_credit_restrict"

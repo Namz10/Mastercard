@@ -57,10 +57,10 @@ def main() -> dict:
         pmap = raw_pmap
     scores = _fraud_score(pmap, len(train_scored))
     pred = _pred_family(pmap, champ.classes, len(train_scored))
-    actions = _vectorized_brake_actions(x_raw, pred, scores, rules)
+    payee_s = pd.Series(payee)
+    actions = _vectorized_brake_actions(x_raw, pred, scores, rules, payees=payee_s)
     hard, _, applies = _rule_hit_masks(x_raw, rules, scores=scores)
 
-    payee_s = pd.Series(payee)
     hub_mask = payee_s.str.startswith(HUB_PREFIX).to_numpy()
     hub_df = train_scored.loc[hub_mask].copy()
     hub_actions = pd.Series(actions)[hub_mask]

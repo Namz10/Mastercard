@@ -346,3 +346,9 @@ Stream-scored `v1-train-46__loopm-train` (~18 min, peak RSS ~4.1 GB). Artifact: 
 Still weak absolute transfer; lead metric only. `binary_ap` ~0.002 (both).
 
 **Ledger:** [`data/validation/v1/agent/`](data/validation/v1/agent/), [`docs/agent/final_validation_report.md`](docs/agent/final_validation_report.md).
+
+---
+
+## Wave 1 iteration 1 — H2 hub exemption (2026-08-29)
+
+**ACCEPT.** Hub `mule_credit_restrict` 31 → 0 on gtest-48. Seed 49 confirmatory: `genuine_fp` 8.12%, cost 0.0092. Loop continues (SAML-D / portable features next).

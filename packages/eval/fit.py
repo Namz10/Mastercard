@@ -32,7 +32,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import OrdinalEncoder
 
 from packages.config.ml import load_ml_flags, select_n_trials
-from packages.eval.brake import APP_HOLD_SCORE, ATO_DECLINE_SCORE, as_record, brake
+from packages.eval.brake import APP_HOLD_SCORE, ATO_DECLINE_SCORE, HUB_PAYEE_PREFIX, as_record, brake
 from packages.eval.iso_check import (
     apply_iso_brake_upgrade,
     check_iso_genuine_notify_rate,
@@ -537,6 +537,7 @@ def _vectorized_brake_actions(
     rules: list[Rule],
     iso_model: Any | None = None,
     pmap: dict[str, np.ndarray] | None = None,
+    payees: pd.Series | None = None,
 ) -> np.ndarray:
     """Vectorized brake priority using attached ``rule__`` bits (not a second rule engine)."""
     n = len(raw)
@@ -545,6 +546,15 @@ def _vectorized_brake_actions(
     score_arr = np.asarray(scores, dtype=float)
     actions = np.array(["allow"] * n, dtype=object)
     done = np.zeros(n, dtype=bool)
+    hub_mask = np.zeros(n, dtype=bool)
+    fan_burst = np.zeros(n, dtype=bool)
+    if payees is not None:
+        hub_mask = payees.astype(str).str.startswith(HUB_PAYEE_PREFIX).to_numpy()
+    if "rule__mule-fan-in-burst" in raw.columns:
+        fan_burst = raw["rule__mule-fan-in-burst"].fillna(0).astype(int).to_numpy(dtype=bool)
+    hub_fan_exempt = hub_mask & fan_burst
+    if hub_fan_exempt.any():
+        hard = hard & ~hub_fan_exempt
 
     def _assign(mask: np.ndarray, values: np.ndarray | str) -> None:
         m = mask & ~done
@@ -556,9 +566,10 @@ def _vectorized_brake_actions(
             actions[m] = values[m]
         done[m] = True
 
-    mule_hit = ((family == "mule") & (score_arr >= ATO_DECLINE_SCORE)) | applies.get(
-        "mule", np.zeros(n, dtype=bool)
-    )
+    mule_rule = applies.get("mule", np.zeros(n, dtype=bool))
+    if hub_fan_exempt.any():
+        mule_rule = mule_rule & ~hub_fan_exempt
+    mule_hit = ((family == "mule") & (score_arr >= ATO_DECLINE_SCORE)) | mule_rule
     app_hit = (family == "app_fraud") | applies.get("app", np.zeros(n, dtype=bool))
     ato_hit = (family == "ato") | applies.get("ato", np.zeros(n, dtype=bool))
     invoice_hit = (family == "invoice_fraud") | applies.get("bec", np.zeros(n, dtype=bool))
@@ -606,7 +617,9 @@ def _brake_action_hist(
     """Brake action histogram over all rows + the false-positive rows only."""
     yhat = (scores >= threshold).astype(int)
     lbl = labels.astype(str).to_numpy()
-    actions = _vectorized_brake_actions(raw, pred, scores, rules, iso_model=iso_model, pmap=pmap)
+    actions = _vectorized_brake_actions(
+        raw, pred, scores, rules, iso_model=iso_model, pmap=pmap, payees=payees
+    )
     hist: dict[str, int] = {}
     fp_hist: dict[str, int] = {}
     fp_mask = (lbl == "normal") & (yhat == 1)

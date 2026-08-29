@@ -79,6 +79,20 @@ Loop M improves TPR@FPR vs Stage 1 on the same SAML-D eval slice but remains far
 - Claim hub high-volume merchants are exempt from mule rules (unmeasured until Wave 1).
 - Lead with accuracy or “lab rate = India.”
 
+## Wave 1 iteration 1 — H2 hub payee exemption (ACCEPT)
+
+**Change:** `mule-fan-in-burst` does not trigger `mule_credit_restrict` for `VID-SIM-HUB-*` payees (`brake.py`, vectorized hist in `fit.py`).
+
+| Check | Before | After |
+|---|---|---|
+| Hub `mule_credit_restrict` (gtest-48) | 31 | **0** |
+| `hub_fan_in_ge6_with_restrict` | 31 | **0** |
+| Loop M `genuine_fp` gtest-48 | 8.07% | 8.07% (unchanged) |
+| Loop M `genuine_fp` gtest-49 | — | 8.12% |
+| Cost sketch gtest-49 | — | 0.0092 |
+
+Confirmatory world: `data/runs/v1-gtest-49/` (seed 49, 396,655 events). Model scores unchanged; Brake-only.
+
 ## Wave 1 entry criteria
 
 P0 closed. Hub gate measured (fail documented). Proceed with hypotheses on seed **49** for behavior changes only.

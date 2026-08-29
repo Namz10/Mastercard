@@ -21,8 +21,8 @@
       "causal_plausibility": 0.8,
       "implementation_feasibility": 0.6,
       "falsifiable_experiment": "Hub gate report on gtest-48; any fan_in>=6 hub with mule restrict fails Wave 1",
-      "status": "open",
-      "wave0_outcome": "31 hub rows restricted; Wave 1 Brake change deferred to seed 49"
+      "status": "accepted",
+      "wave0_outcome": "31 hub restricts → 0 after payee exemption; confirmed on gtest-48/49"
     },
     {
       "id": "H3",

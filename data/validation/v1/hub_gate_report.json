@@ -12,13 +12,14 @@
     "ge_6": 21233
   },
   "hub_actions": {
-    "allow": 34021,
-    "mule_credit_restrict": 31
+    "allow": 34047,
+    "step_up": 4,
+    "decline": 1
   },
-  "hub_mule_credit_restrict": 31,
+  "hub_mule_credit_restrict": 0,
   "hub_hard_flag_rows": 31,
   "hub_mule_rule_rows": 31,
-  "hub_fan_in_ge6_with_restrict": 31,
+  "hub_fan_in_ge6_with_restrict": 0,
   "hub_fan_in_ge6_with_hard_flag": 31,
   "wave1_gate_spec": "any hub with fan_in_1h>=6 hard-flagged as mule \u2192 fail (measure only in Wave 0)",
   "note": "Report-only; Brake unchanged in Wave 0."
