@@ -372,3 +372,11 @@ Worlds generated: `v1-train-50`, `v1-gdev-51`, `v1-gtest-52`. **Fit failed** E2:
 ## Wave 1 iteration 5 — H6 hard-negative mining (2026-08-29, REJECT)
 
 Critic PASS → RED tests → `packages/eval/hard_negatives.py`. Judge REJECT: gtest-49 `genuine_fp` **6.74%** (was 8.12%) but `identity_burst` AP −62%, cost_sketch ~40×. Artifact: [`h6_hard_negatives.json`](data/validation/v1/h6_hard_negatives.json).
+
+---
+
+## Wave 1 iteration 6 — H5b + H6-D parallel (2026-08-29, ACCEPT)
+
+**H5b:** `fpr_pareto.py` + [`pareto_genuine_fpr.json`](data/validation/v1/pareto_genuine_fpr.json). LoopM max recall @ 1% FPR: **99.6%** (g48), **99.6%** (g49); `identity_burst` recall **99.8%** at 1% cap on g48. Dominates Stage1 at all three caps.
+
+**H6-D:** [`h6_diagnosis.json`](data/validation/v1/h6_diagnosis.json) + [`docs/agent/h6_diagnosis.md`](docs/agent/h6_diagnosis.md). Mined normals **91% `is_new_payee`**; identity fraud is **fan_in-shaped**. Generic HN targets wrong mode — next mining must filter new-payee pool or use family-aware caps.

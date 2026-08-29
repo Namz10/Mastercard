@@ -1,11 +1,7 @@
 # Agent prompt (user overrides)
 
-Optional one-shot or standing instructions for the autonomous validation loop. **Read at the start of every cycle** (after `kb.md`). When this file is non-empty, treat its contents as **highest-priority user intent** for the current session, subject to anti-rig rules in the skill.
+**Standing:** PLAN → CRITIC → RED → implement → pytest → JUDGE. Never skip gates.
 
-Leave blank when you have nothing to add.
+**Session priority (2026-08-29):** Run **H5 FPR-constrained optimization** and **H6 failure diagnosis** in parallel this cycle. Success = **Pareto improvement**, not lower FPR alone.
 
----
-
-**Standing (2026-08-29):** Always **PLAN → CRITIC subagent → RED tests → implement → pytest → JUDGE** before fit/generate/eval. Never skip critic/judge.
-
-<!-- Append instructions below this line -->
+**Loop:** Loop M → FPR op → gtest-49 → weakest family → diagnose → intervention → critic → 46/47/48/49 → ACCEPT on full gate table.

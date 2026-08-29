@@ -85,3 +85,15 @@ Temporal/behavioral features — particularly for ATO/identity and APP. Things l
 Cross-world robustness — retrain on multiple seeds and measure variance. This tells you whether the impressive Loop M result is genuinely robust or partly a lucky world.
 
 More valuable than easier fraud.
+
+---
+
+## 2026-08-29 (user) — Execution order & success definition
+
+**Order:** (1) FPR-constrained optimization → (2) diagnose H6 before more mining → (4) ablation → (5) graph/behavior features → (6) simulator last.
+
+**Loop:** Loop M → FPR-constrained op → eval seed 49 → weakest family → diagnose → targeted intervention → critic → eval 46/47/48/49 → ACCEPT only on **Pareto improvement** (not raw lower FPR alone).
+
+**ACCEPT requires:** FPR ↓ or within ε · recall not materially worse · no major family AP collapse · cost stable · no leakage.
+
+**H6 lesson:** generic top-k hard negatives collapsed `identity_burst` (−62%) while lowering FPR — next mining must be family-aware/capped.

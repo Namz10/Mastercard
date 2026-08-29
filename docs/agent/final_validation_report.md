@@ -141,4 +141,18 @@ Mined top-500 high-scoring normals from `v1-gdev-47` (frozen Loop M scorer) → 
 | `identity_burst` AP | 0.967 → **0.333** | 0.958 → **0.364** |
 | `cost_sketch` | 0.011 → **0.575** | 0.009 → **0.368** |
 
-FPR win is real on seed 49, but **identity_burst collapse** and **cost explosion** fail G6. Do **not** promote `v1-train-46__hn-train`. Artifact: `data/validation/v1/h6_hard_negatives.json`. Next: smaller `top_k`, family-aware mining, or payee/graph features per KB.
+FPR win is real on seed 49, but **identity_burst collapse** and **cost explosion** fail G6. Do **not** promote `v1-train-46__hn-train`. Artifact: `data/validation/v1/h6_hard_negatives.json`. **Diagnosis (H6-D):** mined normals are 91% `is_new_payee` — wrong shape vs fan_in-shaped `identity_burst`; see `docs/agent/h6_diagnosis.md`.
+
+## Wave 1 iteration 6 — H5b FPR envelope + H6-D diagnosis (parallel, ACCEPT)
+
+**H5b (instrumentation):** `packages/eval/fpr_pareto.py` — max recall @ genuine FPR ≤ 1% / 0.5% / 0.1% on frozen Stage1 vs LoopM, gtest-48 **and** gtest-49. Artifact: `data/validation/v1/pareto_genuine_fpr.json`.
+
+| FPR cap | Stage1 recall (g48) | LoopM recall (g48) | LoopM `identity_burst` @ 1% |
+|---------|---------------------|--------------------|-----------------------------|
+| 1% | 84.7% | **99.6%** | **99.8%** |
+| 0.5% | 84.4% | **99.5%** | 99.8% |
+| 0.1% | 83.2% | **98.7%** | 98.9% |
+
+gtest-49 confirms (LoopM 99.6% / 99.5% / 98.6% @ 1/0.5/0.1%). **Insight:** default `detect_thr` (~8% FPR) undersells Loop M; operational Pareto is strong. Next: wire FPR-constrained `detect_thr` selection in `fit_champion` (inner_val only).
+
+**H6-D (forensics):** Mined HN are new-payee-shaped (not stamp-heavy). Retrain targeted wrong failure mode → identity collateral damage. See `docs/agent/h6_diagnosis.md`.
