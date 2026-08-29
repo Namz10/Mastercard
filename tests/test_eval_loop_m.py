@@ -37,12 +37,12 @@ def test_loop_m_g_test_new_seed_reports_ap_and_fpr(pop: dict, tmp_path: Path):
         "loop-m-train",
         "app_fraud",
         train_seed=42,
-        gtest_seed=43,
+        gtest_seed=48,
         runs_dir=runs,
         models_dir=models,
     )
     assert body["train_seed"] != body["gtest_seed"]
-    assert body["gtest_seed"] == 43
+    assert body["gtest_seed"] == 48
     assert body["catalog_solved"] is False
     assert body["catalog_status"] == "open"
     assert body["n_extra"] > 0
@@ -53,7 +53,8 @@ def test_loop_m_g_test_new_seed_reports_ap_and_fpr(pop: dict, tmp_path: Path):
     assert "ap_verdict" in cmp_
     assert cmp_["ap_verdict"] in {"improved", "equal", "regressed", "not_comparable"}
     assert "genuine_fp_before" in cmp_ and "genuine_fp_after" in cmp_
-    assert isinstance(cmp_["genuine_fp_ok"], bool)
+    assert isinstance(cmp_["other_family_ok"], bool)
+    assert "other_family_ap" in cmp_
 
     eps = float(body["ap_equal_eps"])
     a0, a1 = cmp_["ap_before"], cmp_["ap_after"]

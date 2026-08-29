@@ -127,7 +127,7 @@ def test_score_run_all_rows_n_pos_matches_y_length_by_family(fitted: dict):
         assert n_pos[fam] == int((y == fam).sum())
 
 
-def test_gtest_ablation_copied_not_refit(fitted: dict):
+def test_gtest_ablation_recomputed_not_copied(fitted: dict):
     body = score_run(
         "fit-c",
         model_run_id="fit-c",
@@ -136,9 +136,7 @@ def test_gtest_ablation_copied_not_refit(fitted: dict):
         all_rows=True,
     )
     ab = body["metrics"]["app_ablation"]
-    assert ab["app_ablation_source"] == "champion_fit"
-    assert "average_precision" in ab["with_app_flags"]
-    assert "average_precision" in ab["without_app_flags"]
+    assert ab["app_ablation_source"] == "scored_world"
 
 
 def test_metrics_pass_false_without_n_pos(fitted: dict):

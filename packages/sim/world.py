@@ -119,6 +119,21 @@ def generate_quiet_world(
                 category=cat,
             )
         )
+    # Legitimate high-fan-in hubs: payroll / marketplace / bill-pay. Hard negatives for mule.
+    hub_specs = (("payroll", "utilities"), ("marketplace", "grocery"), ("billpay", "telecom"))
+    for i, (kind, cat) in enumerate(hub_specs, start=1):
+        merchants.append(
+            Party(
+                party_id=party_id("HUB", i),
+                kind="hub",
+                persona=None,
+                created_ts=start - timedelta(days=int(rng.integers(200, 800))),
+                device_hash=f"dev-hub-{i:06d}",
+                kyc_tier="tier2",
+                opening_balance_minor=500_000_000,
+                category=cat,
+            )
+        )
     by_cat: dict[str, list[Party]] = {}
     for m in merchants:
         by_cat.setdefault(m.category or "grocery", []).append(m)
@@ -135,6 +150,9 @@ def generate_quiet_world(
             for _ in range(int(rng.integers(2, 5)))
         ]
         friends = [f for f in friends if f != party_id("C", i + 1)]
+        known_list = list(dict.fromkeys(known + friends))
+        if rng.random() < 0.45:
+            known_list.append(party_id("HUB", int(rng.integers(1, 4))))
         customers.append(
             Party(
                 party_id=party_id("C", i + 1),
@@ -144,7 +162,7 @@ def generate_quiet_world(
                 device_hash=f"dev-c-{i + 1:06d}",
                 kyc_tier="tier2" if persona != "young_urban" else "tier1",
                 opening_balance_minor=int(rng.integers(15_000_000, 40_000_000)),
-                known_payees=list(dict.fromkeys(known + friends)),
+                known_payees=list(dict.fromkeys(known_list)),
             )
         )
 
@@ -161,6 +179,11 @@ def generate_quiet_world(
     day_spend: dict[tuple[str, str], int] = {}
     events: list[dict[str, Any]] = []
     seq = 0
+    upgrade_day = {
+        c.party_id: int(rng.integers(sim_days // 3, max(sim_days // 3 + 1, sim_days - 5)))
+        for c in customers
+        if rng.random() < 0.04
+    }
 
     for cust in customers:
         lam = float(priors.persona_txn_per_day[cust.persona or "salaried"]) * sim_days
@@ -178,19 +201,28 @@ def generate_quiet_world(
                 continue
             p2m = rng.random() < priors.p2m_share
             if p2m and cust.known_payees:
-                merch_ids = [p for p in cust.known_payees if p.startswith("VID-SIM-M-")]
-                payee = merch_ids[int(rng.integers(0, len(merch_ids)))] if merch_ids else cust.known_payees[0]
+                if rng.random() < 0.08:
+                    hubs = [p for p in cust.known_payees if p.startswith("VID-SIM-HUB-")]
+                    payee = hubs[int(rng.integers(0, len(hubs)))] if hubs else None
+                    if payee is None:
+                        merch_ids = [p for p in cust.known_payees if p.startswith("VID-SIM-M-")]
+                        payee = merch_ids[int(rng.integers(0, len(merch_ids)))] if merch_ids else cust.known_payees[0]
+                else:
+                    merch_ids = [p for p in cust.known_payees if p.startswith(("VID-SIM-M-", "VID-SIM-HUB-"))]
+                    payee = merch_ids[int(rng.integers(0, len(merch_ids)))] if merch_ids else cust.known_payees[0]
             else:
                 p2p = [p for p in cust.known_payees if p.startswith("VID-SIM-C-") and p in cust_by_id]
                 payee = p2p[int(rng.integers(0, len(p2p)))] if p2p else merchants[0].party_id
             if payee not in meta:
                 continue
-            if payee.startswith("VID-SIM-M-"):
+            if payee.startswith("VID-SIM-M-") or payee.startswith("VID-SIM-HUB-"):
                 merch = merchants_by_id.get(payee)
                 cat = (merch.category if merch else None) or "grocery"
             else:
                 cat = "p2p"
             amount = sample_amount_minor(rng, priors, cat)
+            # Hubs keep the category prior (utilities/grocery/telecom). Ticket-size
+            # must stay in the PSI envelope; mule hard-negatives are fan-in, not rupees.
             day_key = (cust.party_id, ts.date().isoformat())
             spent = day_spend.get(day_key, 0)
             if spent + amount > priors.caps.day_max_minor:
@@ -199,13 +231,31 @@ def generate_quiet_world(
             if reason:
                 continue
             seq += 1
+            device = cust.device_hash
+            if cust.party_id in upgrade_day and day >= upgrade_day[cust.party_id]:
+                device = f"dev-c-up-{cust.party_id[-6:]}"
+            app_flags = None
+            payload = None
+            if rng.random() < 0.004:
+                app_flags = {
+                    "call_active_flag": False,
+                    "copy_paste_payee_flag": True,
+                    "pause_ms": int(rng.integers(200, 1200)),
+                    "urgency_pressure": 0.0,
+                }
+            if cust.persona == "small_biz" and rng.random() < 0.006:
+                payload = {
+                    "beneficiary_changed": True,
+                    "gstin_checksum_ok": True,
+                    "lookalike_domain_flag": False,
+                }
             feats = fc.snapshot_and_apply(
                 ts=ts,
                 payer=cust.party_id,
                 payee=payee,
                 amount_minor=amount,
-                device_hash=cust.device_hash,
-                app_flags=None,
+                device_hash=device,
+                app_flags=app_flags,
                 liveness_score=None,
                 doc_consistency=None,
                 debit=True,
@@ -222,6 +272,7 @@ def generate_quiet_world(
                     label_family="normal",
                     features_auth=feats,
                     economic_class=None,
+                    payload=payload,
                     kyc_tier=cust.kyc_tier,
                 )
             )

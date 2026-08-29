@@ -87,6 +87,26 @@ def test_calm_down_allow_even_if_weak_model_score():
     assert "calm_down" in decision.reason_codes
 
 
+def test_brake_mule_nudge_does_not_restrict_at_low_score():
+    row = {
+        "fan_in_1h": 4,
+        "amount_vs_p30": 0.8,
+        "fan_out_1h": 4,
+        "is_new_payee": False,
+        "is_new_device": False,
+        "call_active_flag": False,
+        "copy_paste_payee_flag": False,
+        "pause_ms": 0,
+        "burst_velocity": 0.0,
+        "account_age_days": 200,
+        "payee_history_count": 3,
+    }
+    ev = evaluate_rules(row)
+    assert any(r.id == "smurf-under-cap" for r in ev.hits)
+    decision = brake(pred_label_family="normal", score=0.05, hits=ev)
+    assert decision.policy_action != "mule_credit_restrict"
+
+
 def test_brake_app_not_decline_ato_may_decline_mule_payee_restricts():
     app_row = {
         "call_active_flag": True,

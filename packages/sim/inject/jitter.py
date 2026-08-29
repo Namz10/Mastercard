@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
+
+
+def clamp_ts(ts: datetime, t0: datetime, sim_days: int) -> datetime:
+    """Keep injector clocks inside [t0, t0+sim_days). Stops calendar-cut inflation."""
+    end = t0 + timedelta(days=sim_days) - timedelta(minutes=5)
+    if ts < t0:
+        return t0 + timedelta(hours=1)
+    if ts > end:
+        return end
+    return ts
 
 
 def jitter_value(rng: np.random.Generator, value: float, pin: bool) -> float:

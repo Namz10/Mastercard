@@ -29,6 +29,7 @@ POLICY_ACTIONS: tuple[str, ...] = (
 
 ATO_DECLINE_SCORE = 0.5
 APP_HOLD_SCORE = 0.65
+DEFAULT_ACT_THR = 0.5
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ def brake(
     score: float,
     hits: RuleEval | list[Rule] | tuple[Rule, ...] | None = None,
     payee: str | None = None,
+    act_thr: float | None = None,
 ) -> BrakeDecision:
     """
     Live order already ran rules. This table maps family + hits + score → action.
@@ -59,13 +61,20 @@ def brake(
     """
     _ = payee  # party ids are not model input; action is from family/hits
     rules = _hits_of(hits or [])
+    rules = [
+        r
+        for r in rules
+        if r.min_score is None or score >= float(r.min_score)
+    ]
     kinds = {r.kind for r in rules}
-    applies = {r.applies_to.lower() for r in rules}
+    applies = {r.applies_to.lower() for r in rules if r.kind == "hard_flag"}
     reasons = [r.id for r in rules]
     family = (pred_label_family or "normal").lower()
     hard = "hard_flag" in kinds
     calm = "calm_down" in kinds
-    mule_hit = family == "mule" or "mule" in applies
+    act = float(act_thr) if act_thr is not None else DEFAULT_ACT_THR
+    mule_hit = family == "mule" and score >= act
+    mule_hit = mule_hit or "mule" in applies
     app_hit = family == "app_fraud" or "app" in applies
     ato_hit = family == "ato" or "ato" in applies
     invoice_hit = family == "invoice_fraud" or "bec" in applies

@@ -7,17 +7,23 @@ from typing import Any
 
 import numpy as np
 
+from packages.sim.inject.jitter import clamp_ts
 from packages.sim.ledger import party_id
 from packages.sim.world import Party, WorldResult, append_event, register_party
 
 
+def _ts(world: WorldResult, ts):
+    return clamp_ts(ts, world.t0, world.sim_days)
+
+
 def _new_mule(world: WorldResult, rng: np.random.Generator, created_ts, age_days: int) -> Party:
     n = 1 + sum(1 for p in world.meta if p.startswith("VID-SIM-U-"))
+    created = created_ts
     mule = Party(
         party_id=party_id("U", n),
         kind="mule",
         persona=None,
-        created_ts=created_ts,
+        created_ts=created,
         device_hash=f"dev-u-{n:06d}",
         kyc_tier="tier1",
         opening_balance_minor=5_000_000,
@@ -28,8 +34,8 @@ def _new_mule(world: WorldResult, rng: np.random.Generator, created_ts, age_days
     return mule
 
 
-def _ensure_sink(world: WorldResult) -> Party:
-    pid = party_id("SINK", 1)
+def _ensure_sink(world: WorldResult, idx: int = 1) -> Party:
+    pid = party_id("SINK", max(1, idx))
     if pid in world.meta:
         m = world.meta[pid]
         return Party(
@@ -47,7 +53,7 @@ def _ensure_sink(world: WorldResult) -> Party:
         kind="sink",
         persona=None,
         created_ts=world.t0,
-        device_hash="dev-sink-000001",
+        device_hash=f"dev-sink-{max(1, idx):06d}",
         kyc_tier="tier2",
         opening_balance_minor=100_000_000,
         category="crypto_offramp",
@@ -63,15 +69,17 @@ def inject_funnel(
     n_inbound: int,
     window_start,
     signals: dict[str, Any],
+    span_minutes: float = 40.0,
 ) -> list[dict[str, Any]]:
-    n_inbound = max(16, n_inbound)
-    mule = _new_mule(world, rng, window_start - timedelta(days=3), int(signals.get("mule_account_age_days", 3)))
+    n_inbound = max(2, n_inbound)
+    age = int(signals.get("mule_account_age_days", 3))
+    mule = _new_mule(world, rng, window_start - timedelta(days=max(1, age)), age)
     senders = [world.customers[i] for i in rng.permutation(len(world.customers))]
     written: list[dict[str, Any]] = []
-    span_min = 40.0
+    span_min = max(5.0, float(span_minutes))
     for i in range(n_inbound):
         sender = senders[i % len(senders)]
-        ts = window_start + timedelta(minutes=span_min * i / max(n_inbound - 1, 1))
+        ts = _ts(world, window_start + timedelta(minutes=span_min * i / max(n_inbound - 1, 1)))
         amount = int(world.priors.caps.txn_min_minor * 8 + rng.integers(500, 20_000))
         ev = append_event(
             world,
@@ -95,13 +103,14 @@ def inject_cashout(
     start,
     ttl_hours: float,
     n_out: int = 4,
+    sink_idx: int = 1,
 ) -> list[dict[str, Any]]:
-    sink = _ensure_sink(world)
+    sink = _ensure_sink(world, sink_idx)
     written: list[dict[str, Any]] = []
     mule_acc = world.computer.accounts[mule_id]
     chunk = max(world.priors.caps.txn_min_minor, mule_acc.balance_minor // max(n_out, 1))
     for i in range(n_out):
-        ts = start + timedelta(hours=float(ttl_hours) * (i + 1) / n_out)
+        ts = _ts(world, start + timedelta(hours=float(ttl_hours) * (i + 1) / n_out))
         amount = min(chunk, mule_acc.balance_minor)
         if amount <= 0:
             break
@@ -135,7 +144,7 @@ def inject_smurf(
     written: list[dict[str, Any]] = []
     for i in range(max(3, n_inbound)):
         sender = senders[i % len(senders)]
-        ts = window_start + timedelta(minutes=i * 4)
+        ts = _ts(world, window_start + timedelta(minutes=i * 4))
         ev = append_event(
             world,
             ts=ts,
@@ -163,7 +172,7 @@ def inject_hop(
     a1 = int(rng.integers(50_000, 200_000))
     e1 = append_event(
         world,
-        ts=window_start,
+        ts=_ts(world, window_start),
         payer=sender.party_id,
         payee=mule.party_id,
         amount_minor=a1,
@@ -173,7 +182,7 @@ def inject_hop(
     )
     e2 = append_event(
         world,
-        ts=window_start + timedelta(minutes=20),
+        ts=_ts(world, window_start + timedelta(minutes=20)),
         payer=mule.party_id,
         payee=hop.party_id,
         amount_minor=min(a1, world.computer.accounts[mule.party_id].balance_minor),
@@ -199,7 +208,7 @@ def inject_dust(
         funder = world.customers[0]
         append_event(
             world,
-            ts=window_start,
+            ts=_ts(world, window_start),
             payer=funder.party_id,
             payee=mule.party_id,
             amount_minor=min(2_000_000, world.computer.accounts[funder.party_id].balance_minor // 8),
@@ -213,7 +222,7 @@ def inject_dust(
         payee = world.customers[i % len(world.customers)].party_id
         ev = append_event(
             world,
-            ts=window_start + timedelta(minutes=i),
+            ts=_ts(world, window_start + timedelta(minutes=i)),
             payer=mule_id,
             payee=payee,
             amount_minor=dust,

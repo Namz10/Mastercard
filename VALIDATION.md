@@ -511,7 +511,7 @@ Protocol:
 | Metric | Pass condition | Failure action |
 |--------|---------------|----------------|
 | G-test AP (miss family) after Loop M | ≥ prior AP or documented equal | Do not mark `solved`; continue loop |
-| G-test AP (other families) | < 5% relative drop | Investigate; may be acceptable |
+| G-test AP (other comparable families) | relative drop ≤ 5% (`loop_m.other_family_rel_drop_eps`) | **Fail `loop_pass`**; do not promote |
 | Genuine FPR | ≤ prior + **0.02** (Loop M slack) | Rollback; do not promote |
 | Canary Vault AP | ≥ prior − 0.02 (absolute) | Rollback |
 
@@ -555,7 +555,9 @@ A technique is marked `solved` in the Atlas ONLY when ALL of the following hold:
 
 ## 6. External Holdout Validation (HoldoutVault)
 
-This section documents the external datasets used for transfer validation. Per `decisions.md Part C`, some links are unverified and **must be confirmed before citing in the .docx**.
+> **Superseded for Stage 4 sequencing** by [Master validation protocol](.cursor/plans/external_holdout_validation_64f9d54e.plan.md) and [`Docs/plans/eval-child-external-dataset.md`](Docs/plans/eval-child-external-dataset.md). Do not score lab-champion AP on SAML-D without a FeatureComputer replay adapter; use `blocked_no_adapter` in the write-up. Do not copy “vault” terminology into the .docx.
+
+This section documents the external datasets used for transfer validation. Per `decisions.md Part C`, some links are unverified and **must be confirmed before citing in the .docx**. TalkingData AdTracking, BitcoinHeist, and FinCEN Files are **not** scored holdouts — see §6.6.
 
 ### 6.1 Category 1 — Network (transfer datasets)
 
@@ -630,6 +632,16 @@ Adversarial validation is inherently relative to the current champion.
 | Expert red-team | Human manually crafts beneficiary-swap invoices; inject into our detector | TPR on expert-crafted attacks |
 | GST distributional sanity | Compare our synthetic GSTIN patterns to publicly available GST filing aggregate statistics | Field-level PSI |
 | Checksum gate | Verify `gstin_checksum_ok()` is correct via known-valid GSTINs | 100% pass on known-valid; 0% pass on known-invalid |
+
+### 6.6 Named-gap appendix — not scored external-dataset
+
+These tables are **not** HoldoutVault scored holdouts. Do not quote AP / TPR / transfer AUC on them.
+
+| Dataset | Include in scored external-dataset? | Named gap |
+|---------|--------------------------------------|-----------|
+| TalkingData AdTracking | **No** | No `amount` — click/ad events, not payment-time transfers. |
+| BitcoinHeist | **No** | Pre-aggregated address/window features, not authorization-time ledger rows. |
+| FinCEN Files | **No** | SAR-level filings, not payment-rail events our AuthGate schema can score. |
 
 ---
 

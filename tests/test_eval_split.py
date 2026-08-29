@@ -11,10 +11,12 @@ import pytest
 
 from packages.eval.split import (
     LeakError,
+    assert_fold_n_pos,
     assign_folds,
     build_matrix,
     calendar_cut,
     folds_from_run,
+    inner_folds_from_train,
 )
 from packages.eval import split as split_mod
 from packages.sim.export import (
@@ -192,3 +194,51 @@ def test_population_writes_split_join_safe(tmp_path: Path):
     assert packed["y_train"].isin(LABEL_FAMILIES).all()
     assert (packed["folds"] == "eval").any()
     assert (packed["folds"] == "train").any()
+
+
+def test_assert_fold_n_pos_rejects_train_only_y():
+    n = 20
+    y_full = pd.Series(["app_fraud"] * 8 + ["normal"] * 12)
+    folds = pd.Series(["train"] * 12 + ["eval"] * 8)
+    inner = pd.Series(["inner_fit"] * 6 + ["inner_val"] * 6 + ["outer_eval"] * 8)
+    with pytest.raises(ValueError, match="length mismatch"):
+        assert_fold_n_pos(y_full.iloc[:12], folds, inner, min_n=1)
+    assert_fold_n_pos(y_full, folds, inner, min_n=0)
+
+
+def test_inner_folds_exclude_event_ids_stay_inner_fit():
+    rows = []
+    for i in range(50):
+        rows.append(
+            {
+                "event_id": f"evt-{i:010d}",
+                "event_ts": _ts(i).isoformat(),
+                "payer": "VID-SIM-C-000001",
+                "payee": "VID-SIM-M-000001",
+                "amount_minor": 1,
+                "label_family": "normal",
+            }
+        )
+    rows.append(
+        {
+            "event_id": "evt-lm-0000000001",
+            "event_ts": _ts(80).isoformat(),
+            "payer": "VID-SIM-C-000001",
+            "payee": "VID-SIM-M-000001",
+            "amount_minor": 1,
+            "label_family": "identity_burst",
+        }
+    )
+    split_df = pd.DataFrame(rows)
+    folds = pd.Series(["train"] * 51)
+    inner = inner_folds_from_train(
+        split_df, folds, fraction=0.20, exclude_event_ids=frozenset({"evt-lm-0000000001"})
+    )
+    assert inner.iloc[-1] == "inner_fit"
+    val_ids = set(split_df.loc[inner == "inner_val", "event_id"].astype(str))
+    assert "evt-lm-0000000001" not in val_ids
+    assert val_ids
+    orig_ts = pd.to_datetime(split_df.iloc[:50]["event_ts"], utc=True)
+    cut = orig_ts.max() - (orig_ts.max() - orig_ts.min()) * 0.20
+    val_ts = pd.to_datetime(split_df.loc[inner == "inner_val", "event_ts"], utc=True)
+    assert (val_ts >= cut).all()

@@ -10,9 +10,11 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import average_precision_score
 
 from packages.eval import fit as fit_mod
 from packages.eval.fit import (
+    FRAUD_FAMILIES,
     _calibrate_pmap,
     _cluster_bootstrap_ci,
     _top_features,
@@ -118,14 +120,14 @@ def test_optuna_skipped_small_n(pop: dict, tmp_path: Path):
     assert data["best_params"]["max_depth"] == int(recipe.get("max_depth", 3))
 
 
-def test_optuna_objective_is_not_min_family_ap():
-    """5.4 — objective is binary AP minus genuine-FP penalty, never min over family AP."""
+def test_optuna_objective_uses_nested_inner_val_ab():
+    """Objective must use inner_val A/B only; outer eval is forbidden."""
     src = inspect.getsource(fit_mod.tune_champion)
-    assert "average_precision" in src, "objective must use average_precision"
-    assert "10.0 * max(0.0, genuine_fp - 0.01)" in src, (
-        "objective must include the genuine-FP penalty term"
-    )
-    assert "min(" not in src, "objective must not be a min() over family AP"
+    assert "split_inner_val_ab" in src
+    assert "inner_B_genuine_fp" in src
+    assert "x_ev_enc" not in src
+    assert "outer_genuine" not in src
+    assert "outer_fp =" not in src
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +172,16 @@ def test_iso_feature_cols_stamp_free():
         "burst_velocity",
         "is_new_payee",
         "is_new_device",
+        "fan_in_24h",
+        "fan_out_24h",
+        "fan_in_unique_payers_24h",
+        "txn_velocity_24h",
+        "hours_since_prev_txn",
+        "hours_since_payee",
+        "amount_vs_7d_mean",
+        "unique_payees_7d",
+        "payee_fan_out_1h",
+        "in_out_asymmetry_24h",
     ]
     assert list(ISO_STAMP_FREE_FEATURES) == expected
     assert len(ISO_STAMP_FREE_FEATURES) == len(set(ISO_STAMP_FREE_FEATURES))
@@ -186,6 +198,22 @@ def test_iso_aborts_if_genuine_notify_gt_0_05():
     assert iso_enabled_flag({"enabled_default": False}, 0.0) is False, "disabled_default off -> off"
     # malformed config defaults off, never raises
     assert iso_enabled_flag({"enabled_default": "not-a-bool", "genuine_notify_rate_abort": None}, 0.0) is False
+
+
+def test_iso_contamination_defaults_to_recipe_0_01():
+    """Child 1 — IsolationForest contamination comes from features.json (0.01), not 0.05."""
+    from packages.eval.fit import load_recipe
+    from packages.eval.iso_check import ISO_STAMP_FREE_FEATURES, fit_isolation_forest
+
+    recipe = load_recipe()
+    iso_cfg = recipe.get("isolation_forest") or {}
+    assert iso_cfg.get("enabled_default") is False
+    assert float(iso_cfg.get("contamination")) == 0.01
+    n = 20
+    df = pd.DataFrame({c: np.zeros(n) for c in ISO_STAMP_FREE_FEATURES})
+    y = pd.Series(["normal"] * n)
+    model = fit_isolation_forest(df, y, contamination=float(iso_cfg.get("contamination", 0.01)))
+    assert model.get_params()["contamination"] == 0.01
 
 
 def test_coverage_named_gaps_unchanged_by_iso(postgres_required, tmp_path):
@@ -231,7 +259,7 @@ def test_stage2_skipped_n_pos_lt_50():
     out = _calibrate_pmap(pmap, y, classes)
     # mule (n_pos=10<50) must be left raw (skipped) — renormalization reweights but
     # family with zero positives is not calibrated. We assert skip via source flag.
-    src = inspect.getsource(fit_mod._calibrate_pmap)
+    src = inspect.getsource(fit_mod._fit_pmap_calibrators)
     assert "stage2_skipped_n_pos_lt_50" in src or "50" in src
     assert out["mule"] is not None
 
@@ -282,6 +310,117 @@ def test_cluster_bootstrap_ci_ordered():
         assert lo < hi, f"{fam} low must be < high (got {lo}, {hi})"
 
 
+def _cluster_bootstrap_ci_naive_isin(
+    split_eval: pd.DataFrame,
+    y_eval: pd.Series,
+    pmap: dict[str, np.ndarray],
+    *,
+    n_resamples: int,
+) -> dict[str, dict[str, float]]:
+    """Reference implementation using per-resample np.isin (slow path)."""
+    out: dict[str, dict[str, float]] = {}
+    yv = y_eval.astype(str).to_numpy()
+    n = len(yv)
+    payees = split_eval["payee"].astype(str).to_numpy()
+    payers = split_eval["payer"].astype(str).to_numpy()
+    rng = np.random.default_rng(42)
+
+    for fam in FRAUD_FAMILIES:
+        mask = yv == fam
+        n_pos = int(mask.sum())
+        if n_pos < 1:
+            out[fam] = {"low": float("nan"), "high": float("nan")}
+            continue
+
+        clusters = payees if fam in {"mule", "invoice_fraud"} else payers
+        unique_clusters = np.unique(clusters)
+        scores = pmap.get(fam, np.zeros(n))
+        aps: list[float] = []
+
+        for _ in range(n_resamples):
+            sampled_clusters = rng.choice(unique_clusters, size=len(unique_clusters), replace=True)
+            cluster_mask = np.isin(clusters, sampled_clusters)
+            sub_y = mask[cluster_mask].astype(int)
+            sub_scores = scores[cluster_mask]
+            if sub_y.min() != sub_y.max() and len(sub_y) >= 2:
+                aps.append(float(average_precision_score(sub_y, sub_scores)))
+
+        if len(aps) >= 5:
+            low = float(np.percentile(aps, 2.5))
+            high = float(np.percentile(aps, 97.5))
+            if low == high and high < 1.0:
+                high = min(1.0, low + 1e-4)
+            out[fam] = {"low": low, "high": high}
+        else:
+            out[fam] = {"low": float("nan"), "high": float("nan")}
+
+    return out
+
+
+def _bootstrap_ci_small_fixture() -> tuple[pd.DataFrame, pd.Series, dict[str, np.ndarray]]:
+    n = 120
+    rng = np.random.default_rng(11)
+    split_eval = pd.DataFrame(
+        {
+            "payee": [f"p{i % 20}" for i in range(n)],
+            "payer": [f"c{i % 30}" for i in range(n)],
+        }
+    )
+    yv = ["normal"] * n
+    for i in range(20, 50):
+        yv[i] = "mule"
+    for i in range(60, 85):
+        yv[i] = "app_fraud"
+    y = pd.Series(yv)
+    base = rng.uniform(0, 0.4, n)
+    pmap = {
+        "mule": base + np.where(np.arange(n) < 80, 0.35, 0),
+        "app_fraud": base + np.where(np.arange(n) < 90, 0.3, 0),
+    }
+    return split_eval, y, pmap
+
+
+def test_cluster_bootstrap_ci_matches_naive_isin():
+    """10.1b — fast integer path matches naive isin loop on a small fixture."""
+    split_eval, y, pmap = _bootstrap_ci_small_fixture()
+    n_resamples = 20
+    fast = _cluster_bootstrap_ci(split_eval, y, pmap, n_resamples=n_resamples)
+    naive = _cluster_bootstrap_ci_naive_isin(split_eval, y, pmap, n_resamples=n_resamples)
+
+    for fam in FRAUD_FAMILIES:
+        for key in ("low", "high"):
+            f_val = fast[fam][key]
+            n_val = naive[fam][key]
+            if np.isnan(f_val) and np.isnan(n_val):
+                continue
+            assert f_val == pytest.approx(n_val, rel=0, abs=1e-9), (
+                f"{fam}.{key}: fast={f_val} naive={n_val}"
+            )
+
+
+def test_cluster_bootstrap_ci_skipped_families_nan():
+    """10.1c — families with n_pos<1 return nan low/high."""
+    n = 80
+    split_eval = pd.DataFrame(
+        {"payee": [f"p{i % 10}" for i in range(n)], "payer": [f"c{i % 12}" for i in range(n)]}
+    )
+    y = pd.Series(["normal"] * n)
+    pmap: dict[str, np.ndarray] = {}
+    ci = _cluster_bootstrap_ci(split_eval, y, pmap, n_resamples=5)
+    for fam in FRAUD_FAMILIES:
+        assert np.isnan(ci[fam]["low"])
+        assert np.isnan(ci[fam]["high"])
+
+
+def test_cluster_bootstrap_ci_logs_progress(capsys):
+    """10.1d — stderr includes bootstrap_ci progress and a family name."""
+    split_eval, y, pmap = _bootstrap_ci_small_fixture()
+    _cluster_bootstrap_ci(split_eval, y, pmap, n_resamples=5)
+    err = capsys.readouterr().err
+    assert "bootstrap_ci" in err
+    assert "mule" in err or "app_fraud" in err
+
+
 def test_permutation_on_inner_val_not_gtest():
     """10.2 — permutation importance path never touches make-gtest; features ⊆ allowlist."""
     src = inspect.getsource(fit_mod._top_features)
@@ -294,7 +433,7 @@ def test_permutation_on_inner_val_not_gtest():
     y = pd.Series(np.where(rng.uniform(0, 1, 120) < 0.5, "normal", "mule"))
     model = HistGradientBoostingClassifier(max_depth=2, max_iter=30, random_state=42)
     model.fit(x, y.astype(str))
-    top = _top_features(model, x, y, cols, k=3)
+    top, _imps = _top_features(model, x, y, cols, k=3)
     assert set(top).issubset(set(cols))
     assert set(top).issubset(set(TRAIN_ALLOWLIST) | {"rule__"}, ) or set(top).issubset(
         set(TRAIN_ALLOWLIST)
