@@ -2,6 +2,6 @@
 
 **Standing:** PLAN → CRITIC → RED → implement → pytest → JUDGE. Never skip gates.
 
-**Session priority (2026-08-29):** Run **H5 FPR-constrained optimization** and **H6 failure diagnosis** in parallel this cycle. Success = **Pareto improvement**, not lower FPR alone.
+**Champion:** `v1-train-46__loopm-train` (v1). v2 `__fpr-v2` REJECT — see `docs/agent/champions.md`.
 
-**Loop:** Loop M → FPR op → gtest-49 → weakest family → diagnose → intervention → critic → 46/47/48/49 → ACCEPT on full gate table.
+**Session priority:** FPR Pareto on **frozen v1** for deployment threshold; H7 recursive Loop M on **gdev-47 only** (max 3 rounds); no gtest-48 in promote loop.

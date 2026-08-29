@@ -100,6 +100,9 @@ def _recipe_hash_accepted(frozen_hash: str) -> bool:
         return True
     if frozen_hash == FROZEN_V0_RECIPE_HASH and V0_RECIPE_PATH.is_file():
         return True
+    wip = MODELS_DIR / "features.wip.json"
+    if wip.is_file() and _recipe_hash(wip) == frozen_hash:
+        return True
     return False
 
 
@@ -116,13 +119,20 @@ def _act_threshold(recipe: dict[str, Any] | None) -> float:
 
 def _canonical_hgb_params(params: dict[str, Any], recipe: dict[str, Any] | None = None) -> dict[str, Any]:
     rec = recipe or {}
-    return {
-        "max_depth": int(params.get("max_depth", rec.get("max_depth", 3))),
+    out: dict[str, Any] = {
         "max_iter": int(params.get("max_iter", rec.get("max_iter", 80))),
         "learning_rate": float(params.get("learning_rate", rec.get("learning_rate", 0.08))),
         "random_state": int(params.get("random_state", rec.get("random_state", 42))),
         "early_stopping": False,
     }
+    if params.get("max_leaf_nodes") is not None:
+        out["max_leaf_nodes"] = int(params["max_leaf_nodes"])
+    else:
+        out["max_depth"] = int(params.get("max_depth", rec.get("max_depth", 3)))
+    for key in ("min_samples_leaf", "l2_regularization", "max_bins"):
+        if key in params:
+            out[key] = params[key]
+    return out
 
 
 def _model_freeze_id(
@@ -391,6 +401,26 @@ def _tpr_at_fpr(y_bin: np.ndarray, scores: np.ndarray, target: float) -> dict[st
         return {"tpr": 0.0, "threshold": float(thr[0]), "fpr_target": target}
     i = int(ok[-1])
     return {"tpr": float(tpr[i]), "threshold": float(thr[i] if i < len(thr) else 1.0), "fpr_target": target}
+
+
+def _build_hgb_kwargs(tuned_params: dict[str, Any], recipe: dict[str, Any]) -> dict[str, Any]:
+    """HistGradientBoosting kwargs from Optuna/recipe; max_leaf_nodes OR max_depth."""
+    clean = {k: v for k, v in tuned_params.items() if k != "use_max_leaf_nodes"}
+    return _canonical_hgb_params(clean, recipe)
+
+
+def _detect_thr_genuine_fpr(
+    scores: np.ndarray,
+    y_labels: pd.Series,
+    *,
+    fpr_target: float,
+) -> dict[str, float]:
+    from packages.eval.fpr_pareto import max_recall_at_genuine_fpr
+
+    y_str = y_labels.astype(str).to_numpy()
+    y_bin = (y_str != "normal").astype(int)
+    normal_mask = y_str == "normal"
+    return max_recall_at_genuine_fpr(scores, y_bin, normal_mask, fpr_target=fpr_target)
 
 
 def _ap_by_family(y: pd.Series, pmap: dict[str, np.ndarray]) -> dict[str, float]:
@@ -1190,13 +1220,7 @@ def fit_champion(
     weights = _class_weight(y_tr)
     # Deterministic weight assertion — same y must produce identical weights
     assert _class_weight(y_tr) == weights, "_class_weight must be deterministic"
-    hgb_kwargs = dict(
-        max_depth=int(tuned_params.get("max_depth", recipe.get("max_depth", 3))),
-        max_iter=int(tuned_params.get("max_iter", recipe.get("max_iter", 80))),
-        learning_rate=float(tuned_params.get("learning_rate", recipe.get("learning_rate", 0.08))),
-        random_state=int(recipe.get("random_state", 42)),
-        early_stopping=False,
-    )
+    hgb_kwargs = _build_hgb_kwargs(tuned_params, recipe)
     # --- Inner fold masks relative to train-only rows ---
     train_idx = (packed["folds"].reset_index(drop=True) == "train")
     inner_of_train = inner[train_idx.to_numpy()].reset_index(drop=True)
@@ -1223,7 +1247,7 @@ def fit_champion(
         inner_cal_pmap = _calibrate_pmap(inner_pmap, y_ival, ival_classes)
         inner_scores = _fraud_score(inner_cal_pmap, len(y_ival))
         op_fpr = float(recipe.get("operating_point_fpr", 0.01))
-        inner_op = _tpr_at_fpr(inner_y_bin, inner_scores, op_fpr)
+        inner_op = _detect_thr_genuine_fpr(inner_scores, y_ival, fpr_target=op_fpr)
         thr = float(inner_op.get("threshold") or 1.0)
     _LOG.info("threshold_fit", extra={"fold": "inner_val", "n_rows": len(y_ival), "op_threshold": thr})
 
@@ -1552,6 +1576,8 @@ def tune_champion(
             "max_iter": int(recipe.get("max_iter", 80)),
             "learning_rate": float(recipe.get("learning_rate", 0.08)),
         }
+        if recipe.get("min_samples_leaf") is not None:
+            best_params["min_samples_leaf"] = int(recipe["min_samples_leaf"])
         direction = None
     else:
         weights = _class_weight(y_tr)
@@ -1567,18 +1593,19 @@ def tune_champion(
             raise ValueError("inner_val A/B split produced an empty slice")
 
         def _objective(trial: Any) -> float:
-            p = {
-                "max_depth": trial.suggest_categorical("max_depth", [2, 3, 4, 5]),
+            use_leaf = trial.suggest_categorical("use_max_leaf_nodes", [False, True])
+            p: dict[str, Any] = {
                 "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.2, log=True),
                 "max_iter": trial.suggest_int("max_iter", 40, 200),
+                "min_samples_leaf": trial.suggest_int("min_samples_leaf", 5, 50),
+                "l2_regularization": trial.suggest_float("l2_regularization", 1e-6, 10.0, log=True),
+                "max_bins": trial.suggest_categorical("max_bins", [64, 128, 255]),
             }
-            m = HistGradientBoostingClassifier(
-                max_depth=p["max_depth"],
-                learning_rate=p["learning_rate"],
-                max_iter=p["max_iter"],
-                random_state=random_state,
-                early_stopping=False,
-            )
+            if use_leaf:
+                p["max_leaf_nodes"] = trial.suggest_int("max_leaf_nodes", 15, 63)
+            else:
+                p["max_depth"] = trial.suggest_categorical("max_depth", [2, 3, 4, 5])
+            m = HistGradientBoostingClassifier(**_build_hgb_kwargs(p, recipe))
             m.fit(x_ifit, y_ifit_s, sample_weight=inner_sw)
             classes_t = [str(c) for c in m.classes_]
             pmap_a = _proba_map(m, x_ival[a_rows])
@@ -1590,18 +1617,21 @@ def tune_champion(
             cal_b = _apply_pmap_calibrators(pmap_b, cals, classes_t)
             scores_a = _fraud_score(cal_a, int(a_rows.sum()))
             scores_b = _fraud_score(cal_b, int(b_rows.sum()))
-            y_bin_a = (y_a.astype(str) != "normal").to_numpy(dtype=int)
-            tau = float(_tpr_at_fpr(y_bin_a, scores_a, op_fpr).get("threshold") or 1.0)
-            pred_a = scores_a >= tau
-            pos_a = y_bin_a == 1
-            recall_a = float(np.mean(pred_a[pos_a])) if pos_a.any() else 0.0
+            op_pt = _detect_thr_genuine_fpr(scores_a, y_a, fpr_target=op_fpr)
+            tau = float(op_pt.get("threshold") or 1.0)
+            recall_a = float(op_pt.get("recall") or 0.0)
             genuine_b = (y_b.astype(str) == "normal").to_numpy()
             inner_b_fp = (
                 float(np.mean(scores_b[genuine_b] >= tau)) if genuine_b.any() else 0.0
             )
+            pareto_caps = tuple(float(x) for x in opt_cfg.get("fpr_pareto_targets", [0.01, 0.005, 0.001]))
+            pareto_a = {
+                f"{t:g}": _detect_thr_genuine_fpr(scores_a, y_a, fpr_target=t) for t in pareto_caps
+            }
             trial.set_user_attr("inner_A_tpr", recall_a)
             trial.set_user_attr("inner_B_genuine_fp", inner_b_fp)
             trial.set_user_attr("tau", tau)
+            trial.set_user_attr("pareto_inner_A", pareto_a)
             trial_log.append(
                 {
                     "number": int(trial.number),
@@ -1609,6 +1639,7 @@ def tune_champion(
                     "inner_A_tpr": recall_a,
                     "inner_B_genuine_fp": inner_b_fp,
                     "tau": tau,
+                    "pareto_inner_A": pareto_a,
                 }
             )
             if inner_b_fp > fpr_ceiling:
@@ -1628,7 +1659,9 @@ def tune_champion(
         dest_pre = (models_dir or MODELS_DIR) / (dest_run_id or run_id)
         dest_pre.mkdir(parents=True, exist_ok=True)
         trials_payload = {
-            "objective": "recall_at_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
+            "objective": "max_recall_genuine_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
+            "operating_point_fpr": op_fpr,
+            "fpr_pareto_targets": list(opt_cfg.get("fpr_pareto_targets", [0.01, 0.005, 0.001])),
             "inner_b_fpr_ceiling": fpr_ceiling,
             "best_value": study.best_value,
             "best_params": best_params,

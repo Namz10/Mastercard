@@ -380,3 +380,19 @@ Critic PASS → RED tests → `packages/eval/hard_negatives.py`. Judge REJECT: g
 **H5b:** `fpr_pareto.py` + [`pareto_genuine_fpr.json`](data/validation/v1/pareto_genuine_fpr.json). LoopM max recall @ 1% FPR: **99.6%** (g48), **99.6%** (g49); `identity_burst` recall **99.8%** at 1% cap on g48. Dominates Stage1 at all three caps.
 
 **H6-D:** [`h6_diagnosis.json`](data/validation/v1/h6_diagnosis.json) + [`docs/agent/h6_diagnosis.md`](docs/agent/h6_diagnosis.md). Mined normals **91% `is_new_payee`**; identity fraud is **fan_in-shaped**. Generic HN targets wrong mode — next mining must filter new-payee pool or use family-aware caps.
+
+---
+
+## Wave 1 iteration 7 — H5c FPR Optuna v2 (2026-08-29, REJECT)
+
+**Champion registry:** [`docs/agent/champions.md`](docs/agent/champions.md) · [`champion_registry.json`](data/validation/v1/champion_registry.json)
+
+Tuned `v1-train-46__fpr-v2` (25 Optuna trials, inner_val FPR objective). **Keep v1 Loop M** (`v1-train-46__loopm-train`).
+
+| gdev-47 | v1 Loop M | v2 FPR |
+|---------|-----------|--------|
+| Pareto recall @ 1% | **99.59%** | 99.38% |
+| `identity_burst` AP | **0.988** | 0.908 |
+| `cost_sketch` | **0.002** | 0.663 |
+
+Artifact: [`h5c_fpr_v2_eval.json`](data/validation/v1/h5c_fpr_v2_eval.json). Lesson: FPR-only tuning ≠ Pareto win; same trap as H6.

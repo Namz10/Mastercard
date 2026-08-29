@@ -156,3 +156,13 @@ FPR win is real on seed 49, but **identity_burst collapse** and **cost explosion
 gtest-49 confirms (LoopM 99.6% / 99.5% / 98.6% @ 1/0.5/0.1%). **Insight:** default `detect_thr` (~8% FPR) undersells Loop M; operational Pareto is strong. Next: wire FPR-constrained `detect_thr` selection in `fit_champion` (inner_val only).
 
 **H6-D (forensics):** Mined HN are new-payee-shaped (not stamp-heavy). Retrain targeted wrong failure mode → identity collateral damage. See `docs/agent/h6_diagnosis.md`.
+
+## Wave 1 iteration 7 — H5c FPR-constrained Optuna (REJECT)
+
+**Change:** Expanded HGB Optuna (`max_leaf_nodes`, `min_samples_leaf`, `l2`, `max_bins`) + `max_recall_at_genuine_fpr` threshold on inner_val → `v1-train-46__fpr-v2` (**champion v2 candidate**).
+
+**Promote gate (gdev-47):** v2 Pareto recall @ 1% **99.38%** vs v1 Loop M **99.59%**; `identity_burst` AP **0.908** vs **0.988**; `cost_sketch` **0.663** vs **0.002**. **JUDGE REJECT** — keep **`v1-train-46__loopm-train`** as provisional champion.
+
+**Confirmatory (gtest-49, one shot):** same failure pattern. Artifact: `data/validation/v1/h5c_fpr_v2_eval.json`. Versioned record: `docs/agent/champions.md`.
+
+**Next:** Deploy Pareto threshold on **frozen v1** (no retrain), or multi-objective tune with identity/cost gates — not FPR-only.

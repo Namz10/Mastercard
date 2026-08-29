@@ -1,99 +1,164 @@
-# Agent knowledge base (append-only)
+# Big-Win Improvement Priorities
 
-User-supplied priorities, context, and decisions. The autonomous validation loop **reads this file at the start of every cycle** (with `prompt.md`). Append new sections at the bottom — do not delete prior entries without noting why.
+**Goal:** Improve classifier potency without chasing cosmetic metrics or burning time on low-impact experiments.
 
----
+## Priority 1 — FPR-Constrained Optimization + Hyperparameter Tuning
 
-## 2026-08-29 — SAML-D transfer & improvement priorities
+**Objective:** Keep fraud recall extremely high while materially reducing genuine false positives.
 
-**Context:** Chase SAML-D transfer and lab FPR jointly. Optimize the operating problem, not AP alone.
+Optimize:
 
-### 1. FPR-constrained training/thresholding — #1 priority
+> maximize recall subject to genuine FPR ≤ target
 
-Don't optimize AP alone. Optimize:
+Evaluate at:
 
-> maximize recall subject to genuine FPR ≤ X%
+* 5%
+* 2%
+* **1%**
+* 0.5%
+* 0.1%
 
-Run a **Pareto curve** at multiple FPR operating points, e.g.:
+### Hyperparameter search
 
-- 5% FPR
-- 2%
-- 1%
-- 0.5%
-- 0.1%
+Run nested/controlled Optuna tuning against the operating objective, not AP alone.
 
-Then check whether Loop M **dominates** Stage 1 across the full curve. Very high recall at ~1% FPR would be a major upgrade.
+Tune the HGB classifier's meaningful parameters, including:
 
-### 2. Make Loop M recursive
+* learning rate
+* max leaf nodes / tree complexity
+* max iterations
+* minimum samples per leaf
+* L2 regularization
+* `max_bins` (sklearn HGB; no `max_features` on HGB — verify pinned sklearn)
 
-Current: weakest family → add examples → retrain → evaluate.
+Optuna runs on **inner_fit / inner_val only** — never G-dev, never G-test, never SAML-D labels.
 
-Target loop:
+Primary objective:
 
-> detect weakness → generate targeted hard negatives/positives → retrain → evaluate → find next weakness → repeat
+> maximize recall at the chosen FPR constraint
 
-Strict **max rounds** and an **untouched final test set**. Automated adversarial validation/improvement loop.
+Secondary checks:
 
-### 3. Hard-negative mining
+* binary AP
+* identity_burst AP
+* mule AP
+* cost sketch
+* WITHOUT_STAMPS performance
 
-High value for FPR. Find legitimate transactions scored highly:
-
-> normal transaction + high fraud score = hard negative
-
-Add to training. Teaches: *"This looks suspicious, but is actually legitimate."* More aligned with current weakness than generating more fraud.
-
-### 4. Cross-world robustness
-
-Avoid seed-48 specialist. Train/improve on one world; evaluate across 46 → 47 → 48 → 49 with different behavioral distributions.
-
-Ideal protocol:
-
-> train 46 → validate 47 → untouched test 48/49
-
-Repeat with another seed. Strong cross-world performance makes headline metrics more convincing.
-
-### 5. Feature ablation + leakage audit
-
-Systematically ablate: stamps, app flags, velocity, merchant, temporal, customer history, graph, every suspiciously powerful feature.
-
-Question: *Does the model still work when individual shortcuts disappear?*
-
-### 6. Improve the simulator (long-term)
-
-Simulator should deliberately produce:
-
-- legitimate high-volume hubs
-- legitimate burst behavior
-- fraud that looks normal
-- normal behavior that looks fraudulent
-- overlapping fraud/normal distributions
-- temporal drift
-- unseen fraud patterns
-- noisy/missing features
-- changing fraud prevalence
-
-> Make the simulator actively try to fool the classifier.
-
-Yeah — these are the right kinds of improvements, but they are not all equally valuable.
-
-The biggest ones I'd prioritize from this document are:
-
-Hard-negative mining (H6) — probably the most direct way to reduce your current ~8% genuine FPR. Find legitimate transactions the model is incorrectly scoring highly, then train against those.
-Payee-side / graph-lite features — especially important for mule detection: unique senders, money-in → money-out speed, payee age, payer/payee role stability. These attack the actual mule behavior rather than simulator-specific stamps.
-Calibration + cost-based thresholding — this is huge for your current situation. Your model can have excellent recall but still produce too many false positives. Calibration makes the score meaningful, while cost-based threshold selection lets you explicitly trade missed fraud against false actions.
-Temporal/behavioral features — particularly for ATO/identity and APP. Things like inter-event gaps, acceleration of activity, time since device/payee changes, etc. should make the classifier less dependent on static simulator artifacts.
-Cross-world robustness — retrain on multiple seeds and measure variance. This tells you whether the impressive Loop M result is genuinely robust or partly a lucky world.
-
-More valuable than easier fraud.
+**Acceptance rule:** A candidate is only promoted if it improves the operating objective without causing a major regression in important fraud families.
 
 ---
 
-## 2026-08-29 (user) — Execution order & success definition
+## Priority 2 — Recursive Targeted Loop M
 
-**Order:** (1) FPR-constrained optimization → (2) diagnose H6 before more mining → (4) ablation → (5) graph/behavior features → (6) simulator last.
+Turn Loop M from a one-shot correction into an **automated weakness → correction → validation loop**.
 
-**Loop:** Loop M → FPR-constrained op → eval seed 49 → weakest family → diagnose → targeted intervention → critic → eval 46/47/48/49 → ACCEPT only on **Pareto improvement** (not raw lower FPR alone).
+### Loop
 
-**ACCEPT requires:** FPR ↓ or within ε · recall not materially worse · no major family AP collapse · cost stable · no leakage.
+1. Identify the weakest important fraud family.
+2. Inspect its false negatives and confusing legitimate examples.
+3. Generate targeted additional positives and/or behavioral variants.
+4. Generate realistic hard negatives where appropriate.
+5. Retrain.
+6. **Evaluate on G-dev (`v1-gdev-47`)** — promote/reject this round against prior champion.
+7. Compare Pareto (recall @ fixed FPR) on G-dev only.
+8. Promote only if operating objective improves without family/cost regressions.
+9. Repeat for **max 3 rounds** (hard cap).
 
-**H6 lesson:** generic top-k hard negatives collapsed `identity_burst` (−62%) while lowering FPR — next mining must be family-aware/capped.
+**After loop terminates:** one-shot confirmatory score on **`v1-gtest-49` only**. Frozen **`v1-gtest-48` photograph is never used for promote/reject decisions** (instrumentation compare OK, not tuning).
+
+### Guardrails
+
+* Never modify the frozen final test set.
+* Never train on test examples.
+* Never tune directly on the final test set.
+* No seed-43 museum contamination.
+* No estimator swapping during this improvement pass.
+* No metric cherry-picking.
+* No promotion based on AP alone.
+* Reject any candidate with severe regression in another important fraud family.
+* Reject candidates that improve FPR only by destroying recall.
+* Every round must produce a reproducible artifact and comparison against the previous champion.
+
+### Promotion objective
+
+Prefer:
+
+> **lower genuine FPR + very high recall + lower operational cost**
+
+rather than:
+
+> maximum AP.
+
+---
+
+## Priority 3 — Targeted Behavioral Features
+
+Only investigate features that attack genuine weaknesses in the fraud behavior.
+
+Highest-value areas:
+
+* transaction velocity
+* inter-event timing
+* acceleration/burstiness
+* customer behavioral history
+* payee history
+* money-in → money-out timing
+* sender/payee relationship stability
+* graph-lite transaction behavior
+* account/device/payee changes
+
+Do not add features merely because they increase lab AP.
+
+---
+
+## Priority 4 — Systematic Ablation / Leakage Audit
+
+Verify that performance is not coming from simulator shortcuts.
+
+Ablate:
+
+* stamps
+* app flags
+* velocity
+* merchant features
+* temporal features
+* customer history
+* graph features
+* suspiciously powerful individual features
+
+A feature is considered valuable only if its contribution is defensible and performance does not collapse when obvious shortcuts disappear.
+
+---
+
+# Execution Order
+
+### FIRST
+
+**Optuna + FPR-constrained optimization**
+
+### SECOND
+
+**Recursive targeted Loop M**
+
+### THIRD
+
+**Behavioral/graph-lite feature improvements**
+
+Everything else is lower priority unless these experiments expose a specific defect.
+
+## Final promotion rule
+
+A new champion must demonstrate:
+
+**Higher recall at the same FPR OR lower FPR at the same recall**
+
+while maintaining acceptable:
+
+* fraud-family AP
+* cost sketch
+* ablation robustness
+* no leakage
+* no test contamination
+
+If an experiment produces a prettier single metric but violates these conditions, **reject it.**

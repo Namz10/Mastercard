@@ -1,0 +1,44 @@
+{
+  "schema": "champion_registry_v1",
+  "provisional_champion": "v1-train-46__loopm-train",
+  "versions": [
+    {
+      "version": "v0-stage1",
+      "model_run_id": "v1-train-46",
+      "status": "baseline"
+    },
+    {
+      "version": "v1-loopm",
+      "model_run_id": "v1-train-46__loopm-train",
+      "status": "provisional_champion",
+      "gtest48": {
+        "binary_ap": 0.996,
+        "genuine_fp": 0.0807,
+        "identity_burst_ap": 0.967,
+        "cost_sketch": 0.011,
+        "pareto_recall_1pct": 0.996
+      },
+      "gdev47": {
+        "genuine_fp": 0.0381,
+        "pareto_recall_1pct": 0.9959
+      }
+    },
+    {
+      "version": "v2-fpr-tuned",
+      "model_run_id": "v1-train-46__fpr-v2",
+      "status": "rejected_h5c",
+      "artifact": "data/validation/v1/h5c_fpr_v2_eval.json",
+      "gdev47": {
+        "genuine_fp": 0.00025,
+        "pareto_recall_1pct": 0.9938,
+        "identity_burst_ap": 0.908,
+        "cost_sketch": 0.663
+      },
+      "gtest49": {
+        "identity_burst_ap": 0.909,
+        "cost_sketch": 0.69
+      },
+      "reject_reason": "identity_burst AP -8%, cost_sketch ~300x; Pareto @1% not improved vs v1"
+    }
+  ]
+}

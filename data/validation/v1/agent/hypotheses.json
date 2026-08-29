@@ -49,7 +49,19 @@
       "outcome": "fit blocked: inner_val.ato=0<15 on v1-train-50 (E2 fold floor). Frozen LoopM on gtest-52 genuine_fp=10.03% vs 8.07% g48 (seed+generator confound; retrain not completed)"
     },
     {
-      "id": "H5b",
+      "id": "H5c",
+      "statement": "FPR-constrained Optuna on inner_val selects HGB params that improve Pareto recall@FPR vs Loop M on gdev without family collapse",
+      "priority": 0.96,
+      "expected_external_gain": 0.4,
+      "evidence_strength": 0.75,
+      "causal_plausibility": 0.9,
+      "implementation_feasibility": 0.8,
+      "falsifiable_experiment": "tune v1-train-46 → v1-train-46__fpr-v2; promote on gdev-47 Pareto; confirm gtest-49 once",
+      "status": "rejected",
+      "kb_ref": "docs/agent/kb.md Priority 1",
+      "plan": "docs/agent/plans/h5c-fpr-constrained-tune.md",
+      "outcome": "JUDGE REJECT on gdev-47: identity AP 0.988→0.908, cost 0.002→0.663; Pareto @1% 99.38% vs v1 99.59%. Keep v1-loopm champion. Artifact h5c_fpr_v2_eval.json"
+    },
       "statement": "Explicit max-recall @ genuine FPR {1%, 0.5%, 0.1%} envelope with per-family recall on gtest-48/49 quantifies operational Pareto frontier",
       "priority": 0.94,
       "expected_external_gain": 0.35,
@@ -108,9 +120,9 @@
       "evidence_strength": 0.6,
       "causal_plausibility": 0.75,
       "implementation_feasibility": 0.5,
-      "falsifiable_experiment": "Max 3 rounds on train-46 extras only; eval frozen 48; Pareto + SAML-D vs single Loop M",
+      "falsifiable_experiment": "Max 3 rounds on train-46 extras only; **promote/reject on gdev-47 each round**; gtest-49 confirmatory once after loop; Pareto + SAML-D vs single Loop M",
       "status": "open",
-      "kb_ref": "docs/agent/kb.md §2"
+      "kb_ref": "docs/agent/kb.md Priority 2 + plans/h7-recursive-loop-m.md"
     },
     {
       "id": "H8",
