@@ -184,3 +184,29 @@ def test_yaml_when_is_predicate_list():
         assert isinstance(row["when"], list)
         assert row["when"]
         assert all(isinstance(x, str) for x in row["when"])
+
+
+def test_invoice_rule_bit_can_fire_on_parquet_row():
+    # Parquet dict has no 'payload' key, but features_auth keys were exported into columns
+    row = {
+        "rail": "NEFT",
+        "beneficiary_changed": True,
+        "gstin_checksum_ok": True,
+        "lookalike_domain_flag": False,
+        "label_family": "invoice_fraud",
+    }
+    hits = evaluate_rules(row)
+    assert any(r.id == "invoice-beneficiary-swap" for r in hits.hits)
+
+
+def test_seasoning_burst_still_uses_burst_velocity_name():
+    rules = load_v0_rules()
+    seasoning_rule = next(r for r in rules if r.id == "seasoning-burst")
+    fields = [p.field for p in seasoning_rule.predicates]
+    assert "burst_velocity" in fields
+
+
+def test_coverage_equiv_unique_fan_in():
+    from packages.policy.rules import COVERAGE_EQUIV
+    assert "fan_in_unique_payers_1h" in COVERAGE_EQUIV
+

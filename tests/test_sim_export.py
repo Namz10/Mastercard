@@ -76,6 +76,29 @@ def test_population_full_mix_parquet_and_seasoning(runs: Path):
     assert "fan_in_1h" in sidecar
 
 
+def test_train_parquet_has_invoice_cols_not_gstin(runs: Path):
+    result = run_population(
+        None,
+        run_id="pop-invoice-cols",
+        n_customers=16,
+        n_merchants=6,
+        sim_days=30,
+        world_seed=42,
+        runs_dir=runs,
+        pin=True,
+    )
+    df = pd.read_parquet(result["parquet_path"])
+    expected_invoice_cols = {"beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag"}
+    assert expected_invoice_cols.issubset(set(df.columns))
+    assert "gstin" not in df.columns
+    assert "payload" not in df.columns
+
+
+def test_allowlist_includes_invoice_booleans():
+    for name in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag"):
+        assert name in TRAIN_ALLOWLIST, f"missing {name} in TRAIN_ALLOWLIST"
+
+
 def test_canary_shared_chain_180d_pinned(runs: Path):
     result = run_canary(
         None,

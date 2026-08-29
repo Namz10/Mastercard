@@ -1,4 +1,4 @@
-.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow
+.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow defend-fit defend-gtest defend-gdev defend-loop-m defend-remediate defend-validate
 
 PYTHONPATH ?= $(CURDIR)
 export PYTHONPATH
@@ -49,8 +49,27 @@ batch3-validate:
 generate-validate:
 	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app', n_customers=16, n_merchants=8, sim_days=40, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>1 and 'simulatable_signals' not in r and r['counts_by_label_family'].get('app_fraud',0)>=3; assert r['fidelity']['pass'] is True, r['fidelity']; print(r['parquet_path'], r.get('split_path'), r['counts_by_label_family'], r['fidelity']['pass'])"
 
+# Phase 4 scale reference target (full mix, no vector_id pin)
+# Expected scale: 2400 customers x 120 merchants x 90 sim_days (~50k-70k events, ~1-2 min wall clock)
 generate-scale:
-	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, vector_id='t13-upi-impersonation-app', run_id='make-scale', n_customers=2400, n_merchants=120, sim_days=90, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>50000, r['event_count']; assert 'simulatable_signals' not in r; assert r['fidelity']['pass'] is True, r['fidelity']; print('scale OK', r['event_count'], r['parquet_path'], r['fidelity']['pass'])"
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='make-scale-fullmix', n_customers=2400, n_merchants=120, sim_days=90, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>50000, r['event_count']; assert 'simulatable_signals' not in r; assert r['fidelity']['pass'] is True, r['fidelity']; print('scale OK', r['event_count'], r['parquet_path'], r['fidelity']['pass'])"
+
+defend-fit:
+	$(PY) -c "from packages.eval.fit import fit_champion; r=fit_champion('make-scale-fullmix', world_seed=42); print('fit OK', r['run_id'], r['metrics']['recipe_hash'])"
+
+defend-gtest:
+	$(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gtest', world_seed=43, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gtest', model_run_id='make-scale-fullmix', all_rows=True); print('gtest OK', s['run_id'], s['metrics']['ap_by_family'])"
+
+defend-gdev:
+	$(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gdev', world_seed=44, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gdev', model_run_id='make-scale-fullmix', all_rows=True); print('gdev OK', s['run_id'], s['metrics']['ap_by_family'])"
+
+defend-loop-m:
+	@echo "Loop M requires POST /defend/loop-m with body: {\"miss_family\": \"<family>\", \"family_chosen_from_slice\": \"gdev44\"}"
+
+defend-remediate:
+	@echo "Phase 8 Loop T remediation cycle requires a configured LLM provider (AEGIS_LLM_*) and G-dev + train runs."
+	@echo "Run: $(PY) -c \"from apps.api.env import load_project_env; load_project_env(); from packages.agents.llm.config import build_provider, load_provider_config; from packages.eval.loop_t_orchestrator import run_remediation_cycle; p=build_provider(load_provider_config()); print(run_remediation_cycle(gdev_run_id='make-gdev', train_run_id='make-scale-fullmix', provider=p))\""
+	@echo "Kill switch: remediation.orchestrator_enabled in models/features.json (off = no-op)."
 
 generate-slow:
 	$(PY) -m pytest tests/test_sim_calibrator.py tests/test_sim_slow.py -q --tb=short

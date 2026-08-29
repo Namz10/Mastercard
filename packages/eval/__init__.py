@@ -2,7 +2,7 @@
 
 from packages.eval.brake import POLICY_ACTIONS, BrakeDecision, brake
 from packages.eval.fit import fit_champion, score_run
-from packages.eval.split import SPLIT_ONLY_COLUMNS, assign_folds, build_matrix
+from packages.eval.split import SPLIT_ONLY_COLUMNS, assign_folds, build_matrix, inner_folds_from_train
 
 __all__ = [
     "POLICY_ACTIONS",
@@ -12,5 +12,6 @@ __all__ = [
     "brake",
     "build_matrix",
     "fit_champion",
+    "inner_folds_from_train",
     "score_run",
 ]

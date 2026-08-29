@@ -54,7 +54,7 @@ def test_defend_fit_and_score_http(postgres_required, tmp_path):
         blob = json.dumps(body)
         assert "simulatable_signals" not in blob
         for banned in TRAIN_DENYLIST:
-            assert banned not in blob
+            assert f'"{banned}"' not in blob
         cov = client.get("/defend/coverage-map")
         assert cov.status_code == 200
         assert cov.json()["technique_count"] == 24

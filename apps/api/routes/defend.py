@@ -9,10 +9,17 @@ from sqlalchemy.orm import Session
 from apps.api.db import get_db
 from packages.catalog.query import get_spec_by_vector_id
 from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
-from packages.eval.fit import fit_champion, score_run
+from packages.eval.fit import (
+    RecipeHashMismatchError,
+    fit_champion,
+    score_run,
+    tune_champion,
+)
 from packages.eval.loop_m import run_loop_m
+from packages.eval.loop_t import mine_fn_rules
 from packages.policy.coverage import build_coverage_map, scout_topics_from_gaps
 from packages.policy.loop_i import draft_rule_from_spec
+from packages.policy.rule_hitl import approve_draft, load_drafts, reject_draft
 from packages.policy.rules import load_v0_rules
 
 router = APIRouter(prefix="/defend", tags=["defend"])
@@ -33,10 +40,28 @@ class LoopMRequest(BaseModel):
     miss_family: str
     train_seed: int = 42
     gtest_seed: int = 43
+    family_chosen_from_slice: str = Field(default="gdev44", description="inner_val | diagnostic | gdev44")
     n_customers: int | None = None
     n_merchants: int | None = None
     sim_days: int | None = None
     pin: bool | None = None
+
+
+class TuneRequest(BaseModel):
+    run_id: str
+    world_seed: int = 42
+    n_trials: int | None = Field(default=None, description="Overrides recipe n_trials (CI uses 10)")
+    timeout: float | None = Field(default=None, description="Overrides recipe timeout_seconds")
+
+
+class LoopTMineRequest(BaseModel):
+    train_run_id: str
+    gdev_run_id: str
+    family: str
+
+
+class RejectRequest(BaseModel):
+    note: str = ""
 
 
 @router.get("/coverage-map")
@@ -111,6 +136,8 @@ def defend_fit(body: FitRequest) -> dict:
         return fit_champion(body.run_id, world_seed=body.world_seed)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RecipeHashMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ValueError, AssertionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -122,9 +149,31 @@ def defend_score(body: ScoreRequest) -> dict:
         return score_run(body.run_id, model_run_id=body.model_run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RecipeHashMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (ValueError, AssertionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/tune")
+def defend_tune(body: TuneRequest) -> dict:
+    """Ticket 5 — Optuna search on inner_val only; writes best_params.json, refits."""
+    try:
+        return tune_champion(
+            body.run_id,
+            world_seed=body.world_seed,
+            n_trials=body.n_trials,
+            timeout=body.timeout,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RecipeHashMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (AssertionError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -137,6 +186,7 @@ def defend_loop_m(body: LoopMRequest) -> dict:
             body.miss_family,
             train_seed=body.train_seed,
             gtest_seed=body.gtest_seed,
+            family_chosen_from_slice=body.family_chosen_from_slice,
             n_customers=body.n_customers,
             n_merchants=body.n_merchants,
             sim_days=body.sim_days,
@@ -144,7 +194,58 @@ def defend_loop_m(body: LoopMRequest) -> dict:
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RecipeHashMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (ValueError, AssertionError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/loop-t/mine")
+def defend_loop_t_mine(body: LoopTMineRequest) -> dict:
+    """Loop T: Mine decision-tree FN rules on G-dev seed 44."""
+    try:
+        return mine_fn_rules(body.train_run_id, body.gdev_run_id, body.family)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (ValueError, AssertionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/rules/drafts")
+def defend_rules_drafts(status: str | None = None) -> dict:
+    """List rule drafts. Default view = proposed only (the reviewable queue),
+    so orchestrator auto-rejects stay hidden unless ?status=auto_rejected —
+    they remain human-approvable via /rules/approve/."""
+    drafts = load_drafts()
+    if status:
+        drafts = [d for d in drafts if d.get("status") == status]
+    else:
+        drafts = [d for d in drafts if d.get("status") == "proposed"]
+    return {"count": len(drafts), "items": drafts}
+
+
+@router.post("/rules/approve/{draft_id}")
+def defend_rules_approve(draft_id: str) -> dict:
+    """HITL: Approve a rule draft into live v0_rules.yaml."""
+    try:
+        return approve_draft(draft_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rules/reject/{draft_id}")
+def defend_rules_reject(draft_id: str, body: RejectRequest | None = None) -> dict:
+    """HITL: Reject a rule draft."""
+    note = body.note if body else ""
+    try:
+        return reject_draft(draft_id, note=note)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

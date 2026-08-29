@@ -45,6 +45,7 @@ ALLOWED_RULE_FIELDS = (set(TRAIN_ALLOWLIST) - {"label_family"}) | EXTRA_ROW_FIEL
 COVERAGE_EQUIV: dict[str, frozenset[str]] = {
     "account_age_days": frozenset({"account_age_days", "mule_account_age_days", "seasoning_days"}),
     "fan_in_1h": frozenset({"fan_in_1h"}),
+    "fan_in_unique_payers_1h": frozenset({"fan_in_unique_payers_1h"}),
     "fan_out_1h": frozenset({"fan_out_1h", "fan_out_ttl_hours", "hop_rails"}),
     "burst_velocity": frozenset(
         {"burst_velocity", "seasoning_txn_count", "velocity_jump", "windowed_fan_in"}
@@ -290,3 +291,8 @@ def match_rules_to_features(
         if _condition_matches(rule, feat_set):
             matched.append(rule)
     return matched
+
+
+def promote_from_draft(draft_id: str, **kwargs) -> dict:
+    from packages.policy.rule_hitl import approve_draft
+    return approve_draft(draft_id, **kwargs)

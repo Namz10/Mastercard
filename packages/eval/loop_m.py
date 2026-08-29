@@ -143,6 +143,18 @@ def _write_augmented(
         ),
         encoding="utf-8",
     )
+    (dest / "manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": augmented_id,
+                "row_count": len(out_tr),
+                "n_extra": int(len(extra_tr)),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (dest / "_DONE").write_text("DONE\n", encoding="utf-8")
     return int(len(extra_tr)), cap, frozenset(new_ids)
 
 
@@ -152,6 +164,7 @@ def run_loop_m(
     *,
     train_seed: int = 42,
     gtest_seed: int = 43,
+    family_chosen_from_slice: str = "gdev44",
     n_customers: int | None = None,
     n_merchants: int | None = None,
     sim_days: int | None = None,
@@ -164,6 +177,12 @@ def run_loop_m(
         raise ValueError(f"miss_family must be a fraud label_family, got {family}")
     if gtest_seed == train_seed:
         raise ValueError("G-test seed must differ from train seed")
+    slice_choice = str(family_chosen_from_slice or "").strip().lower()
+    if "gtest" in slice_choice or "43" in slice_choice:
+        raise ValueError(f"Forbidden slice for miss family selection: {family_chosen_from_slice}. Must be inner_val | diagnostic | gdev44.")
+    if slice_choice not in {"inner_val", "diagnostic", "gdev44"}:
+        raise ValueError(f"family_chosen_from_slice must be one of: inner_val, diagnostic, gdev44; got {family_chosen_from_slice!r}")
+
     runs = runs_dir or RUNS_DIR
     recipe = load_recipe()
     loop_cfg = dict(recipe.get("loop_m") or {})
@@ -262,6 +281,7 @@ def run_loop_m(
         "genuine_fpr_eps": fpr_eps,
         "comparison": {
             "family": family,
+            "family_chosen_from_slice": family_chosen_from_slice,
             "ap_before": ap0,
             "ap_after": ap1,
             "ap_delta": None if ap0 is None or ap1 is None else ap1 - ap0,
@@ -270,6 +290,8 @@ def run_loop_m(
             "genuine_fp_after": fpr1,
             "genuine_fp_ok": fpr_ok,
             "genuine_fp_note": fpr_note,
+            "n_pos_before": before["metrics"].get("n_pos", {}),
+            "n_pos_after": after["metrics"].get("n_pos", {}),
         },
         "metrics": {
             "pass": loop_pass,

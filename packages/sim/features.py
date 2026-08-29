@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from typing import Any
 
 from packages.sim.ledger import empty_app_flags
+
+logger = logging.getLogger(__name__)
 
 HOUR = timedelta(hours=1)
 P30 = timedelta(days=30)
@@ -25,8 +28,8 @@ class AccountRuntime:
         "kyc_tier",
         "balance_minor",
         "payee_count",
-        "inbound_ts",
-        "outbound_ts",
+        "inbound_edges",
+        "outbound_edges",
         "amount_history",
         "txn_count",
     )
@@ -43,17 +46,17 @@ class AccountRuntime:
         self.kyc_tier = kyc_tier
         self.balance_minor = balance_minor
         self.payee_count: dict[str, int] = defaultdict(int)
-        self.inbound_ts: deque[datetime] = deque()
-        self.outbound_ts: deque[datetime] = deque()
+        self.inbound_edges: deque[tuple[datetime, str]] = deque()
+        self.outbound_edges: deque[tuple[datetime, str]] = deque()
         self.amount_history: deque[tuple[datetime, int]] = deque()
         self.txn_count = 0
 
     def prune(self, now: datetime) -> None:
         cutoff_h = now - HOUR
-        while self.inbound_ts and self.inbound_ts[0] < cutoff_h:
-            self.inbound_ts.popleft()
-        while self.outbound_ts and self.outbound_ts[0] < cutoff_h:
-            self.outbound_ts.popleft()
+        while self.inbound_edges and self.inbound_edges[0][0] < cutoff_h:
+            self.inbound_edges.popleft()
+        while self.outbound_edges and self.outbound_edges[0][0] < cutoff_h:
+            self.outbound_edges.popleft()
         cutoff_30 = now - P30
         while self.amount_history and self.amount_history[0][0] < cutoff_30:
             self.amount_history.popleft()
@@ -105,10 +108,11 @@ class FeatureComputer:
         p30_vals = [a for _, a in payer_acc.amount_history]
         p30_mean = (sum(p30_vals) / len(p30_vals)) if p30_vals else None
         amount_vs_p30 = (amount_minor / p30_mean) if p30_mean and p30_mean > 0 else 1.0
-        fan_in_1h = len(payee_acc.inbound_ts)
-        fan_out_1h = len(payer_acc.outbound_ts)
+        fan_in_1h = len(payee_acc.inbound_edges)
+        fan_in_unique_payers_1h = len({pid for _, pid in payee_acc.inbound_edges})
+        fan_out_1h = len(payer_acc.outbound_edges)
         is_new_device = device_hash != payer_acc.device_hash
-        burst_velocity = float(fan_out_1h)
+        burst_velocity = float(len({pid for _, pid in payer_acc.outbound_edges}))
 
         flags = empty_app_flags() if app_flags is None else {**empty_app_flags(), **app_flags}
 
@@ -117,6 +121,7 @@ class FeatureComputer:
             "payee_history_count": history,
             "amount_vs_p30": round(amount_vs_p30, 4),
             "fan_in_1h": fan_in_1h,
+            "fan_in_unique_payers_1h": fan_in_unique_payers_1h,
             "fan_out_1h": fan_out_1h,
             "is_new_payee": is_new_payee,
             "is_new_device": is_new_device,
@@ -135,10 +140,10 @@ class FeatureComputer:
                 payer_acc.balance_minor -= amount_minor
                 payee_acc.balance_minor += amount_minor
         payer_acc.payee_count[payee] += 1
-        payer_acc.outbound_ts.append(ts)
+        payer_acc.outbound_edges.append((ts, payee))
         payer_acc.amount_history.append((ts, amount_minor))
         payer_acc.txn_count += 1
-        payee_acc.inbound_ts.append(ts)
+        payee_acc.inbound_edges.append((ts, payer))
         payee_acc.txn_count += 1
         if is_new_device:
             payer_acc.device_hash = device_hash
@@ -207,6 +212,21 @@ def replay_features(
             debit=True,
         )
         computed.pop("_insufficient_float", None)
+
+        # ── carry through invoice payload booleans ────────────────
+        # NOTE: invoice AP is stamp skill (payload booleans are set by
+        # the injector), not BEC detection in the wild.
+        payload = ev.get("payload") or {}
+        for key in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag"):
+            val = payload.get(key, False)
+            if not isinstance(val, bool):
+                logger.warning(
+                    "payload_flag_type_mismatch event_id=%s key=%s",
+                    ev.get("event_id", "?"),
+                    key,
+                )
+            computed[key] = bool(val)
+
         new_ev = dict(ev)
         new_ev["features_auth"] = computed
         new_ev["kyc_tier"] = computed["kyc_tier"]
@@ -221,3 +241,4 @@ def featurize_events(
     """Recompute features_auth in time order. meta[party] has created_ts, device_hash, kyc_tier, opening_balance_minor."""
     replayed, _fc = replay_features(events, meta)
     return replayed
+

@@ -157,3 +157,94 @@ def test_seasoning_clamped_on_short_calendar(mixed_world):
     ident = report["seasoning"]["identity_burst"]
     assert ident["clamped"] is True
     assert ident["effective_days"] == 36 - 14
+
+
+def test_replay_copies_invoice_payload_booleans():
+    from datetime import datetime, timezone
+    from packages.sim.features import replay_features
+    from packages.sim.ledger import make_event
+    t0 = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
+    payer = "VID-SIM-C-000001"
+    payee = "VID-SIM-BENE-000001"
+    meta = {
+        payer: {"created_ts": t0, "device_hash": "dev-a", "kyc_tier": "tier1", "opening_balance_minor": 100_000_000},
+        payee: {"created_ts": t0, "device_hash": "dev-b", "kyc_tier": "tier1", "opening_balance_minor": 100_000_000},
+    }
+    ev = make_event(
+        seq=1,
+        ts=t0,
+        rail="NEFT",
+        payer=payer,
+        payee=payee,
+        amount_minor=500000,
+        label_family="invoice_fraud",
+        features_auth={},
+        payload={"beneficiary_changed": True, "gstin_checksum_ok": True, "lookalike_domain_flag": True},
+    )
+    [out], _ = replay_features([ev], meta)
+    fa = out["features_auth"]
+    assert fa["beneficiary_changed"] is True
+    assert fa["gstin_checksum_ok"] is True
+    assert fa["lookalike_domain_flag"] is True
+
+
+def test_genuine_invoice_flags_false_after_replay():
+    from datetime import datetime, timezone
+    from packages.sim.features import replay_features
+    from packages.sim.ledger import make_event
+    t0 = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
+    payer = "VID-SIM-C-000001"
+    payee = "VID-SIM-M-000001"
+    meta = {
+        payer: {"created_ts": t0, "device_hash": "dev-a", "kyc_tier": "tier1", "opening_balance_minor": 100_000_000},
+        payee: {"created_ts": t0, "device_hash": "dev-b", "kyc_tier": "tier1", "opening_balance_minor": 100_000_000},
+    }
+    ev = make_event(
+        seq=1,
+        ts=t0,
+        rail="UPI",
+        payer=payer,
+        payee=payee,
+        amount_minor=500,
+        label_family="normal",
+        features_auth={},
+    )
+    [out], _ = replay_features([ev], meta)
+    fa = out["features_auth"]
+    assert fa["beneficiary_changed"] is False
+    assert fa["gstin_checksum_ok"] is False
+    assert fa["lookalike_domain_flag"] is False
+
+
+def test_fan_in_unique_same_payer_twice():
+    from datetime import datetime, timedelta, timezone
+    from packages.sim.features import FeatureComputer
+    t0 = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
+    fc = FeatureComputer()
+    fc.ensure("P1", t0, "dev-1", "tier1", 100_000_000)
+    fc.ensure("M1", t0, "dev-m", "tier1", 100_000_000)
+    
+    fc.snapshot_and_apply(ts=t0, payer="P1", payee="M1", amount_minor=100, device_hash="dev-1")
+    f2 = fc.snapshot_and_apply(ts=t0 + timedelta(minutes=5), payer="P1", payee="M1", amount_minor=200, device_hash="dev-1")
+    
+    assert f2["fan_in_1h"] == 1
+    f3 = fc.snapshot_and_apply(ts=t0 + timedelta(minutes=10), payer="P1", payee="M1", amount_minor=300, device_hash="dev-1")
+    assert f3["fan_in_1h"] == 2
+    assert f3["fan_in_unique_payers_1h"] == 1
+
+
+def test_burst_velocity_unique_outbound_not_event_count():
+    from datetime import datetime, timedelta, timezone
+    from packages.sim.features import FeatureComputer
+    t0 = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
+    fc = FeatureComputer()
+    fc.ensure("P1", t0, "dev-1", "tier1", 100_000_000)
+    fc.ensure("M1", t0, "dev-m", "tier1", 100_000_000)
+    
+    fc.snapshot_and_apply(ts=t0, payer="P1", payee="M1", amount_minor=100, device_hash="dev-1")
+    fc.snapshot_and_apply(ts=t0 + timedelta(minutes=1), payer="P1", payee="M1", amount_minor=100, device_hash="dev-1")
+    f3 = fc.snapshot_and_apply(ts=t0 + timedelta(minutes=2), payer="P1", payee="M1", amount_minor=100, device_hash="dev-1")
+    
+    assert f3["fan_out_1h"] == 2
+    assert f3["burst_velocity"] == 1.0
+

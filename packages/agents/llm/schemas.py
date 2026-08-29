@@ -50,7 +50,46 @@ CURATOR_RANK_SCHEMA: dict = {
     },
 }
 
-_SCHEMAS = {"AttackExtract": ATTACK_EXTRACT_SCHEMA, "CuratorRank": CURATOR_RANK_SCHEMA}
+# Phase 8 — Loop T remediation-cycle decision (one review pass, fail-closed).
+REMEDIATION_DECISION_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["verdict", "reason", "items", "in_focus_families", "error"],
+    "properties": {
+        "verdict": {"type": "string", "enum": ["stop", "defer", "submit"]},
+        "reason": {"type": "string"},
+        "items": {
+            "type": "array",
+            "maxItems": 7,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action", "rule_id", "kind", "applies_to", "family", "when", "reason"],
+                "properties": {
+                    "action": {"type": "string", "enum": ["press", "calm_down", "fn"]},
+                    "rule_id": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["hard_flag", "calm_down"]},
+                    "applies_to": {"type": "string"},
+                    "family": {"type": ["string", "null"]},
+                    "when": {"type": ["array", "null"], "items": {"type": "string"}},
+                    "reason": {"type": "string"},
+                },
+            },
+        },
+        "in_focus_families": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "reviewer_capacity_hint": {"type": "integer"},
+        "error": {"type": ["string", "null"]},
+    },
+}
+
+_SCHEMAS = {
+    "AttackExtract": ATTACK_EXTRACT_SCHEMA,
+    "CuratorRank": CURATOR_RANK_SCHEMA,
+    "RemediationDecision": REMEDIATION_DECISION_SCHEMA,
+}
 
 
 def get_json_schema(schema_name: str) -> dict:

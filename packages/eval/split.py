@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+import logging
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,8 @@ from packages.sim.export import TRAIN_ALLOWLIST, TRAIN_DENYLIST
 from packages.sim.ledger import LABEL_FAMILIES, TECHNIQUE_IDS
 
 Fold = Literal["train", "eval"]
+
+_LOG = logging.getLogger(__name__)
 
 SPLIT_ONLY_COLUMNS = frozenset(
     {"event_id", "event_ts", "payer", "payee", "amount_minor"}
@@ -112,6 +115,50 @@ def assign_folds(
     if not (folds == "eval").any():
         raise ValueError("time cut produced an empty eval fold")
     return folds
+
+
+def inner_folds_from_train(
+    split_df: pd.DataFrame,
+    folds: pd.Series,
+    *,
+    fraction: float = 0.20,
+) -> pd.Series:
+    """Carve inner_fit / inner_val from outer train by last 20% of calendar span.
+
+    Never shuffled — deterministic calendar cut identical in style to
+    :func:`calendar_cut` but measured from the *end* of the span.
+    """
+    mask = (folds == "train").to_numpy()
+    if not mask.any():
+        raise ValueError("outer train fold is empty; cannot create inner folds")
+    ts = _parse_ts(split_df.loc[mask, "event_ts"])
+    t0, t1 = ts.min(), ts.max()
+    if pd.isna(t0) or pd.isna(t1):
+        raise ValueError("event_ts required for inner fold calendar cut")
+    cut = t1 - (t1 - t0) * fraction   # last `fraction` of calendar span
+    inner = pd.Series("inner_fit", index=folds.index, name="inner_fold")
+    inner.loc[mask & (_parse_ts(split_df["event_ts"]) >= cut).to_numpy()] = "inner_val"
+    inner.loc[~mask] = "outer_eval"
+    # Guard: both inner folds must be non-empty
+    if not (inner == "inner_val").any():
+        raise ValueError(
+            "inner_val is empty after calendar cut — calendar span too short "
+            f"(t0={t0}, t1={t1}, fraction={fraction})"
+        )
+    if not (inner == "inner_fit").any():
+        raise ValueError(
+            "inner_fit is empty after calendar cut — all train rows fall in inner_val "
+            f"(t0={t0}, t1={t1}, fraction={fraction})"
+        )
+    _LOG.info(
+        "inner_folds_from_train",
+        extra={
+            "inner_fit_n": int((inner == "inner_fit").sum()),
+            "inner_val_n": int((inner == "inner_val").sum()),
+            "cut_ts": str(cut),
+        },
+    )
+    return inner
 
 
 def assert_no_x_leak(columns: list[str] | pd.Index) -> None:
