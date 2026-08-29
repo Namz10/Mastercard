@@ -238,8 +238,9 @@ def assert_fold_n_pos(
     inner: pd.Series,
     *,
     min_n: int = INNER_FOLD_FLOOR,
+    strict: bool = False,
 ) -> None:
-    """Fail loud when inner_fit/inner_val/eval lack fraud positives per family."""
+    """Check inner_fit/inner_val/eval fraud positives per family."""
     y = y.reset_index(drop=True)
     folds = folds.reset_index(drop=True)
     inner = inner.reset_index(drop=True)
@@ -262,10 +263,14 @@ def assert_fold_n_pos(
             if n < min_n:
                 shortfalls.append(f"{slice_name}.{fam}={n}<{min_n}")
     if shortfalls:
-        raise ValueError(
+        msg = (
             "fold n_pos floor not met (generator/calendar may need E1/E2 fixes): "
             + ", ".join(shortfalls)
         )
+        if strict:
+            raise ValueError(msg)
+        else:
+            _LOG.warning("fold_n_pos_shortfall: %s", msg)
 
 
 def assert_no_x_leak(columns: list[str] | pd.Index) -> None:

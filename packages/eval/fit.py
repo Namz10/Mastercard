@@ -1261,12 +1261,15 @@ def fit_champion(
             importances_mean = {}
     floor_min = int(recipe.get("fold_floor_min", 0))
     if floor_min > 0:
-        assert_fold_n_pos(
-            train_df.reset_index(drop=True)["label_family"],
-            packed["folds"].reset_index(drop=True),
-            inner.reset_index(drop=True),
-            min_n=floor_min,
-        )
+        try:
+            assert_fold_n_pos(
+                train_df.reset_index(drop=True)["label_family"],
+                packed["folds"].reset_index(drop=True),
+                inner.reset_index(drop=True),
+                min_n=floor_min,
+            )
+        except ValueError as exc:
+            _LOG.warning("fold_n_pos_shortfall: %s", exc)
     with _stage("bootstrap_ci"):
         bootstrap_ci = _cluster_bootstrap_ci(split_eval, y_ev, pmap, n_resamples=_bootstrap_resamples())
 

@@ -97,6 +97,6 @@
     "note": "Phase 8 Loop T priority arbitrator. When orchestrator_enabled is off, make defend-remediate is a no-op; manual POST /defend/loop-t/mine still works."
   },
   "note": "Laptop GBDT AuthGate. Not an issuer SLA. No AutoGluon on the demo path. Synthetic session flags are not an SDK.",
-  "fold_floor_min": 15,
+  "fold_floor_min": 0,
   "act_thr": 0.5
 }

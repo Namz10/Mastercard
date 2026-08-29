@@ -235,10 +235,7 @@ def _inject_identity_budget(
     span_hi = max(span_lo + 1, world.sim_days - 3)
     hi_create = max(2, min(world.sim_days // 5, world.sim_days - 16))
     for i in range(n_farms):
-        if family == "ato" and i < n_early:
-            burst_day = int(rng.integers(14, max(15, early_cut)))
-        else:
-            burst_day = int(span_lo + (span_hi - span_lo) * (i + 0.5) / n_farms)
+        burst_day = int(span_lo + (span_hi - span_lo) * (i + 0.5) / n_farms)
         created_day = max(1, min(hi_create, burst_day - 4))
         last = inject_identity(
             world,

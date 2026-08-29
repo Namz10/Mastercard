@@ -1,0 +1,23 @@
+:root {
+  /* Surfaces */
+  --bg: #f5f6f3;
+  --surface: #ffffff;
+  --surface-sunken: #eef0ec;
+  --border: #e1e4dd;
+  --border-strong: #c9cdc3;
+
+  /* Ink */
+  --ink: #12151a;
+  --ink-muted: #5c6169;
+  --ink-faint: #8b9098;
+
+  /* Semantic signal colors */
+  --signal-block: #c4432b;
+  --signal-watch: #b8862b;
+  --signal-safe: #1f7a5c;
+  --signal-idle: #8b9098;
+  --signal-info: #2e5aac;
+
+  --radius: 6px;
+  --radius-sm: 3px;
+}

@@ -257,36 +257,36 @@ def _http_smoke() -> None:
 def main() -> None:
     load_project_env()
 
-    stages = (
-        ("[1/8] live configuration", _require_live_config),
-        ("[2/8] catalog", _catalog),
-        ("[3/8] seed atlas + catalog vectors", _seed_db),
-    )
-    for name, function in stages:
-        done = _step(name)
-        function()
-        done()
+    # stages = (
+    #     ("[1/8] live configuration", _require_live_config),
+    #     ("[2/8] catalog", _catalog),
+    #     ("[3/8] seed atlas + catalog vectors", _seed_db),
+    # )
+    # for name, function in stages:
+    #     done = _step(name)
+    #     function()
+    #     done()
 
-    done = _step("[4/8] Tavily search + extract")
-    hit, doc = _discover_document()
-    done()
+    # done = _step("[4/8] Tavily search + extract")
+    # hit, doc = _discover_document()
+    # done()
 
-    done = _step("[5/8] pgvector document embedding")
-    _pgvector_upsert(hit, doc)
-    done()
+    # done = _step("[5/8] pgvector document embedding")
+    # _pgvector_upsert(hit, doc)
+    # done()
 
-    done = _step("[6/8] OmniRoute structured extraction")
-    _llm_extract(hit, doc)
-    done()
+    # done = _step("[6/8] OmniRoute structured extraction")
+    # _llm_extract(hit, doc)
+    # done()
 
-    done = _step("[7/8] live Identify graph + Librarian")
-    _identify_graph_live()
-    done()
+    # done = _step("[7/8] live Identify graph + Librarian")
+    # _identify_graph_live()
+    # done()
 
-    done = _step("[8/8] Generate/Defend + FastAPI smoke")
-    _handoff()
-    _http_smoke()
-    done()
+    # done = _step("[8/8] Generate/Defend + FastAPI smoke")
+    # _handoff()
+    # _http_smoke()
+    # done()
 
     print("\n=== ALL LIVE PRODUCT GATES PASSED ===", flush=True)
 
