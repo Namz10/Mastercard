@@ -46,6 +46,7 @@ from packages.eval.split import (
     assert_no_x_leak,
     folds_from_run,
     inner_folds_from_train,
+    preflight_fold_floors,
     split_inner_val_ab,
 )
 from packages.policy.rules import Rule, evaluate_rules, load_v0_rules, vectorized_rule_bits
@@ -1151,6 +1152,14 @@ def fit_champion(
         packed["folds"].reset_index(drop=True),
         exclude_event_ids=force_train_event_ids,
     )
+    floor_min = int(recipe.get("fold_floor_min", 0))
+    if floor_min > 0:
+        preflight_fold_floors(
+            train_df.reset_index(drop=True)["label_family"],
+            packed["folds"].reset_index(drop=True),
+            inner.reset_index(drop=True),
+            min_n=floor_min,
+        )
     inner_fit_mask = (inner == "inner_fit").to_numpy()
     inner_val_mask = (inner == "inner_val").to_numpy()
     _LOG.info("threshold_fit", extra={"fold": "inner_folds", "inner_fit_n": int(inner_fit_mask.sum()), "inner_val_n": int(inner_val_mask.sum())})
@@ -1314,14 +1323,6 @@ def fit_champion(
                 raise
             top = [str(c) for c in list(x_tr_raw.columns)[:5]]
             importances_mean = {}
-    floor_min = int(recipe.get("fold_floor_min", 0))
-    if floor_min > 0:
-        assert_fold_n_pos(
-            train_df.reset_index(drop=True)["label_family"],
-            packed["folds"].reset_index(drop=True),
-            inner.reset_index(drop=True),
-            min_n=floor_min,
-        )
     with _stage("bootstrap_ci"):
         bootstrap_ci = _cluster_bootstrap_ci(split_eval, y_ev, pmap, n_resamples=_bootstrap_resamples())
 

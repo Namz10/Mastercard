@@ -96,3 +96,49 @@ Confirmatory world: `data/runs/v1-gtest-49/` (seed 49, 396,655 events). Model sc
 ## Wave 1 entry criteria
 
 P0 closed. Hub gate measured (fail documented). Proceed with hypotheses on seed **49** for behavior changes only.
+
+## User KB + prompt intake
+
+- **KB:** `docs/agent/kb.md` (append-only priorities; seeded 2026-08-29 with FPR Pareto, recursive Loop M, hard negatives, cross-world, ablation, adversarial sim)
+- **Prompt:** `docs/agent/prompt.md` (session overrides; read each cycle)
+
+## Wave 1 iteration 2 — H5 FPR Pareto baseline (measurement)
+
+**Artifact:** `data/validation/v1/pareto_gtest48.json` on frozen `v1-gtest-48`.
+
+| FPR target | Stage 1 TPR | Loop M TPR | Loop M dominates? |
+|------------|-------------|------------|-------------------|
+| 5% | 96.3% | **99.9%** | yes |
+| 2% | 94.8% | **99.9%** | yes |
+| 1% | 87.9% | **99.8%** | yes |
+| 0.5% | 84.7% | **99.7%** | yes |
+| 0.1% | 83.1% | **98.7%** | yes |
+
+Loop M dominates Stage 1 at every operating point on seed 48. Next: FPR-**constrained training** (not just threshold sweep) per KB §1.
+
+## Wave 1 iteration 3 — H4 genuine stamp noise (REJECT)
+
+**Worlds:** train `v1-train-50` (seed 50), test `v1-gtest-52` (seed 52). Generator change landed (2% low APP-shaped stamp noise on normals).
+
+**Fit blocked:** `inner_val.ato=0<15` on `v1-train-50` (E2 fold floor). Cannot retrain until inner calendar has ≥15 ATO in inner_val.
+
+**Partial read (frozen Loop M, no retrain):** `genuine_fp` on gtest-52 **10.03%** vs gtest-48 **8.07%** — seed + generator confound; does not validate H4 mechanism without successful fit.
+
+## Wave 1 iteration 4 — H4-E2 preflight (ACCEPT)
+
+`preflight_fold_floors()` at start of `fit_champion` — fail fast before PI when E2 fold floors fail (e.g. seed-50 `inner_val.ato=0`).
+
+## Wave 1 iteration 5 — H6 hard-negative mining (REJECT)
+
+**Plan:** [h6-hard-negative-mining.md](plans/h6-hard-negative-mining.md) · **Critic PASS** · **Judge REJECT**
+
+Mined top-500 high-scoring normals from `v1-gdev-47` (frozen Loop M scorer) → `v1-train-46__hn-train` (500 extras, `evt-hn-*`, inner_fit).
+
+| Metric | gtest-48 | gtest-49 (confirmatory) |
+|--------|----------|-------------------------|
+| `genuine_fp` | 8.07% → **6.70%** | 8.12% → **6.74%** |
+| `recall_at_op` | 99.99% → 94.30% | 100% → 96.4% |
+| `identity_burst` AP | 0.967 → **0.333** | 0.958 → **0.364** |
+| `cost_sketch` | 0.011 → **0.575** | 0.009 → **0.368** |
+
+FPR win is real on seed 49, but **identity_burst collapse** and **cost explosion** fail G6. Do **not** promote `v1-train-46__hn-train`. Artifact: `data/validation/v1/h6_hard_negatives.json`. Next: smaller `top_k`, family-aware mining, or payee/graph features per KB.

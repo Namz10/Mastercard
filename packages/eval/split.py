@@ -268,6 +268,17 @@ def assert_fold_n_pos(
         )
 
 
+def preflight_fold_floors(
+    y: pd.Series,
+    folds: pd.Series,
+    inner: pd.Series,
+    *,
+    min_n: int = INNER_FOLD_FLOOR,
+) -> None:
+    """Fail fast before expensive fit stages if E2 per-slice family floors are not met."""
+    assert_fold_n_pos(y, folds, inner, min_n=min_n)
+
+
 def assert_no_x_leak(columns: list[str] | pd.Index) -> None:
     cols = set(columns)
     leaked = cols & (SPLIT_ONLY_COLUMNS | set(TRAIN_DENYLIST))

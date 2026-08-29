@@ -17,6 +17,7 @@ from packages.eval.split import (
     calendar_cut,
     folds_from_run,
     inner_folds_from_train,
+    preflight_fold_floors,
 )
 from packages.eval import split as split_mod
 from packages.sim.export import (
@@ -242,3 +243,28 @@ def test_inner_folds_exclude_event_ids_stay_inner_fit():
     cut = orig_ts.max() - (orig_ts.max() - orig_ts.min()) * 0.20
     val_ts = pd.to_datetime(split_df.loc[inner == "inner_val", "event_ts"], utc=True)
     assert (val_ts >= cut).all()
+
+
+_TRAIN_50 = Path("data/runs/v1-train-50/train.parquet")
+
+
+@pytest.mark.skipif(not _TRAIN_50.is_file(), reason="requires v1-train-50 world")
+def test_preflight_fold_floors_fails_on_seed_50_ato_desert():
+  """RED: E2 fold floor must fail before expensive fit (inner_val.ato=0 on seed 50)."""
+  from packages.eval.fit import _attach_rule_bits, run_paths
+  from packages.policy.rules import load_v0_rules
+
+  paths = run_paths("v1-train-50")
+  train_df = _attach_rule_bits(pd.read_parquet(paths["train"]), load_v0_rules())
+  split_df = pd.read_parquet(paths["split"])
+  packed = folds_from_run(train_df, split_df, seed=50)
+  inner = inner_folds_from_train(
+      split_df.reset_index(drop=True), packed["folds"].reset_index(drop=True)
+  )
+  with pytest.raises(ValueError, match=r"inner_val\.ato=0<15"):
+      preflight_fold_floors(
+          train_df.reset_index(drop=True)["label_family"],
+          packed["folds"].reset_index(drop=True),
+          inner.reset_index(drop=True),
+          min_n=15,
+      )

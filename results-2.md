@@ -352,3 +352,23 @@ Still weak absolute transfer; lead metric only. `binary_ap` ~0.002 (both).
 ## Wave 1 iteration 1 — H2 hub exemption (2026-08-29)
 
 **ACCEPT.** Hub `mule_credit_restrict` 31 → 0 on gtest-48. Seed 49 confirmatory: `genuine_fp` 8.12%, cost 0.0092. Loop continues (SAML-D / portable features next).
+
+---
+
+## Wave 1 iteration 2 — H5 FPR Pareto on gtest-48 (2026-08-29)
+
+**Measurement only** (frozen photograph). Artifact: [`pareto_gtest48.json`](data/validation/v1/pareto_gtest48.json).
+
+Loop M dominates Stage 1 on recall at fixed FPR targets 5% / 2% / 1% / 0.5% / 0.1%. At **1% genuine FPR**, Loop M TPR **99.8%** vs Stage 1 **87.9%**. KB priority: FPR-constrained **training**, not threshold sweep alone.
+
+---
+
+## Wave 1 iteration 3 — H4 stamp noise (2026-08-29, REJECT)
+
+Worlds generated: `v1-train-50`, `v1-gdev-51`, `v1-gtest-52`. **Fit failed** E2: `inner_val.ato=0` on seed 50. Frozen Loop M on gtest-52: `genuine_fp` **10.03%** (vs 8.07% on 48) — inconclusive without retrain.
+
+---
+
+## Wave 1 iteration 5 — H6 hard-negative mining (2026-08-29, REJECT)
+
+Critic PASS → RED tests → `packages/eval/hard_negatives.py`. Judge REJECT: gtest-49 `genuine_fp` **6.74%** (was 8.12%) but `identity_burst` AP −62%, cost_sketch ~40×. Artifact: [`h6_hard_negatives.json`](data/validation/v1/h6_hard_negatives.json).
