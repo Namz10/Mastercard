@@ -236,7 +236,15 @@ def generate_quiet_world(
                 device = f"dev-c-up-{cust.party_id[-6:]}"
             app_flags = None
             payload = None
-            if rng.random() < 0.004:
+            # Genuine session-stamp noise (S2): low-level APP-shaped signals on normal rows.
+            if rng.random() < 0.02:
+                app_flags = {
+                    "call_active_flag": bool(rng.random() < 0.15),
+                    "copy_paste_payee_flag": bool(rng.random() < 0.25),
+                    "pause_ms": int(rng.integers(0, 800)),
+                    "urgency_pressure": float(rng.uniform(0.0, 0.35)),
+                }
+            elif rng.random() < 0.004:
                 app_flags = {
                     "call_active_flag": False,
                     "copy_paste_payee_flag": True,

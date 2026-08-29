@@ -42,6 +42,21 @@ def test_legitimate_hubs_exist_and_are_normal():
     assert all(e["label_family"] == "normal" for e in to_hub)
 
 
+def test_genuine_rows_carry_low_session_stamp_noise():
+    """H4 — normal rows must sometimes expose sub-fraud APP-shaped stamps (S2)."""
+    world = generate_quiet_world(world_seed=11, n_customers=80, n_merchants=12, sim_days=30)
+    normals = [e for e in world.events if e["label_family"] == "normal"]
+    assert len(normals) > 100
+    with_urgency = sum(
+        1 for e in normals if float((e.get("features_auth") or {}).get("urgency_pressure") or 0) > 0.05
+    )
+    with_copy = sum(
+        1 for e in normals if (e.get("features_auth") or {}).get("copy_paste_payee_flag")
+    )
+    assert with_urgency >= 5, "expected genuine stamp noise on normal urgency_pressure"
+    assert with_copy >= 5, "expected genuine stamp noise on normal copy_paste"
+
+
 def test_new_graph_features_are_h_t_minus():
     t0 = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
     fc = FeatureComputer()

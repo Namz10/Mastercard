@@ -35,6 +35,17 @@
       "falsifiable_experiment": "Loop M stream-score on SAML-D; compare TPR@FPR only",
       "status": "accepted",
       "wave0_outcome": "Stage 1 + Loop M scored; Loop M TPR@FPR ~1.8× Stage 1 at 0.1% FPR but still << lab"
+    },
+    {
+      "id": "H4",
+      "statement": "Genuine rows lack APP-shaped stamp diversity; model overfits zero vs fraud-stamp contrast",
+      "priority": 0.45,
+      "expected_external_gain": 0.25,
+      "evidence_strength": 0.75,
+      "causal_plausibility": 0.8,
+      "implementation_feasibility": 0.85,
+      "falsifiable_experiment": "2% low session-stamp noise on normal in world.py; retrain seed 50; genuine_fp down on seed 52 vs 8%",
+      "status": "testing"
     }
   ]
 }
