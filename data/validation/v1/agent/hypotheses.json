@@ -71,7 +71,14 @@
       "falsifiable_experiment": "pareto_genuine_fpr.json: LoopM recall dominates Stage1 at 1/0.5/0.1% on gtest-48 and gtest-49 without family collapse",
       "status": "accepted",
       "kb_ref": "docs/agent/kb.md §1",
-      "outcome": "LoopM 99.6%/99.5%/98.7% recall @ 1/0.5/0.1% FPR on g48; identity_burst recall 99.8% at 1% FPR. g49 confirms. Next: FPR-constrained detect_thr in fit (not retrain yet)."
+      "outcome": "LoopM 99.6%/99.5%/98.7% recall @ 1/0.5/0.1% FPR on g48; identity_burst recall 99.8% at 1% FPR. g49 confirms. H5d operational report on frozen v1."
+    },
+    {
+      "id": "H5d",
+      "statement": "Operational Pareto thresholds on frozen v1 improve deployable recall@FPR without retrain",
+      "priority": 0.93,
+      "status": "accepted",
+      "artifact": "data/validation/v1/pareto_operational_v1.json"
     },
     {
       "id": "H5",
@@ -122,7 +129,8 @@
       "implementation_feasibility": 0.5,
       "falsifiable_experiment": "Max 3 rounds on train-46 extras only; **promote/reject on gdev-47 each round**; gtest-49 confirmatory once after loop; Pareto + SAML-D vs single Loop M",
       "status": "open",
-      "kb_ref": "docs/agent/kb.md Priority 2 + plans/h7-recursive-loop-m.md"
+      "kb_ref": "docs/agent/kb.md Priority 2",
+      "outcome": "Round-1 gdev diagnostic ACCEPT (ato weakest). Full loop pending rounds 2-3."
     },
     {
       "id": "H8",
@@ -145,8 +153,9 @@
       "causal_plausibility": 0.85,
       "implementation_feasibility": 0.8,
       "falsifiable_experiment": "Frozen-champion ablate stamps/app/velocity/merchant/temporal/graph groups; without_stamps portable on SAML-D",
-      "status": "open",
-      "kb_ref": "docs/agent/kb.md §5"
+      "status": "accepted",
+      "kb_ref": "docs/agent/kb.md §5",
+      "outcome": "h9_ablation_audit.json: temporal/graph −0.31 AP; app_flags −0.12; stamps smaller"
     },
     {
       "id": "H10",

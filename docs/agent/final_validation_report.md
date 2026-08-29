@@ -166,3 +166,13 @@ gtest-49 confirms (LoopM 99.6% / 99.5% / 98.6% @ 1/0.5/0.1%). **Insight:** defau
 **Confirmatory (gtest-49, one shot):** same failure pattern. Artifact: `data/validation/v1/h5c_fpr_v2_eval.json`. Versioned record: `docs/agent/champions.md`.
 
 **Next:** Deploy Pareto threshold on **frozen v1** (no retrain), or multi-objective tune with identity/cost gates — not FPR-only.
+
+## Wave 1 iteration 8 — H5d + H7-R1 + H9 parallel (ACCEPT measurement)
+
+| Track | Artifact | Headline |
+|-------|----------|----------|
+| H5d | `pareto_operational_v1.json` | gtest-48 @1% FPR: recall 99.57%, gfp 0.93%, identity 99.8% (no retrain) |
+| H7-R1 | `h7_round1_diagnosis.json` | Weakest on gdev: **ato** (AP 0.54); 17k FP pool excl new_payee |
+| H9 | `h9_ablation_audit.json` | Largest AP drop: **temporal** / **graph** (~−0.31); app_flags −0.12 |
+
+Champion unchanged: `v1-train-46__loopm-train`.

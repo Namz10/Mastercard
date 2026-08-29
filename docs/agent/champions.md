@@ -1,5 +1,7 @@
 # Champion registry (versioned)
 
+**Naming:** **v0** = pre–autonomous-loop baselines (Stage 1 `v1-train-46`, Stage 2 Optuna). **v1** = **provisional champion after Wave 0 + Loop M** (`v1-train-46__loopm-train`) — this is the skill-era winner, not museum v0. **v2+** = subsequent experiments (FPR-tune, HN, etc.).
+
 Canonical record of promoted models. **v1 photograph seeds 46/47/48 stay frozen** — new versions get new `model_run_id` suffixes; headline seed-48 numbers are not retroactively rewritten.
 
 | Version | `model_run_id` | Train world | Promote gate | Confirmatory | Status |
@@ -25,6 +27,8 @@ Artifacts: [`pareto_genuine_fpr.json`](../data/validation/v1/pareto_genuine_fpr.
 
 **Operational note:** Default `detect_thr` undersells the Pareto frontier (~99.6% recall @ 1% FPR without retrain). Deployment should use FPR-constrained thresholding on calibrated scores, not the low default threshold alone.
 
+**H5d operational report:** [`pareto_operational_v1.json`](../data/validation/v1/pareto_operational_v1.json) — on gtest-48 @1% FPR: recall **99.57%**, `genuine_fp` **0.99%**, identity_burst recall **99.8%** (vs default op 8.07% FPR).
+
 ## v2 FPR-tuned — H5c REJECT (`v1-train-46__fpr-v2`)
 
 Optuna 25 trials, inner_val FPR objective, expanded HGB search. Artifact: [`h5c_fpr_v2_eval.json`](../data/validation/v1/h5c_fpr_v2_eval.json).
@@ -47,7 +51,7 @@ Same pattern: identity AP ~0.91 vs 0.99, cost ~0.69 vs 0.002. **Do not promote.*
 
 ## Recursive Loop M (H7)
 
-Promote/reject **each round on `v1-gdev-47`**. **`v1-gtest-49` once** after loop ends. **Max 3 rounds.** See [`plans/h7-recursive-loop-m.md`](plans/h7-recursive-loop-m.md).
+Promote/reject **each round on `v1-gdev-47`**. **`v1-gtest-49` once** after loop ends. **Max 3 rounds.** Round-1 diagnostic: [`h7_round1_diagnosis.json`](../data/validation/v1/h7_round1_diagnosis.json) — weakest family **ato** (AP 0.54 on gdev).
 
 ## Machine-readable
 
