@@ -847,47 +847,67 @@ def _cluster_bootstrap_ci(
     return out
 
 
+def _zero_encoded_columns(
+    x: np.ndarray,
+    raw: pd.DataFrame,
+    cols: list[str],
+    *,
+    cap_amount_vs_p30: bool = False,
+) -> np.ndarray:
+    z = x.copy()
+    col_index = {c: i for i, c in enumerate(raw.columns)}
+    for c in cols:
+        i = col_index.get(c)
+        if i is not None and i < z.shape[1]:
+            z[:, i] = 0.0
+    if cap_amount_vs_p30 and "amount_vs_p30" in col_index:
+        i = col_index["amount_vs_p30"]
+        if i < z.shape[1]:
+            z[:, i] = np.minimum(z[:, i], 1.5)
+    return z
+
+
+def _champion_pmap_scores(champ: Champion, x: np.ndarray) -> tuple[dict[str, np.ndarray], np.ndarray]:
+    raw_pmap = _proba_map(champ.model, x)
+    if getattr(champ, "pmap_calibrators", None):
+        pmap = _apply_pmap_calibrators(raw_pmap, champ.pmap_calibrators, champ.classes)
+    else:
+        pmap = raw_pmap
+    scores = _fraud_score(pmap, x.shape[0])
+    return pmap, scores
+
+
 def _app_ablation(
-    x_tr: np.ndarray,
-    y_tr: pd.Series,
-    x_te: np.ndarray,
-    y_te: pd.Series,
-    raw_tr: pd.DataFrame,
-    raw_te: pd.DataFrame,
+    champ: Champion,
+    x_ev: np.ndarray,
+    y_ev: pd.Series,
+    raw_ev: pd.DataFrame,
     recipe: dict[str, Any],
+    *,
+    model_freeze_id: str | None = None,
 ) -> dict[str, Any]:
-    y_app_tr = (y_tr.astype(str) == "app_fraud").to_numpy(dtype=int)
-    y_app_te = (y_te.astype(str) == "app_fraud").to_numpy(dtype=int)
-    flags = [c for c in recipe.get("app_flag_cols", list(APP_FLAG_COLS)) if c in raw_tr.columns]
-    col_index = {c: i for i, c in enumerate(raw_tr.columns)}
+    """Zero columns on the frozen champion matrix; never refit a toy APP HGB."""
+    y_app = (y_ev.astype(str) == "app_fraud").to_numpy(dtype=int)
+    y_bin = (y_ev.astype(str) != "normal").to_numpy(dtype=int)
+    flags = [c for c in recipe.get("app_flag_cols", list(APP_FLAG_COLS)) if c in raw_ev.columns]
 
-    def _zero(x: np.ndarray, raw: pd.DataFrame) -> np.ndarray:
-        z = x.copy()
-        for c in flags:
-            i = col_index.get(c)
-            if i is not None and i < z.shape[1]:
-                z[:, i] = 0.0
-        _ = raw
-        return z
-
-    def _ap(x_train: np.ndarray, x_test: np.ndarray) -> float:
-        if y_app_tr.min() == y_app_tr.max() or y_app_te.min() == y_app_te.max():
+    def _app_ap(x_mod: np.ndarray) -> float:
+        if y_app.min() == y_app.max():
             return float("nan")
-        m = HistGradientBoostingClassifier(
-            max_depth=int(recipe.get("max_depth", 3)),
-            max_iter=int(recipe.get("max_iter", 80)),
-            learning_rate=float(recipe.get("learning_rate", 0.08)),
-            random_state=int(recipe.get("random_state", 42)),
-            class_weight="balanced",
-        )
-        m.fit(x_train, y_app_tr)
-        scores = m.predict_proba(x_test)[:, 1]
-        return float(average_precision_score(y_app_te, scores))
+        pmap, _ = _champion_pmap_scores(champ, x_mod)
+        app_scores = pmap.get("app_fraud", np.zeros(len(y_ev)))
+        return float(average_precision_score(y_app, app_scores))
 
-    with_flags = _ap(x_tr, x_te)
-    without = _ap(_zero(x_tr, raw_tr), _zero(x_te, raw_te))
+    def _binary_ap(x_mod: np.ndarray) -> float:
+        if y_bin.min() == y_bin.max():
+            return float("nan")
+        _, scores = _champion_pmap_scores(champ, x_mod)
+        return float(average_precision_score(y_bin, scores))
+
+    with_flags = _app_ap(x_ev)
+    without = _app_ap(_zero_encoded_columns(x_ev, raw_ev, flags))
     died = (
-        int(y_app_te.sum()) > 0
+        int(y_app.sum()) > 0
         and np.isfinite(with_flags)
         and np.isfinite(without)
         and without <= max(0.05, 0.5 * with_flags)
@@ -895,35 +915,26 @@ def _app_ablation(
     stamp_cols = list(flags) + [
         c
         for c in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag")
-        if c in raw_tr.columns
-    ]
-
-    def _zero_stamps(x: np.ndarray, raw: pd.DataFrame) -> np.ndarray:
-        z = _zero(x, raw)
-        col_index_st = {c: i for i, c in enumerate(raw.columns)}
-        for c in stamp_cols:
-            i = col_index_st.get(c)
-            if i is not None and i < z.shape[1]:
-                z[:, i] = 0.0
-        if "is_new_payee" in col_index_st:
-            i = col_index_st["is_new_payee"]
-            if i < z.shape[1]:
-                z[:, i] = 0.0
-        if "amount_vs_p30" in col_index_st:
-            i = col_index_st["amount_vs_p30"]
-            if i < z.shape[1]:
-                z[:, i] = np.minimum(z[:, i], 1.5)
-        return z
-
-    without_stamps = _ap(_zero_stamps(x_tr, raw_tr), _zero_stamps(x_te, raw_te))
-    return {
+        if c in raw_ev.columns
+    ] + [c for c in raw_ev.columns if str(c).startswith("rule__")]
+    stamp_zero = list(stamp_cols)
+    if "is_new_payee" in raw_ev.columns:
+        stamp_zero.append("is_new_payee")
+    without_stamps = _binary_ap(
+        _zero_encoded_columns(x_ev, raw_ev, stamp_zero, cap_amount_vs_p30=True)
+    )
+    out: dict[str, Any] = {
         "app_flags": flags,
         "with_app_flags": {"average_precision": with_flags},
         "without_app_flags": {"average_precision": without},
         "without_stamps": {"average_precision": without_stamps},
         "app_metric_died_without_synthetic_flags": died,
+        "app_ablation_source": "frozen_champion",
         "note": "Synthetic session flags are not an SDK. Collapse without flags is documented, not hidden.",
     }
+    if model_freeze_id:
+        out["model_freeze_id"] = model_freeze_id
+    return out
 
 
 def _mule_entity_recall(
@@ -1247,8 +1258,39 @@ def fit_champion(
     split_eval = split_df.reset_index(drop=True).loc[packed["folds"].reset_index(drop=True) == "eval"]
     hang_s = float(recipe.get("hang_guard_seconds_1k", 120))
     bench = _bench_ms(model, x_ev, hang_s)
+    freeze_params_early = _canonical_hgb_params(hgb_kwargs, recipe)
+    freeze_id_early = _model_freeze_id(
+        recipe_hash=r_hash,
+        best_params=freeze_params_early,
+        op_threshold=thr,
+        recipe=recipe,
+    )
+    champ_for_ablation = Champion(
+        model=model,
+        encoder=encoder,
+        raw_columns=list(x_tr_raw.columns),
+        cat_cols=cat_cols,
+        classes=classes,
+        op_threshold=thr,
+        detect_thr=detect_thr,
+        act_thr=act_thr,
+        fold_seed=world_seed,
+        rule_ids=[r.id for r in rules if r.status == "live"],
+        top_features=[],
+        recipe=recipe,
+        iso_model=iso_model if iso_enabled else None,
+        isolation_forest_enabled=iso_enabled,
+        pmap_calibrators=pmap_cals,
+    )
     with _stage("app_ablation"):
-        ablation = _app_ablation(x_tr, y_tr, x_ev, y_ev, x_tr_raw, x_ev_raw, recipe)
+        ablation = _app_ablation(
+            champ_for_ablation,
+            x_ev,
+            y_ev,
+            x_ev_raw,
+            recipe,
+            model_freeze_id=freeze_id_early,
+        )
     mule_rec = _mule_entity_recall(split_eval, pred, scores, thr)
 
     with _stage("permutation_importance"):
@@ -1684,6 +1726,9 @@ def _gtest_cached_score_if_opened(
         )
     score_path = _gtest_score_path(model_run_id, models_dir)
     if proto.get("gtest_opened_at") and stored_freeze == freeze_id and score_path.is_file():
+        cached_run_id = proto.get("gtest_run_id")
+        if cached_run_id and str(cached_run_id) != str(run_id):
+            return None
         return json.loads(score_path.read_text(encoding="utf-8"))
     return None
 
@@ -1746,9 +1791,30 @@ def score_run(
     genuine_fp_over_eval = _genuine_fp_over_eval(yhat, len(y_ev))
     hang_s = float(recipe.get("hang_guard_seconds_1k", 120))
     bench = _bench_ms(champ.model, x_ev, hang_s)
-    x_tr, _ = _encode(x_tr_raw, encoder=champ.encoder, cat_cols=champ.cat_cols, fit=False)
-    ablation = _app_ablation(x_tr, y_tr, x_ev, y_ev, x_tr_raw, x_ev_raw, recipe)
-    ablation["app_ablation_source"] = "scored_world"
+    manifest_path = (models_dir or MODELS_DIR) / mid / "model_manifest.json"
+    manifest = {}
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    recipe_hash = str(manifest.get("recipe_hash") or _recipe_hash())
+    champ_metrics_path = (models_dir or MODELS_DIR) / mid / "metrics.json"
+    champ_metrics: dict[str, Any] = {}
+    if champ_metrics_path.is_file():
+        champ_metrics = json.loads(champ_metrics_path.read_text(encoding="utf-8"))
+    freeze_params = _best_params_from_champion(champ, champ_metrics if champ_metrics_path.is_file() else {})
+    freeze_id = _model_freeze_id(
+        recipe_hash=recipe_hash,
+        best_params=freeze_params,
+        op_threshold=float(thr),
+        recipe=recipe,
+    )
+    ablation = _app_ablation(
+        champ,
+        x_ev,
+        y_ev,
+        x_ev_raw,
+        recipe,
+        model_freeze_id=freeze_id,
+    )
 
     iso_model_pass = champ.iso_model if (getattr(champ, "isolation_forest_enabled", None) is True) else None
     hist, fp_hist = _brake_action_hist(
@@ -1764,24 +1830,7 @@ def score_run(
         fp_action_hist=fp_hist,
     )
 
-    manifest_path = (models_dir or MODELS_DIR) / mid / "model_manifest.json"
-    manifest = {}
-    if manifest_path.is_file():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    recipe_hash = str(manifest.get("recipe_hash") or _recipe_hash())
-    champ_metrics_path = (models_dir or MODELS_DIR) / mid / "metrics.json"
-    champ_metrics: dict[str, Any] = {}
-    if champ_metrics_path.is_file():
-        champ_metrics = json.loads(champ_metrics_path.read_text(encoding="utf-8"))
-
     bin_op = _binary_op_metrics(y_bin, scores, yhat)
-    freeze_params = _best_params_from_champion(champ, champ_metrics if champ_metrics_path.is_file() else {})
-    freeze_id = _model_freeze_id(
-        recipe_hash=recipe_hash,
-        best_params=freeze_params,
-        op_threshold=float(thr),
-        recipe=recipe,
-    )
 
     metrics = {
         "pass": False,

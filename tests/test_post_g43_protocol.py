@@ -21,7 +21,7 @@ def test_tune_champion_never_reads_outer_eval_in_objective():
     assert "outer_fp =" not in src
 
 
-def test_gtest_ablation_recomputed_on_scored_world(fitted: dict):
+def test_gtest_ablation_recomputed_on_frozen_champion(fitted: dict):
     body = fit_mod.score_run(
         "fit-c",
         model_run_id="fit-c",
@@ -30,7 +30,7 @@ def test_gtest_ablation_recomputed_on_scored_world(fitted: dict):
         all_rows=True,
     )
     ab = body["metrics"]["app_ablation"]
-    assert ab["app_ablation_source"] == "scored_world"
+    assert ab["app_ablation_source"] == "frozen_champion"
 
 
 def test_genuine_fp_uses_n_normal_denom(fitted: dict):

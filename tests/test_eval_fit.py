@@ -16,6 +16,17 @@ from packages.sim.export import TRAIN_DENYLIST
 from packages.sim.ledger import LABEL_FAMILIES, TECHNIQUE_IDS
 from packages.sim.runner import run_population
 
+_real_load_recipe = fit_mod.load_recipe
+
+
+def _test_load_recipe(path=None):
+    recipe = dict(_real_load_recipe(path))
+    recipe["fold_floor_min"] = 0
+    return recipe
+
+
+fit_mod.load_recipe = _test_load_recipe
+
 
 @pytest.fixture(scope="module")
 def pop(tmp_path_factory) -> dict:
@@ -76,6 +87,7 @@ def test_app_ablation_reported(pop: dict, tmp_path: Path):
     assert "average_precision" in ab["with_app_flags"]
     assert "average_precision" in ab["without_app_flags"]
     assert "app_metric_died_without_synthetic_flags" in ab
+    assert ab["app_ablation_source"] == "frozen_champion"
 
 
 def test_fit_reproducible_seed_42(pop: dict, tmp_path: Path):
@@ -136,7 +148,43 @@ def test_gtest_ablation_recomputed_not_copied(fitted: dict):
         all_rows=True,
     )
     ab = body["metrics"]["app_ablation"]
-    assert ab["app_ablation_source"] == "scored_world"
+    assert ab["app_ablation_source"] == "frozen_champion"
+
+
+def test_frozen_champion_ablation_differs_per_model(pop: dict, tmp_path: Path):
+    """Wave 0.1 — two frozen champions on the same world must yield different ablations."""
+    runs = Path(pop["parquet_path"]).parent.parent
+    fit_champion("fit-c", world_seed=42, runs_dir=runs, models_dir=tmp_path / "full")
+    fit_champion(
+        "fit-c",
+        world_seed=42,
+        runs_dir=runs,
+        models_dir=tmp_path / "toy",
+        dest_run_id="fit-c-toy",
+        override_params={"max_iter": 1, "max_depth": 2},
+    )
+    score_full = score_run(
+        "fit-c",
+        model_run_id="fit-c",
+        runs_dir=runs,
+        models_dir=tmp_path / "full",
+        all_rows=True,
+    )
+    score_toy = score_run(
+        "fit-c",
+        model_run_id="fit-c-toy",
+        runs_dir=runs,
+        models_dir=tmp_path / "toy",
+        all_rows=True,
+    )
+    ab_full = score_full["metrics"]["app_ablation"]
+    ab_toy = score_toy["metrics"]["app_ablation"]
+    assert ab_full["app_ablation_source"] == "frozen_champion"
+    assert ab_toy["app_ablation_source"] == "frozen_champion"
+    ws_full = ab_full["without_stamps"]["average_precision"]
+    ws_toy = ab_toy["without_stamps"]["average_precision"]
+    assert np.isfinite(ws_full) and np.isfinite(ws_toy)
+    assert ws_full != ws_toy, "without_stamps must differ when champions differ"
 
 
 def test_metrics_pass_false_without_n_pos(fitted: dict):
