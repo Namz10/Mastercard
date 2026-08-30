@@ -5,6 +5,7 @@ from apps.api.env import load_project_env
 load_project_env()
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.db import init_db
 from apps.api.routes.catalog import router as catalog_router
@@ -15,6 +16,14 @@ from packages.agents.llm import public_llm_status
 from packages.osint.settings import get_osint_settings
 
 app = FastAPI(title="AegisLoop API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(catalog_router)
 app.include_router(identify_router)
