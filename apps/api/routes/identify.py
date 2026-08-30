@@ -1,16 +1,23 @@
 """Identify / HITL API routes."""
 
+import asyncio
+import json
+import logging
+import queue
+import threading
+import time
 import uuid
-from typing import Annotated, Any, List
+from typing import Annotated, Any, AsyncIterator, List
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from apps.api.db import get_db, init_db
 from apps.api.models import AtlasRow
-from packages.agents.identify_graph import run_identify_graph
-from packages.agents.librarian_db import hitl_payload_for_spec
+from packages.agents.identify_graph import identify_graph
+from packages.agents.librarian_db import dedupe_atlas_rows, hitl_payload_for_spec, proposal_dedupe_key
 from packages.agents.llm import public_llm_status
 from packages.agents.settings import get_identify_settings
 from packages.catalog.models import AttackSpec
@@ -19,6 +26,40 @@ from packages.osint.settings import get_osint_settings
 from packages.osint.vector_store import nearest_catalog_row
 
 router = APIRouter(prefix="/identify", tags=["identify"])
+logger = logging.getLogger(__name__)
+
+
+def _identify_mode_flags() -> dict[str, bool | str]:
+    """Safe snapshot of env flags that gate live vs fixture paths (no secrets)."""
+    osint = get_osint_settings()
+    identify = get_identify_settings()
+    llm = public_llm_status()
+    return {
+        "identify_live_search": osint.identify_live_search,
+        "tavily_configured": bool(osint.tavily_api_key),
+        "llm_configured": bool(llm.get("configured")),
+        "llm_profile": str(llm.get("profile", "")),
+    }
+
+NODE_VERBS = {
+    "scout": "COLLECT",
+    "curator": "RANK",
+    "extractor": "EXTRACT",
+    "grounder": "GROUND",
+    "tier_scorer": "GROUND",
+    "corroborator": "GROUND",
+    "librarian": "PROPOSE",
+}
+
+NODE_BODY = {
+    "scout": "Collecting sources",
+    "curator": "Ranking sources",
+    "extractor": "Reading articles",
+    "grounder": "Matching to the catalog",
+    "tier_scorer": "Scoring source quality",
+    "corroborator": "Checking corroboration",
+    "librarian": "Proposing attacks for review",
+}
 
 
 class IdentifyRunRequest(BaseModel):
@@ -74,6 +115,8 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
     init_db()
     req = body or IdentifyRunRequest()
     run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
+    from packages.agents.identify_graph import run_identify_graph
+
     result = run_identify_graph(run_id=run_id, topic=req.topic)
     candidates = result.get("candidate_urls") or []
     scout_count = result.get("scout_candidate_count")
@@ -96,16 +139,193 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
     }
 
 
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _stream_identify_worker(
+    run_id: str,
+    topic: str,
+    event_q: "queue.SimpleQueue[str | None]",
+    t0: float,
+) -> None:
+    """Run blocking identify graph in a worker thread; push SSE lines to event_q."""
+    from packages.agents.state import empty_identify_state
+    from packages.osint.collect import reset_identify_progress_hook, set_identify_progress_hook
+
+    flags = _identify_mode_flags()
+    mode = "live" if flags["identify_live_search"] else "fixtures"
+    logger.info(
+        "identify stream start run_id=%s topic_len=%d mode=%s flags=%s",
+        run_id,
+        len(topic),
+        mode,
+        flags,
+    )
+
+    def elapsed_ms() -> int:
+        return int((time.time() - t0) * 1000)
+
+    def emit(payload: dict) -> None:
+        event_q.put(_sse_event(payload))
+
+    def on_progress(verb: str, body: str) -> None:
+        emit({"t": elapsed_ms(), "verb": verb, "body": body, "status": "progress"})
+
+    token = set_identify_progress_hook(on_progress)
+    try:
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "COLLECT",
+                "body": "Collect started",
+                "status": "started",
+            }
+        )
+        state = empty_identify_state(run_id=run_id, topic=topic)
+        try:
+            for chunk in identify_graph.stream(state, stream_mode="updates"):
+                for node, update in chunk.items():
+                    if isinstance(update, dict):
+                        state.update(update)
+                    verb = NODE_VERBS.get(node, "COLLECT")
+                    body_text = NODE_BODY.get(node, node)
+                    artifacts: dict[str, Any] | None = None
+                    if node == "scout":
+                        urls = state.get("candidate_urls") or []
+                        if urls:
+                            artifacts = {
+                                "urls": [
+                                    u.get("url", u) if isinstance(u, dict) else u for u in urls[:8]
+                                ]
+                            }
+                    logger.debug(
+                        "identify stream event run_id=%s node=%s verb=%s elapsed_ms=%d",
+                        run_id,
+                        node,
+                        verb,
+                        elapsed_ms(),
+                    )
+                    emit(
+                        {
+                            "t": elapsed_ms(),
+                            "verb": verb,
+                            "body": body_text,
+                            "status": "ok",
+                            "artifacts": artifacts,
+                        }
+                    )
+            proposed_count = len(state.get("proposed_specs") or [])
+            logger.info(
+                "identify stream complete run_id=%s mode=%s proposed_count=%d elapsed_ms=%d",
+                run_id,
+                mode,
+                proposed_count,
+                elapsed_ms(),
+            )
+            emit(
+                {
+                    "t": elapsed_ms(),
+                    "verb": "PROPOSE",
+                    "body": f"{proposed_count} proposed",
+                    "status": "done",
+                    "result": {
+                        "run_id": state.get("run_id", run_id),
+                        "proposed_count": proposed_count,
+                        "candidate_urls": state.get("candidate_urls", []),
+                    },
+                }
+            )
+        except Exception as exc:
+            logger.exception(
+                "identify stream failed run_id=%s mode=%s flags=%s — falling back to replay",
+                run_id,
+                mode,
+                flags,
+            )
+            reason = str(exc) or exc.__class__.__name__
+            emit({"fallback": "recorded", "reason": reason})
+            from packages.agents.identify_graph import run_identify_graph
+
+            result = run_identify_graph(run_id=run_id, topic=topic)
+            replay_count = len(result.get("proposed_specs") or [])
+            logger.info(
+                "identify stream replay complete run_id=%s proposed_count=%d reason=%s",
+                run_id,
+                replay_count,
+                reason,
+            )
+            emit(
+                {
+                    "t": elapsed_ms(),
+                    "verb": "REPLAY",
+                    "body": "Recorded corpus playback",
+                    "status": "done",
+                    "result": {
+                        "run_id": result.get("run_id", run_id),
+                        "proposed_count": replay_count,
+                        "candidate_urls": result.get("candidate_urls", []),
+                    },
+                }
+            )
+    finally:
+        reset_identify_progress_hook(token)
+        event_q.put(None)
+
+
+async def _async_stream_identify(run_id: str, topic: str) -> AsyncIterator[str]:
+    """Drain SSE chunks from a worker thread so progress events flush during long nodes."""
+    t0 = time.time()
+    event_q: queue.SimpleQueue[str | None] = queue.SimpleQueue()
+    threading.Thread(
+        target=_stream_identify_worker,
+        args=(run_id, topic, event_q, t0),
+        daemon=True,
+    ).start()
+
+    while True:
+        drained = False
+        while True:
+            try:
+                item = event_q.get_nowait()
+            except queue.Empty:
+                break
+            drained = True
+            if item is None:
+                return
+            yield item
+            await asyncio.sleep(0)
+        if not drained:
+            await asyncio.sleep(0.05)
+
+
+@router.post("/run/stream")
+async def identify_run_stream(body: IdentifyRunRequest | None = None) -> StreamingResponse:
+    init_db()
+    req = body or IdentifyRunRequest()
+    run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
+    logger.info("identify run/stream request run_id=%s topic_len=%d", run_id, len(req.topic))
+
+    async def gen():
+        try:
+            async for line in _async_stream_identify(run_id, req.topic):
+                yield line
+        except Exception:
+            logger.exception("identify run/stream generator error run_id=%s", run_id)
+            raise
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/hitl")
 def hitl_queue(db: Annotated[Session, Depends(get_db)]) -> dict:
-    rows = (
-        db.query(AtlasRow)
-        .filter(AtlasRow.status == "proposed")
-        .order_by(AtlasRow.updated_at.desc())
-        .all()
-    )
-    items = []
-    for row in rows:
+    """Pending proposals plus demo catalog context (prior identify-* approvals)."""
+
+    def _payload(row: AtlasRow, disposition: str) -> dict:
         spec = dict(row.spec or {})
         nearest = nearest_catalog_row(
             str(spec.get("name") or ""),
@@ -117,15 +337,42 @@ def hitl_queue(db: Annotated[Session, Depends(get_db)]) -> dict:
             nrow = db.query(AtlasRow).filter(AtlasRow.vector_id == nearest["vector_id"]).one_or_none()
             if nrow and nrow.spec:
                 nearest_spec = dict(nrow.spec)
-        items.append(
-            hitl_payload_for_spec(
-                spec,
-                nearest_technique=str((nearest_spec or spec).get("technique_id", "")),
-                nearest_spec=nearest_spec,
-            )
+        item = hitl_payload_for_spec(
+            spec,
+            nearest_technique=str((nearest_spec or spec).get("technique_id", "")),
+            nearest_spec=nearest_spec,
         )
+        item["disposition"] = disposition
+        return item
+
+    pending_rows = dedupe_atlas_rows(
+        db.query(AtlasRow)
+        .filter(AtlasRow.status == "proposed")
+        .order_by(AtlasRow.updated_at.desc())
+        .all()
+    )
+    pending_ids = {row.vector_id for row in pending_rows}
+    pending_keys = {proposal_dedupe_key(row.spec or {}) for row in pending_rows}
+    items = [_payload(row, "review") for row in pending_rows]
+
+    catalog_rows = (
+        db.query(AtlasRow)
+        .filter(AtlasRow.status == "open")
+        .filter(AtlasRow.vector_id.like("identify-%"))
+        .order_by(AtlasRow.updated_at.desc())
+        .limit(12)
+        .all()
+    )
+    for row in catalog_rows:
+        if row.vector_id in pending_ids:
+            continue
+        if proposal_dedupe_key(row.spec or {}) in pending_keys:
+            continue
+        items.append(_payload(row, "in_catalog"))
+
     return {
-        "count": len(rows),
+        "count": len(pending_rows),
+        "catalog_count": sum(1 for i in items if i.get("disposition") == "in_catalog"),
         "items": items,
     }
 @router.get("/state")

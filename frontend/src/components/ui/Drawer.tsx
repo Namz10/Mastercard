@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 export function Drawer({
   open,
@@ -12,6 +12,15 @@ export function Drawer({
   title: string;
   children: ReactNode;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   return (
     <>
       <div
@@ -23,14 +32,16 @@ export function Drawer({
         aria-hidden={!open}
       />
       <aside
+        role="dialog"
+        aria-modal={open}
         className={clsx(
-          "fixed top-0 right-0 h-full w-full max-w-md bg-surface border-l border-border z-50 shadow-sm transition-transform duration-150",
+          "fixed top-0 right-0 h-full w-full max-w-[400px] bg-surface border-l border-border z-50 shadow-drawer transition-transform duration-150",
           open ? "translate-x-0" : "translate-x-full",
         )}
         aria-hidden={!open}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-mono text-sm font-medium">{title}</h2>
+          <h2 className="font-sans text-[14px] font-medium text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="text-ink-faint hover:text-ink text-sm">
             Close
           </button>

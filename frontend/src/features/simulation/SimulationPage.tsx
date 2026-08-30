@@ -1,3 +1,4 @@
+/** Quarantined GFF 2026 — off nav. Proof-only lab. Do not restore to chrome. */
 import { PageHeader } from "@/components/layout/Topbar";
 import { Card } from "@/components/ui/Card";
 import { LaunchPanel } from "./LaunchPanel";

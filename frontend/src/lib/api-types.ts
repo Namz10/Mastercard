@@ -66,10 +66,13 @@ export interface HitlItem {
   corroboration_type: string | null;
   name: string | null;
   field_diff: Record<string, unknown> | null;
+  /** review = pending disposition; in_catalog = prior identify-* approval (demo context) */
+  disposition?: "review" | "in_catalog";
 }
 
 export interface HitlQueueResponse {
   count: number;
+  catalog_count?: number;
   items: HitlItem[];
 }
 
@@ -122,7 +125,7 @@ export interface ScoreMetrics {
   pass: boolean;
   n_eval: number;
   ap_by_family: Record<string, { ap: number }>;
-  tpr_at_fpr: Record<string, number>;
+  tpr_at_fpr: Record<string, number | { tpr: number; fpr_target?: number }>;
   genuine_fp: number;
   f1_at_op: number;
   precision_at_op: number;

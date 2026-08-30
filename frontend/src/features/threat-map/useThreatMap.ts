@@ -47,10 +47,36 @@ export function useThreatMap() {
     queryFn: () => api.get<ThreatMapResponse>("/catalog/threat-map"),
   });
 
-  const techniques =
-    coverageQuery.data && threatQuery.data
-      ? mergeThreatData(coverageQuery.data, threatQuery.data)
-      : [];
+  const techniques = (() => {
+    if (coverageQuery.data && threatQuery.data) {
+      return mergeThreatData(coverageQuery.data, threatQuery.data);
+    }
+    if (coverageQuery.data) {
+      return mergeThreatData(coverageQuery.data, { categories: {}, technique_count: 0 });
+    }
+    if (threatQuery.data) {
+      const cells = Object.values(threatQuery.data.categories).flatMap((groups) =>
+        groups.map((g) => ({
+          technique_id: g.technique_id,
+          vector_id: g.chips[0]?.vector_id ?? null,
+          name: g.name,
+          status: g.status,
+          generate_mode: g.generate_mode,
+          coverage_status: "empty",
+          live_rule_ids: [] as string[],
+          named_gap_reason: null,
+          draft_rule: null,
+          features_expected: [] as string[],
+          scout_topic_hint: null,
+        })),
+      );
+      return mergeThreatData(
+        { technique_count: cells.length, cells, status_counts: {}, scout_topics_for_gaps: [] },
+        threatQuery.data,
+      );
+    }
+    return [];
+  })();
 
   const byCategory = techniques.reduce<Record<number, MergedTechnique[]>>((acc, t) => {
     acc[t.category] = acc[t.category] ?? [];
@@ -63,7 +89,7 @@ export function useThreatMap() {
     byCategory,
     categoryLabels: CATEGORY_LABELS,
     isLoading: coverageQuery.isLoading || threatQuery.isLoading,
-    isError: coverageQuery.isError || threatQuery.isError,
+    isError: coverageQuery.isError && threatQuery.isError,
     error: coverageQuery.error ?? threatQuery.error,
     refetch: () => {
       void coverageQuery.refetch();

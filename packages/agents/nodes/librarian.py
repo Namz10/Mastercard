@@ -25,7 +25,10 @@ def librarian(state: IdentifyState) -> IdentifyState:
                 str(spec.get("technique_id") or ""),
             )
             target = find_merge_target(db, spec)
-            # Only merge into an existing *proposed* row. Never demote open catalog cards.
+            # Already approved — do not re-stage or demote open catalog rows.
+            if target is not None and target.status == "open":
+                continue
+            # Only merge into an existing *proposed* row.
             depth_bump = target is not None and target.status == "proposed"
             target_id = target.vector_id if depth_bump else None
             nearest_spec = None

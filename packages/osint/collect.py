@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -13,6 +15,24 @@ from packages.osint.priority import sort_osint_candidates
 from packages.osint.search import DEFAULT_QUERY, search_candidate_urls
 from packages.osint.search_pack import build_search_queries
 from packages.osint.settings import OsintSettings, get_osint_settings
+
+_identify_progress: ContextVar[Callable[[str, str], None] | None] = ContextVar(
+    "_identify_progress", default=None
+)
+
+
+def set_identify_progress_hook(cb: Callable[[str, str], None] | None) -> object:
+    return _identify_progress.set(cb)
+
+
+def reset_identify_progress_hook(token: object) -> None:
+    _identify_progress.reset(token)
+
+
+def _emit_progress(verb: str, body: str) -> None:
+    cb = _identify_progress.get()
+    if cb:
+        cb(verb, body)
 
 
 def _normalize_url(url: str) -> str:
@@ -50,6 +70,7 @@ def gather_live_candidates(
     """Merge enabled live collectors; Tavily first, arXiv last, then tier-sort."""
     err = errors if errors is not None else []
     candidates: list[dict] = []
+    _emit_progress("COLLECT", "Live collectors · starting")
 
     tavily_ok = identify.identify_tavily_enabled and bool(osint.tavily_api_key)
     if tavily_ok:
@@ -69,6 +90,8 @@ def gather_live_candidates(
             depth = "basic"
             if topic and identify.identify_tavily_advanced_on_topic and query == queries[0]:
                 depth = "advanced"
+            short_q = query if len(query) <= 56 else f"{query[:53]}…"
+            _emit_progress("COLLECT", f"Tavily search · {short_q}")
             try:
                 candidates.extend(
                     search_candidate_urls(
@@ -78,12 +101,14 @@ def gather_live_candidates(
                     )
                 )
                 calls += 1
+                _emit_progress("COLLECT", f"Tavily · {len(candidates)} candidates so far")
             except Exception as exc:
                 err.append(f"scout_tavily:{query}:{exc}")
     elif identify.identify_tavily_enabled:
         err.append("scout_tavily:skipped:no_key")
 
     if identify.identify_rss_enabled:
+        _emit_progress("COLLECT", "RSS feeds")
         try:
             from packages.osint.rss import rss_candidate_urls
 
@@ -95,6 +120,7 @@ def gather_live_candidates(
             err.append(f"scout_rss:{exc}")
 
     if identify.identify_gnews_enabled:
+        _emit_progress("COLLECT", "GNews headlines")
         try:
             from packages.osint.gnews_rss import gnews_candidate_urls
 
@@ -104,10 +130,12 @@ def gather_live_candidates(
             err.append(f"scout_gnews:{exc}")
 
     if identify.identify_arxiv_api_enabled:
+        _emit_progress("COLLECT", "arXiv API")
         try:
             from packages.osint.arxiv_api import arxiv_api_candidate_urls
 
             candidates.extend(arxiv_api_candidate_urls())
+            _emit_progress("COLLECT", f"arXiv · {len(candidates)} candidates so far")
         except Exception as exc:
             err.append(f"scout_arxiv:{exc}")
 
@@ -115,6 +143,7 @@ def gather_live_candidates(
     ranked = sort_osint_candidates(dedupe_osint_candidates(candidates))
     for candidate in ranked:
         candidate.setdefault("fetched_at", now)
+    _emit_progress("COLLECT", f"{len(ranked)} sources ranked")
     return ranked
 
 

@@ -3,78 +3,102 @@ import type { ScoreMetrics } from "@/lib/api-types";
 export interface RecallFprPoint {
   fprLabel: string;
   fprPct: number;
-  championRecall: number;
-  baselineRecall: number;
+  recall: number;
+  beforeRecall?: number;
 }
 
-function readTpr(
-  tprAtFpr: ScoreMetrics["tpr_at_fpr"],
-  key: string,
-): number | null {
-  const entry = tprAtFpr?.[key];
-  if (entry == null) return null;
-  if (typeof entry === "number") return entry;
-  if (typeof entry === "object" && "tpr" in entry) return (entry as { tpr: number }).tpr;
-  return null;
+/** Booth anchors — genuine FPR caps shown on the Defend curve. */
+const ANCHOR_FPR: { label: string; pct: number; fpr: number }[] = [
+  { label: "0.05", pct: 0.05, fpr: 0.0005 },
+  { label: "0.1", pct: 0.1, fpr: 0.001 },
+  { label: "0.5", pct: 0.5, fpr: 0.005 },
+  { label: "1", pct: 1, fpr: 0.01 },
+];
+
+interface CurvePoint {
+  fpr: number;
+  recall: number;
 }
 
-/** Build recall-vs-FPR curve points from score metrics; baseline is a conservative pre-retrain estimate. */
-export function buildRecallFprCurve(metrics: ScoreMetrics): RecallFprPoint[] {
-  const anchors: { label: string; pct: number; key: string | null }[] = [
-    { label: "0.1", pct: 0.1, key: "0.001" },
-    { label: "0.5", pct: 0.5, key: "0.005" },
-    { label: "1", pct: 1, key: "0.01" },
-    { label: "2", pct: 2, key: null },
-    { label: "5", pct: 5, key: null },
-  ];
+function extractCurvePoints(tprAtFpr: ScoreMetrics["tpr_at_fpr"]): CurvePoint[] {
+  const pts: CurvePoint[] = [];
+  for (const [key, entry] of Object.entries(tprAtFpr ?? {})) {
+    let recall: number | null = null;
+    let fpr: number | null = null;
+    if (typeof entry === "number") {
+      recall = entry;
+      fpr = Number.parseFloat(key);
+    } else if (entry && typeof entry === "object") {
+      if ("tpr" in entry) recall = (entry as { tpr: number }).tpr;
+      if ("fpr_target" in entry) fpr = (entry as { fpr_target: number }).fpr_target;
+      else fpr = Number.parseFloat(key);
+    }
+    if (recall != null && fpr != null && Number.isFinite(fpr) && Number.isFinite(recall)) {
+      pts.push({ fpr, recall });
+    }
+  }
+  return pts.sort((a, b) => a.fpr - b.fpr);
+}
 
-  const known = anchors
-    .map((a) => ({
-      ...a,
-      champion: a.key ? readTpr(metrics.tpr_at_fpr, a.key) : null,
-    }))
-    .filter((a) => a.champion != null) as { label: string; pct: number; champion: number }[];
+function interpolateRecall(pts: CurvePoint[], targetFpr: number, fallbackRecall: number): number {
+  if (pts.length === 0) return fallbackRecall * 100;
+  if (targetFpr <= pts[0].fpr) return pts[0].recall * 100;
+  if (targetFpr >= pts[pts.length - 1].fpr) return pts[pts.length - 1].recall * 100;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const lo = pts[i];
+    const hi = pts[i + 1];
+    if (targetFpr >= lo.fpr && targetFpr <= hi.fpr) {
+      const t = (targetFpr - lo.fpr) / (hi.fpr - lo.fpr);
+      return (lo.recall + t * (hi.recall - lo.recall)) * 100;
+    }
+  }
+  return pts[pts.length - 1].recall * 100;
+}
 
-  const opRecall = metrics.recall_at_op;
-  const opFprPct = metrics.genuine_fp * 100;
+function pointsFrom(metrics: ScoreMetrics): { label: string; pct: number; recall: number }[] {
+  const curve = extractCurvePoints(metrics.tpr_at_fpr);
+  const fallback = metrics.recall_at_op;
 
-  if (known.length === 0 && opRecall != null) {
-    return [
-      {
-        fprLabel: opFprPct.toFixed(1),
-        fprPct: opFprPct,
-        championRecall: opRecall * 100,
-        baselineRecall: opRecall * 0.84 * 100,
-      },
-    ];
+  if (curve.length === 0 && fallback != null) {
+    const opFprPct = Math.max(0.02, metrics.genuine_fp * 100);
+    return [{ label: opFprPct.toFixed(2), pct: opFprPct, recall: fallback * 100 }];
   }
 
-  const interpolate = (pct: number): number => {
-    if (known.length === 0) return (opRecall ?? 0) * 100;
-    if (pct <= known[0].pct) return known[0].champion * 100;
-    if (pct >= known[known.length - 1].pct) return known[known.length - 1].champion * 100;
-    for (let i = 0; i < known.length - 1; i++) {
-      const lo = known[i];
-      const hi = known[i + 1];
-      if (pct >= lo.pct && pct <= hi.pct) {
-        const t = (pct - lo.pct) / (hi.pct - lo.pct);
-        return (lo.champion + t * (hi.champion - lo.champion)) * 100;
-      }
-    }
-    return known[known.length - 1].champion * 100;
-  };
+  return ANCHOR_FPR.map((a) => ({
+    label: a.label,
+    pct: a.pct,
+    recall: interpolateRecall(curve, a.fpr, fallback),
+  }));
+}
 
-  const baselineScale = (pct: number) => 0.84 + (pct / 5) * 0.12;
+/** Single series unless `before` is a real score. Never invent a 0.84× baseline. */
+export function buildRecallFprCurve(
+  metrics: ScoreMetrics,
+  before?: ScoreMetrics | null,
+): RecallFprPoint[] {
+  const after = pointsFrom(metrics);
+  const beforePts = before ? pointsFrom(before) : null;
+  return after.map((p) => ({
+    fprLabel: p.label,
+    fprPct: p.pct,
+    recall: p.recall,
+    beforeRecall: beforePts?.find((b) => b.pct === p.pct)?.recall,
+  }));
+}
 
-  return anchors.map((a) => {
-    const championRecall = interpolate(a.pct);
-    return {
-      fprLabel: a.label,
-      fprPct: a.pct,
-      championRecall,
-      baselineRecall: championRecall * baselineScale(a.pct),
-    };
-  });
+/** Zoom Y-axis to the curve so 98–99% recall is not visually flat. */
+export function recallYDomain(points: RecallFprPoint[]): [number, number] {
+  const recalls = points.flatMap((p) =>
+    [p.recall, p.beforeRecall].filter((v): v is number => v != null),
+  );
+  if (recalls.length === 0) return [95, 100];
+  const min = Math.min(...recalls);
+  const max = Math.max(...recalls);
+  const span = Math.max(max - min, 0.5);
+  const pad = Math.max(0.25, span * 0.12);
+  const lo = Math.floor((min - pad) * 10) / 10;
+  const hi = Math.ceil((max + pad) * 10) / 10;
+  return [lo, Math.min(100, hi)];
 }
 
 export function opPoint(metrics: ScoreMetrics) {

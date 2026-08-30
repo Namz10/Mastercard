@@ -4,12 +4,17 @@ from apps.api.env import load_project_env
 
 load_project_env()
 
+from apps.api.logging_config import configure_logging
+
+configure_logging()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.db import init_db
 from apps.api.routes.catalog import router as catalog_router
 from apps.api.routes.defend import router as defend_router
+from apps.api.routes.demo import router as demo_router
 from apps.api.routes.generate import router as generate_router
 from apps.api.routes.identify import router as identify_router
 from packages.agents.llm import public_llm_status
@@ -29,6 +34,7 @@ app.include_router(catalog_router)
 app.include_router(identify_router)
 app.include_router(generate_router)
 app.include_router(defend_router)
+app.include_router(demo_router)
 
 
 @app.on_event("startup")

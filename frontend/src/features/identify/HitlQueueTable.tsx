@@ -1,3 +1,4 @@
+/** Quarantined GFF 2026 — off nav. Proof-only lab. Do not restore to chrome. */
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
@@ -7,6 +8,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { useHitlQueue, useIdentifyMutations } from "./useIdentify";
 import { useIdentifySession } from "./useIdentifySession";
 import type { HitlItem } from "@/lib/api-types";
+import { pendingHitlItems } from "@/lib/hitl-dedupe";
 
 function recordFromItem(
   item: HitlItem,
@@ -24,7 +26,7 @@ export function HitlQueueTable() {
   const { data, isLoading, isError, refetch } = useHitlQueue();
   const { approve, reject, rejectUnsafe } = useIdentifyMutations();
 
-  const pending = data?.items ?? [];
+  const pending = pendingHitlItems(data?.items ?? []);
   const decidedIds = new Set(session.decisions.map((d) => d.vector_id));
   const decidedForThisTopic = session.decisions;
 
