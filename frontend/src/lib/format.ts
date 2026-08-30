@@ -10,7 +10,48 @@ export function formatNum(value: number | null | undefined, digits = 2): string 
 
 export function formatInt(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
-  return value.toLocaleString();
+  return value.toLocaleString("en-IN");
+}
+
+export function formatInr(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
+export const FAMILY_LABEL: Record<string, string> = {
+  normal: "quiet",
+  mule: "mule",
+  identity_burst: "identity burst",
+  ato: "ATO",
+  app_fraud: "APP scam",
+  invoice_fraud: "invoice",
+};
+
+export const FAMILY_TO_TECHNIQUE: Record<string, string> = {
+  mule: "T02",
+  identity_burst: "T08",
+  ato: "T09",
+  app_fraud: "T13",
+  invoice_fraud: "T24",
+};
+
+export function missFamilyToTechnique(family: string): string {
+  return FAMILY_TO_TECHNIQUE[family] ?? "T13";
+}
+
+export function worstApFamily(apByFamily: Record<string, { ap: number } | number> | undefined): string {
+  if (!apByFamily) return "app_fraud";
+  let worst = "app_fraud";
+  let worstAp = Infinity;
+  for (const [family, val] of Object.entries(apByFamily)) {
+    if (family === "normal") continue;
+    const ap = typeof val === "object" && val && "ap" in val ? val.ap : Number(val);
+    if (ap < worstAp) {
+      worstAp = ap;
+      worst = family;
+    }
+  }
+  return worst;
 }
 
 export const CATEGORY_LABELS: Record<number, string> = {

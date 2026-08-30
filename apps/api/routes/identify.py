@@ -1,15 +1,17 @@
 """Identify / HITL API routes."""
 
+import json
 import uuid
-from typing import Annotated, Any, List
+from typing import Annotated, Any, AsyncIterator, List
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from apps.api.db import get_db, init_db
 from apps.api.models import AtlasRow
-from packages.agents.identify_graph import run_identify_graph
+from packages.agents.identify_graph import identify_graph
 from packages.agents.librarian_db import hitl_payload_for_spec
 from packages.agents.llm import public_llm_status
 from packages.agents.settings import get_identify_settings
@@ -19,6 +21,26 @@ from packages.osint.settings import get_osint_settings
 from packages.osint.vector_store import nearest_catalog_row
 
 router = APIRouter(prefix="/identify", tags=["identify"])
+
+NODE_VERBS = {
+    "scout": "COLLECT",
+    "curator": "RANK",
+    "extractor": "EXTRACT",
+    "grounder": "GROUND",
+    "tier_scorer": "GROUND",
+    "corroborator": "GROUND",
+    "librarian": "PROPOSE",
+}
+
+NODE_BODY = {
+    "scout": "Collecting sources",
+    "curator": "Ranking sources",
+    "extractor": "Reading articles",
+    "grounder": "Matching to the catalog",
+    "tier_scorer": "Scoring source quality",
+    "corroborator": "Checking corroboration",
+    "librarian": "Proposing attacks for review",
+}
 
 
 class IdentifyRunRequest(BaseModel):
@@ -74,6 +96,8 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
     init_db()
     req = body or IdentifyRunRequest()
     run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
+    from packages.agents.identify_graph import run_identify_graph
+
     result = run_identify_graph(run_id=run_id, topic=req.topic)
     candidates = result.get("candidate_urls") or []
     scout_count = result.get("scout_candidate_count")
@@ -94,6 +118,98 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
         "hitl_queue": result.get("hitl_queue", []),
         "errors": result.get("errors", []),
     }
+
+
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _stream_identify(run_id: str, topic: str) -> AsyncIterator[str]:
+    import time
+
+    from packages.agents.state import empty_identify_state
+
+    t0 = time.time()
+    yield _sse_event(
+        {
+            "t": int((time.time() - t0) * 1000),
+            "verb": "COLLECT",
+            "body": "Collect started",
+            "status": "started",
+        }
+    )
+    state = empty_identify_state(run_id=run_id, topic=topic)
+    try:
+        for chunk in identify_graph.stream(state, stream_mode="updates"):
+            for node, update in chunk.items():
+                if isinstance(update, dict):
+                    state.update(update)
+                verb = NODE_VERBS.get(node, "COLLECT")
+                body_text = NODE_BODY.get(node, node)
+                artifacts: dict[str, Any] | None = None
+                if node == "scout":
+                    urls = state.get("candidate_urls") or []
+                    if urls:
+                        artifacts = {"urls": [u.get("url", u) if isinstance(u, dict) else u for u in urls[:8]]}
+                yield _sse_event(
+                    {
+                        "t": int((time.time() - t0) * 1000),
+                        "verb": verb,
+                        "body": body_text,
+                        "status": "ok",
+                        "artifacts": artifacts,
+                    }
+                )
+        yield _sse_event(
+            {
+                "t": int((time.time() - t0) * 1000),
+                "verb": "PROPOSE",
+                "body": f"{len(state.get('proposed_specs') or [])} proposed",
+                "status": "done",
+                "result": {
+                    "run_id": state.get("run_id", run_id),
+                    "proposed_count": len(state.get("proposed_specs") or []),
+                    "candidate_urls": state.get("candidate_urls", []),
+                },
+            }
+        )
+    except Exception as exc:
+        osint = get_osint_settings()
+        reason = "search unavailable" if osint.identify_live_search else str(exc)
+        yield _sse_event({"fallback": "recorded", "reason": reason})
+        from packages.agents.identify_graph import run_identify_graph
+
+        result = run_identify_graph(run_id=run_id, topic=topic)
+        yield _sse_event(
+            {
+                "t": int((time.time() - t0) * 1000),
+                "verb": "REPLAY",
+                "body": "Recorded corpus playback",
+                "status": "done",
+                "result": {
+                    "run_id": result.get("run_id", run_id),
+                    "proposed_count": len(result.get("proposed_specs") or []),
+                    "candidate_urls": result.get("candidate_urls", []),
+                },
+            }
+        )
+
+
+@router.post("/run/stream")
+async def identify_run_stream(body: IdentifyRunRequest | None = None) -> StreamingResponse:
+    init_db()
+    req = body or IdentifyRunRequest()
+    run_id = req.run_id or f"identify-{uuid.uuid4().hex[:12]}"
+
+    async def gen():
+        for line in _stream_identify(run_id, req.topic):
+            yield line
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/hitl")

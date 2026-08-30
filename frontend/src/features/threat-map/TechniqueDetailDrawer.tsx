@@ -27,16 +27,16 @@ export function TechniqueDetailDrawer({
             <h3 className="font-medium mb-2">{technique.name}</h3>
             <StatusChip status={coverageToChipStatus(technique.coverage_status)} />
           </div>
-          <Row label="vector_id" value={technique.vector_id} />
-          <Row label="confidence_level" value={technique.confidence_level} />
-          <Row label="source_tier" value={technique.source_tier} />
-          <Row label="generate_mode" value={technique.generate_mode} />
-          <Row label="variants" value={technique.variants} />
+          <Row label="Attack ID" value={technique.vector_id} />
+          <Row label="Confidence" value={technique.confidence_level} />
+          <Row label="Source tier" value={technique.source_tier} />
+          <Row label="Generate" value={technique.generate_mode} />
+          <Row label="Variants" value={technique.variants} />
           {technique.live_rule_ids.length > 0 ? (
-            <Row label="live_rule_ids" value={technique.live_rule_ids.join(", ")} />
+            <Row label="Live rules" value={technique.live_rule_ids.join(", ")} />
           ) : null}
           {technique.named_gap_reason ? (
-            <Row label="named_gap_reason" value={technique.named_gap_reason} />
+            <Row label="Coverage gap" value={technique.named_gap_reason} />
           ) : null}
           {technique.features_expected.length > 0 ? (
             <div className="mt-4">

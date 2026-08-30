@@ -13,6 +13,13 @@ export default {
         ink: "var(--ink)",
         "ink-muted": "var(--ink-muted)",
         "ink-faint": "var(--ink-faint)",
+        paper: {
+          0: "var(--paper-0)",
+          1: "var(--paper-1)",
+        },
+        slate: {
+          600: "var(--slate-600)",
+        },
         signal: {
           block: "var(--signal-block)",
           watch: "var(--signal-watch)",
@@ -23,9 +30,17 @@ export default {
       },
       fontFamily: {
         sans: ["IBM Plex Sans", "system-ui", "sans-serif"],
+        serif: ["IBM Plex Serif", "Georgia", "serif"],
         mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
       },
-      borderRadius: { DEFAULT: "var(--radius)", sm: "var(--radius-sm)" },
+      borderRadius: {
+        DEFAULT: "var(--radius)",
+        sm: "var(--radius-sm)",
+        drawer: "var(--radius-drawer)",
+      },
+      boxShadow: {
+        drawer: "var(--shadow-drawer)",
+      },
     },
   },
   plugins: [],

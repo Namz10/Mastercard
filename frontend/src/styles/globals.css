@@ -3,7 +3,11 @@
 @tailwind utilities;
 
 body {
-  @apply bg-bg text-ink font-sans antialiased;
+  @apply bg-bg text-ink font-sans antialiased text-[13px];
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums slashed-zero;
 }
 
 :focus-visible {

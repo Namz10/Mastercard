@@ -1,23 +1,37 @@
 :root {
-  /* Surfaces */
-  --bg: #f5f6f3;
-  --surface: #ffffff;
-  --surface-sunken: #eef0ec;
-  --border: #e1e4dd;
+  /* Paper / sage / ink — DESIGN.md §1 */
+  --paper-0: #f7f5f0;
+  --paper-1: #ffffff;
+  --hairline: #e2dfd6;
+  --ink: #191c19;
+  --ink-2: #4a5248;
+  --ink-3: #6b7367;
+
+  --sage-100: #e9f0e9;
+  --sage-600: #3e6b4f;
+  --sage-700: #2e5340;
+  --ochre-700: #8a5a00;
+  --slate-600: #55606b;
+  --rust-700: #9c3b23;
+
+  /* Legacy aliases */
+  --bg: var(--paper-0);
+  --surface: var(--paper-1);
+  --surface-sunken: var(--sage-100);
+  --border: var(--hairline);
   --border-strong: #c9cdc3;
+  --ink-muted: var(--ink-2);
+  --ink-faint: var(--ink-3);
 
-  /* Ink */
-  --ink: #12151a;
-  --ink-muted: #5c6169;
-  --ink-faint: #8b9098;
-
-  /* Semantic signal colors */
-  --signal-block: #c4432b;
-  --signal-watch: #b8862b;
-  --signal-safe: #1f7a5c;
-  --signal-idle: #8b9098;
-  --signal-info: #2e5aac;
+  --signal-block: var(--rust-700);
+  --signal-watch: var(--ochre-700);
+  --signal-safe: var(--sage-600);
+  --signal-idle: var(--slate-600);
+  --signal-info: var(--sage-600);
 
   --radius: 6px;
-  --radius-sm: 3px;
+  --radius-sm: 4px;
+  --radius-drawer: 8px;
+
+  --shadow-drawer: 0 8px 24px rgba(25, 28, 25, 0.12);
 }
