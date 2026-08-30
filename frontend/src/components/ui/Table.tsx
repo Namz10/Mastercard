@@ -18,22 +18,9 @@ export function Th({ mono, children }: { mono?: boolean; children: ReactNode }) 
   );
 }
 
-export function Td({
-  mono,
-  children,
-  className,
-  colSpan,
-}: {
-  mono?: boolean;
-  children: ReactNode;
-  className?: string;
-  colSpan?: number;
-}) {
+export function Td({ mono, children }: { mono?: boolean; children: ReactNode }) {
   return (
-    <td
-      colSpan={colSpan}
-      className={`px-3 py-2 border-t border-border ${mono ? "font-mono text-xs" : ""} ${className ?? ""}`}
-    >
+    <td className={`px-3 py-2 border-t border-border ${mono ? "font-mono text-xs" : ""}`}>
       {children}
     </td>
   );

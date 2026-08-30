@@ -85,7 +85,7 @@ export function CoEvolutionChart({ vm }: { vm: ArmsRaceViewModel["coEvolution"] 
               tick={({ x, y, payload }) => (
                 <text
                   x={x}
-                  y={Number(y) + 12}
+                  y={y + 12}
                   textAnchor="middle"
                   fontSize={11}
                   fill={payload.value === "G2" ? "#c9cdc3" : "#5c6169"}
@@ -141,7 +141,7 @@ export function CoEvolutionChart({ vm }: { vm: ArmsRaceViewModel["coEvolution"] 
               stroke="#c9cdc3"
               strokeDasharray="4 4"
               label={{
-                value: "Loop M retrain (user-approved)",
+                value: "Feedback loop retrain",
                 position: "insideTopRight",
                 fontSize: 10,
                 fill: "#8b9098",
@@ -183,9 +183,7 @@ export function CoEvolutionChart({ vm }: { vm: ArmsRaceViewModel["coEvolution"] 
       </div>
 
       <p className="text-[11px] text-ink-faint mt-3 leading-relaxed">
-        catalog_solved remains false · extras train-only · G-test new seed protocol. G2 muted: Cat 4
-        offline · not demonstrated · Oracle Guard · not public API. Miss family from gdev44 / inner_val —
-        not G-test seed 43.
+        G2+ projected only. v1 demonstrates one feedback loop iteration. catalog_solved remains false. Cat 4 offline.
       </p>
     </section>
   );

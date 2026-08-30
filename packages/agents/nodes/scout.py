@@ -21,17 +21,6 @@ def scout(state: IdentifyState) -> IdentifyState:
             osint=get_osint_settings(),
             errors=errors,
         )
-        tavily_quota = any(
-            "scout_tavily:" in e and ("432" in e or "429" in e or "401" in e or "403" in e)
-            for e in errors
-        )
-        # Demo resilience: when Tavily is blocked, fixtures beat weak arXiv-only noise
-        if not candidates or tavily_quota:
-            fixtures = fixture_candidate_urls()
-            if fixtures:
-                reason = "empty live OSINT" if not candidates else "Tavily quota/auth failure"
-                errors.append(f"scout_fallback:fixtures ({reason}; using local corpus)")
-                candidates = fixtures if tavily_quota or not candidates else fixtures + candidates
     else:
         candidates = fixture_candidate_urls()
 

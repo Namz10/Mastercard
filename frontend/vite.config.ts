@@ -10,24 +10,7 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
-        timeout: 300_000,
-        proxyTimeout: 300_000,
         rewrite: (p) => p.replace(/^\/api/, ""),
-        // Lab SSE (/lab/stream) must not be buffered
-        configure: (proxy) => {
-          proxy.on("proxyReq", (proxyReq, req) => {
-            if (req.url?.includes("/lab/stream")) {
-              proxyReq.setHeader("Accept", "text/event-stream");
-            }
-          });
-          proxy.on("proxyRes", (proxyRes, req) => {
-            if (req.url?.includes("/lab/stream")) {
-              proxyRes.headers["cache-control"] = "no-cache";
-              proxyRes.headers["connection"] = "keep-alive";
-              proxyRes.headers["x-accel-buffering"] = "no";
-            }
-          });
-        },
       },
     },
   },

@@ -264,41 +264,14 @@ _LOG = logging.getLogger(__name__)
 
 @contextmanager
 def _stage(name: str):
-    """Timed stderr stage log for defend-fit visibility (+ lab SSE)."""
+    """Timed stderr stage log for defend-fit visibility."""
     t0 = time.perf_counter()
     print(f"[fit] start {name}", file=sys.stderr, flush=True)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "defend",
-            name,
-            f"AuthGate · {name}",
-            level="stage",
-            tech=["scikit-learn HistGradientBoostingClassifier"]
-            if "hgb" in name
-            else (["IsolationForest"] if "isolation" in name else (["Brake"] if "brake" in name else ["AuthGate"])),
-            payload={"stage": name},
-        )
-    except Exception:
-        pass
     try:
         yield
     finally:
         elapsed = time.perf_counter() - t0
         print(f"[fit] done {name} ({elapsed:.1f}s)", file=sys.stderr, flush=True)
-        try:
-            from packages.lab.events import emit_lab
-
-            emit_lab(
-                "defend",
-                name,
-                f"AuthGate · {name} done",
-                level="stage",
-                payload={"stage": name, "elapsed_ms": int(elapsed * 1000)},
-            )
-        except Exception:
-            pass
 
 
 def _perm_repeats() -> int:

@@ -3,6 +3,4 @@ export const STORAGE_KEYS = {
   decisioningTraining: "aegisloop:decisioning-training",
   decisioningScore: "aegisloop:decisioning-score",
   armsRaceResult: "aegisloop:arms-race-result",
-  retrainQueue: "aegisloop:retrain-queue",
-  retrainHistory: "aegisloop:retrain-history",
 } as const;

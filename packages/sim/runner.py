@@ -108,19 +108,6 @@ def run_population(
         if not eligible:
             raise ValueError("no generate-eligible atlas rows")
 
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "generate_quiet_world",
-            f"ShadowRail population · world_seed={world_seed} · n_customers={n_customers} · sim_days={sim_days}",
-            level="stage",
-            tech=["ShadowRail", "packages/sim"],
-            payload={"run_id": rid, "world_seed": world_seed, "n_customers": n_customers, "sim_days": sim_days},
-        )
-    except Exception:
-        pass
     world = generate_quiet_world(
         world_seed=world_seed,
         n_customers=n_customers,
@@ -140,51 +127,12 @@ def run_population(
             mix_signals["ato"] = blob
         elif inj == "identity_trajectory":
             mix_signals["identity_burst"] = blob
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "apply_mix",
-            f"Injector mix · families={sorted(families) if families else 'full'}",
-            level="stage",
-            tech=["graph_mule", "app_session", "identity_trajectory"],
-            payload={"run_id": rid, "injector_id": spec.simulator.injector_id if spec and spec.simulator else None},
-        )
-    except Exception:
-        pass
     mix = apply_mix(world, rng, pin=pin, families=families, signals=mix_signals)
     verify = verify_events(world.events, world.meta)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "verify_events",
-            f"rail-rules verifier · pass={verify.get('pass')}",
-            level="stage" if verify.get("pass") else "warn",
-            tech=["rail-rules"],
-            payload={"run_id": rid, "verify": verify},
-        )
-    except Exception:
-        pass
     require_rate = families is None
     fidelity = evaluate_fidelity(
         world.events, world.priors, rng=np.random.default_rng(world_seed), require_mix_rate=require_rate
     )
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "evaluate_fidelity",
-            f"Fidelity gate · psi_amount={fidelity.get('psi_amount')} · fraud_rate={fidelity.get('fraud_rate')} · pass={fidelity.get('pass')}",
-            level="stage" if fidelity.get("pass") else "warn",
-            tech=["ShadowRail"],
-            payload={"run_id": rid, "fidelity": fidelity},
-        )
-    except Exception:
-        pass
     sidecar = {
         "run_id": rid,
         "mode": "population",
@@ -202,19 +150,6 @@ def run_population(
         "mix": {k: mix[k] for k in ("n_app", "n_funnel", "ident_burst", "ato_burst") if k in mix},
     }
     paths = export_run(world.events, sidecar, rid, runs_dir=runs_dir)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "export_run",
-            f"PyArrow export · row_count={len(world.events)} · run_id={rid}",
-            level="stage",
-            tech=["PyArrow Parquet"],
-            payload={"run_id": rid, "row_count": len(world.events), "parquet_path": paths.get("parquet")},
-        )
-    except Exception:
-        pass
     extra = {
         "vector_id": vector_id,
         "sim_days": sim_days,
@@ -307,71 +242,12 @@ def run_canary(
         n_merchants=n_merchants,
         sim_days=sim_days,
     )
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "generate_quiet_world",
-            f"ShadowRail canary · campaign={campaign.campaign_id} · world_seed={world_seed} · n_customers={n_customers}",
-            level="stage",
-            tech=["ShadowRail", "packages/sim"],
-            payload={
-                "run_id": rid,
-                "mode": "canary",
-                "campaign_id": campaign.campaign_id,
-                "world_seed": world_seed,
-                "n_customers": n_customers,
-                "sim_days": sim_days,
-            },
-        )
-    except Exception:
-        pass
     rng = np.random.default_rng(world_seed + 7)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "inject_fincen_chain",
-            f"Canary FinCEN chain · T09→T11→T13→T02 · campaign={campaign.campaign_id}",
-            level="stage",
-            tech=["graph_mule", "app_session", "identity_trajectory"],
-            payload={"run_id": rid, "campaign_id": campaign.campaign_id},
-        )
-    except Exception:
-        pass
     chain = inject_fincen_chain(world, rng, signals_by_stage=signals_by_stage)
     verify = verify_events(world.events, world.meta)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "verify_events",
-            f"rail-rules verifier · pass={verify.get('pass')}",
-            level="stage" if verify.get("pass") else "warn",
-            tech=["rail-rules"],
-            payload={"run_id": rid, "verify": verify},
-        )
-    except Exception:
-        pass
     fidelity = evaluate_fidelity(
         world.events, world.priors, rng=np.random.default_rng(world_seed), require_mix_rate=False
     )
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "evaluate_fidelity",
-            f"Fidelity gate · psi_amount={fidelity.get('psi_amount')} · fraud_rate={fidelity.get('fraud_rate')} · pass={fidelity.get('pass')}",
-            level="stage" if fidelity.get("pass") else "warn",
-            tech=["ShadowRail"],
-            payload={"run_id": rid, "fidelity": fidelity},
-        )
-    except Exception:
-        pass
     sidecar = {
         "run_id": rid,
         "mode": "canary",
@@ -386,27 +262,6 @@ def run_canary(
         "knobs_pinned": signals_by_stage,
     }
     paths = export_run(world.events, sidecar, rid, runs_dir=runs_dir)
-    try:
-        from packages.lab.events import emit_lab
-
-        emit_lab(
-            "generate",
-            "export_run",
-            f"PyArrow canary export · row_count={len(world.events)} · run_id={rid}",
-            level="stage",
-            tech=["PyArrow Parquet"],
-            payload={
-                "run_id": rid,
-                "row_count": len(world.events),
-                "event_count": len(world.events),
-                "mode": "canary",
-                "campaign_id": campaign.campaign_id,
-                "fidelity": fidelity,
-                "lifecycle_stages_logged": chain["lifecycle_stages_logged"],
-            },
-        )
-    except Exception:
-        pass
     extra = {
         "campaign_id": campaign.campaign_id,
         "campaign_name": campaign.name,

@@ -7,7 +7,7 @@ const NAV = [
   { to: "/simulation", label: "Simulation Console", hint: "Generate" },
   { to: "/decisioning", label: "Decisioning", hint: "Defend" },
   { to: "/arms-race", label: "Arms Race", hint: "Loop M" },
-  { to: "/copilot", label: "Command Center", hint: "COMMAND" },
+  { to: "/copilot", label: "Analyst Copilot", hint: "Planned", disabled: true },
 ];
 
 export function Sidebar() {
@@ -18,24 +18,34 @@ export function Sidebar() {
     >
       <div className="px-5 py-5 font-mono text-sm font-medium tracking-wide">AEGISLOOP</div>
       <nav className="flex-1 px-2 space-y-1">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            className={({ isActive }) =>
-              clsx(
-                "px-3 py-2 rounded text-sm flex justify-between transition-colors",
-                isActive
-                  ? "bg-surface-sunken text-ink font-medium"
-                  : "text-ink-muted hover:bg-surface-sunken",
-              )
-            }
-          >
-            <span>{item.label}</span>
-            <span className="font-mono text-[11px] uppercase text-ink-faint">{item.hint}</span>
-          </NavLink>
-        ))}
+        {NAV.map((item) =>
+          item.disabled ? (
+            <div
+              key={item.to}
+              className="px-3 py-2 rounded text-ink-faint text-sm flex justify-between cursor-not-allowed"
+            >
+              <span>{item.label}</span>
+              <span className="font-mono text-[11px] uppercase">{item.hint}</span>
+            </div>
+          ) : (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              className={({ isActive }) =>
+                clsx(
+                  "px-3 py-2 rounded text-sm flex justify-between transition-colors",
+                  isActive
+                    ? "bg-surface-sunken text-ink font-medium"
+                    : "text-ink-muted hover:bg-surface-sunken",
+                )
+              }
+            >
+              <span>{item.label}</span>
+              <span className="font-mono text-[11px] uppercase text-ink-faint">{item.hint}</span>
+            </NavLink>
+          ),
+        )}
       </nav>
     </aside>
   );

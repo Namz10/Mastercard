@@ -202,22 +202,3 @@ export interface MergedTechnique {
   chips: TechniqueChip[];
   category: number;
 }
-
-/** Lab SSE event — see packages/lab/events.py */
-export type LabPhase = "identify" | "generate" | "defend" | "evolve" | "system";
-export type LabLevel = "info" | "stage" | "loop" | "warn" | "error" | "hitl";
-
-export interface LabEvent {
-  ts: string;
-  phase: LabPhase;
-  stage: string;
-  level: LabLevel;
-  message: string;
-  loop: string | null;
-  tech: string[];
-  payload: Record<string, unknown>;
-  thread_id: string;
-}
-
-/** Re-export — full shape lives in features/copilot/command-types.ts */
-export type { CommandCenterSnapshot, CommandCenterBriefResponse } from "@/features/copilot/command-types";

@@ -5,7 +5,7 @@ import type { GenerateRunResponse } from "@/lib/api-types";
 export function useGenerateRun() {
   const { runId } = useLatestRun();
   const [data, setData] = useState<GenerateRunResponse | null>(null);
-  const isLoading = false;
+  const [isLoading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!runId) {

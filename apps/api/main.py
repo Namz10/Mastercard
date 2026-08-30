@@ -9,11 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.db import init_db
 from apps.api.routes.catalog import router as catalog_router
-from apps.api.routes.command_center import router as command_center_router
 from apps.api.routes.defend import router as defend_router
 from apps.api.routes.generate import router as generate_router
 from apps.api.routes.identify import router as identify_router
-from apps.api.routes.lab import router as lab_router
 from packages.agents.llm import public_llm_status
 from packages.osint.settings import get_osint_settings
 
@@ -21,12 +19,7 @@ app = FastAPI(title="AegisLoop API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,8 +29,6 @@ app.include_router(catalog_router)
 app.include_router(identify_router)
 app.include_router(generate_router)
 app.include_router(defend_router)
-app.include_router(lab_router)
-app.include_router(command_center_router)
 
 
 @app.on_event("startup")

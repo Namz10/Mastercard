@@ -1,25 +1,25 @@
-import { useCallback, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
-import { STEPS, readDemoStep, writeDemoStep } from "./useGuidedDemo";
+import { STEPS } from "./useGuidedDemo";
+
+function getStep(): number {
+  return Number(sessionStorage.getItem("aegisloop-demo-step") ?? "0");
+}
+
+function setStep(next: number) {
+  sessionStorage.setItem("aegisloop-demo-step", String(Math.max(0, Math.min(next, STEPS.length - 1))));
+}
 
 export function GuidedDemoBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [step, setStepState] = useState(() => readDemoStep());
-
-  const go = useCallback(
-    (index: number) => {
-      const next = writeDemoStep(index);
-      setStepState(next);
-      navigate(STEPS[next].path);
-    },
-    [navigate],
-  );
+  const step = getStep();
 
   const onNext = () => {
-    go((step + 1) % STEPS.length);
+    const next = Math.min(step + 1, STEPS.length - 1);
+    setStep(next);
+    navigate(STEPS[next].path);
   };
 
   return (
@@ -28,15 +28,17 @@ export function GuidedDemoBar() {
         <span className="text-xs font-mono uppercase text-ink-faint shrink-0">Demo</span>
         {STEPS.map((s, i) => (
           <button
-            key={s.action}
+            key={s.label}
             type="button"
-            onClick={() => go(i)}
-            title={s.label}
+            onClick={() => {
+              setStep(i);
+              navigate(s.path);
+            }}
             className={clsx(
               "px-2 py-0.5 rounded-sm text-[11px] font-mono shrink-0 border transition-colors",
-              i === step
+              i === step && location.pathname === s.path
                 ? "border-signal-info text-signal-info bg-surface"
-                : i < step
+                : i <= step
                   ? "border-border text-ink-muted"
                   : "border-transparent text-ink-faint",
             )}
@@ -46,11 +48,8 @@ export function GuidedDemoBar() {
         ))}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-xs text-ink-muted hidden lg:inline max-w-xs truncate">
-          {STEPS[step]?.label}
-          {location.pathname !== STEPS[step]?.path ? ` · go to ${STEPS[step]?.path}` : ""}
-        </span>
-        <Button variant="primary" onClick={onNext} data-demo="next-step">
+        <span className="text-xs text-ink-muted hidden lg:inline max-w-xs truncate">{STEPS[step]?.label}</span>
+        <Button variant="primary" onClick={onNext} disabled={step >= STEPS.length - 1}>
           Next step →
         </Button>
       </div>
