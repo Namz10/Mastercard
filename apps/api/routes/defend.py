@@ -127,6 +127,19 @@ def defend_miss(vector_id: str, db: Annotated[Session, Depends(get_db)]) -> dict
         raise HTTPException(status_code=404, detail="vector_id not found")
     except IllegalStatusTransition as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    try:
+        from packages.lab.events import emit_lab
+
+        emit_lab(
+            "defend",
+            "miss_recorded",
+            f"miss recorded · vector_id={vector_id} · atlas status=open · Loop M eligible",
+            level="info",
+            loop="M",
+            payload={"vector_id": vector_id, "status": row.status},
+        )
+    except Exception:
+        pass
     return {
         "vector_id": vector_id,
         "status": row.status,
@@ -151,7 +164,65 @@ def defend_fit(body: FitRequest) -> dict:
 def defend_score(body: ScoreRequest) -> dict:
     """Score eval fold. No Atlas vector_id. No knobs / denylist in JSON."""
     try:
-        return score_run(body.run_id, model_run_id=body.model_run_id)
+        result = score_run(body.run_id, model_run_id=body.model_run_id)
+        try:
+            from packages.lab.events import emit_lab
+
+            metrics = result.get("metrics") or {}
+            n_pos = metrics.get("n_pos") or {}
+            recall = float(metrics.get("recall_at_op") or 0)
+            for fam, n in n_pos.items():
+                if fam == "normal":
+                    continue
+                est_fn = int(max(0, round(int(n) * (1.0 - recall))))
+                emit_lab(
+                    "defend",
+                    "fn_harvest",
+                    f"FN harvest · family={fam} · n_fn≈{est_fn} · queued for Loop M",
+                    level="info",
+                    loop="M",
+                    tech=["AuthGate"],
+                    payload={
+                        "family": fam,
+                        "n_fn": est_fn,
+                        "n_pos": int(n),
+                        "run_id": body.run_id,
+                        "binary_ap": metrics.get("binary_ap"),
+                        "genuine_fp": metrics.get("genuine_fp"),
+                        "recall_at_op": recall,
+                        "ap_by_family": metrics.get("ap_by_family"),
+                        "action_histogram": result.get("action_histogram"),
+                    },
+                )
+        except Exception:
+            pass
+        try:
+            from packages.lab.pointers import save_score
+
+            m = result.get("metrics") or {}
+            ag = m.get("authgate_ms") or {}
+            save_score(
+                {
+                    "run_id": result.get("run_id") or body.run_id,
+                    "model_run_id": result.get("model_run_id") or body.model_run_id,
+                    "metrics": {
+                        "binary_ap": m.get("binary_ap"),
+                        "recall_at_op": m.get("recall_at_op"),
+                        "precision_at_op": m.get("precision_at_op"),
+                        "genuine_fp": m.get("genuine_fp"),
+                        "f1_at_op": m.get("f1_at_op"),
+                        "tpr_at_fpr": m.get("tpr_at_fpr") or {},
+                        "authgate_ms": {
+                            "p50": ag.get("p50") or ag.get("p50_ms") or ag.get("p50_ms_per_row"),
+                            "p99": ag.get("p99") or ag.get("p99_ms") or ag.get("p99_ms_per_row"),
+                        },
+                        "pass": m.get("pass"),
+                    },
+                }
+            )
+        except Exception:
+            pass
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecipeHashMismatchError as exc:
@@ -191,7 +262,7 @@ def defend_tune(body: TuneRequest) -> dict:
 def defend_loop_m(body: LoopMRequest) -> dict:
     """Miss family extra on train only, then G-test on a new seed. Does not set solved."""
     try:
-        return run_loop_m(
+        result = run_loop_m(
             body.run_id,
             body.miss_family,
             train_seed=body.train_seed,
@@ -202,6 +273,23 @@ def defend_loop_m(body: LoopMRequest) -> dict:
             sim_days=body.sim_days,
             pin=body.pin,
         )
+        try:
+            from packages.lab.pointers import save_loop_m
+
+            cmp_ = result.get("comparison") or {}
+            save_loop_m(
+                {
+                    "run_id": result.get("run_id") or body.run_id,
+                    "miss_family": result.get("miss_family") or body.miss_family,
+                    "ap_delta": cmp_.get("ap_delta"),
+                    "pass": (result.get("metrics") or {}).get("pass"),
+                    "genuine_fp_ok": cmp_.get("genuine_fp_ok"),
+                    "ap_verdict": cmp_.get("ap_verdict"),
+                }
+            )
+        except Exception:
+            pass
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecipeHashMismatchError as exc:

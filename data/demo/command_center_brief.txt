@@ -1,0 +1,5 @@
+AegisLoop is a synthetic payment-fraud closed loop — Identify (LangGraph, Tavily, pgvector HITL) → Generate (ShadowRail, PyArrow, fidelity gate) → Defend (HistGradientBoostingClassifier AuthGate + Brake + v0 rules) → Evolve (Loop M with explicit analyst approval). This lab does not touch live payment rails.
+
+Headline state is always drawn from verified APIs and metrics.json: Atlas coverage across T01–T24, live_rule vs named_gap honesty, HITL pending proposals, and AuthGate binary AP / genuine FPR / latency when a champion has been fit. Loop M may improve AP on a fresh G-test seed; catalog_solved remains false.
+
+Honest gaps: Cat 4 adversarial AI stays offline with no public attack API; Loops R, F, and G are roadmap; Loop T is partial. The language model only narrates dashboard JSON — AuthGate scores payments.
