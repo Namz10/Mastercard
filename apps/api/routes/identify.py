@@ -82,7 +82,7 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
         scout_count = len(candidates)
     if curator_kept is None:
         curator_kept = len(candidates)
-    return {
+    payload = {
         "run_id": result.get("run_id", run_id),
         "scout_candidate_count": scout_count,
         "curator_kept_count": curator_kept,
@@ -94,6 +94,23 @@ def identify_run(body: IdentifyRunRequest | None = None) -> dict:
         "hitl_queue": result.get("hitl_queue", []),
         "errors": result.get("errors", []),
     }
+    try:
+        from packages.lab.pointers import save_identify
+
+        save_identify(
+            {
+                "run_id": payload["run_id"],
+                "topic": req.topic,
+                "scout_candidate_count": scout_count,
+                "curator_kept_count": curator_kept,
+                "proposed_count": payload["proposed_count"],
+                "hitl_required": payload["hitl_required"],
+                "error_count": len(payload["errors"] or []),
+            }
+        )
+    except Exception:
+        pass
+    return payload
 
 
 @router.get("/hitl")

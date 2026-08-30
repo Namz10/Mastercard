@@ -80,6 +80,12 @@ def gather_live_candidates(
                 calls += 1
             except Exception as exc:
                 err.append(f"scout_tavily:{query}:{exc}")
+                msg = str(exc)
+                # Don't burn the rest of the quota on repeated 432/429/auth failures
+                if any(code in msg for code in ("432", "429", "401", "403")):
+                    err.append("scout_tavily:aborted_remaining_queries")
+                    break
+                calls += 1
     elif identify.identify_tavily_enabled:
         err.append("scout_tavily:skipped:no_key")
 

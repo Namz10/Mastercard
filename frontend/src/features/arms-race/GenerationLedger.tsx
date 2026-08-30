@@ -263,8 +263,8 @@ export function GenerationLedger({
               <SideCard
                 accent="#166534"
                 label="BLUE · POST FEEDBACK LOOP"
-                title="Retrain on capped miss-family extras"
-                body={`Extra ${family} rows appended to train copy only; G-test remains frozen new-seed protocol.`}
+                title="Retrain approved by analyst · Loop M"
+                body={`Extra ${family} rows appended to train copy only; G-test remains frozen new-seed protocol. catalog_solved remains false.`}
                 pills={
                   <>
                     <Pill tone="green">RETRAIN PASS</Pill>
@@ -314,7 +314,7 @@ export function GenerationLedger({
           }
           outcome={
             <span className="inline-flex px-3 py-1 rounded-full bg-gray-50 border border-gray-200 font-mono text-xs text-ink-faint">
-              Not demonstrated in v1
+              Cat 4 offline · not demonstrated
             </span>
           }
           blue={

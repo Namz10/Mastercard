@@ -1,4 +1,64 @@
+# =============================================================================
+# AegisLoop — secrets, local lab dumps, tooling
+# =============================================================================
+
+# Secrets — never commit real keys
+.env
+.env.*
+!.env.example
+.envrc
+esnv.md
+*esnv*.md
+*.pem
+credentials.json
+secrets.json
+
+# Python / venv
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Node (frontend/.gitignore also covers this)
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/node_modules/.vite/
+frontend/node_modules/.tmp/
+
+# Accidental lockfile at repo root (frontend/package-lock.json is tracked)
+/package-lock.json
+
+# Generate / fit artifacts (sidecar + parquet per run)
+data/runs/
+data/lab/
+data/priors_history/
+*.parquet
+
+# Per-run champions; keep models/features.json and features.v0.json tracked
+models/*/
+
+# External datasets
+data/external/
+data/externals/
+**/SAML-D.csv
+
+# OS / editors
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.cursor/
+
+# Logs
+logs/
+*.log
+
 # Byte-compiled / optimized / DLL files
+
 __pycache__/
 *.py[codz]
 *$py.class

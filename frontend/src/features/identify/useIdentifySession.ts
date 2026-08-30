@@ -20,6 +20,8 @@ export function useIdentifySession() {
   function startNewTopic(topic: string) {
     setSession({ topic, decisions: [] });
     clearPersisted(STORAGE_KEYS.armsRaceResult);
+    clearPersisted(STORAGE_KEYS.retrainQueue);
+    clearPersisted(STORAGE_KEYS.retrainHistory);
   }
 
   function recordDecision(entry: DecisionEntry) {

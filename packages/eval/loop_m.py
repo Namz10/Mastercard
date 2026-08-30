@@ -220,6 +220,29 @@ def run_loop_m(
     gtest_id = f"{run_id}__gtest"
     aug_id = f"{run_id}__loopm-train"
 
+    try:
+        from packages.lab.events import emit_lab, emit_loop_start
+
+        emit_loop_start("M", f"miss_family:{family}", phase="evolve")
+        emit_lab(
+            "evolve",
+            "run_loop_m",
+            f"Loop M · miss_family={family} · family_chosen_from_slice={slice_choice}",
+            level="loop",
+            loop="M",
+            tech=["Loop M", "ShadowRail", "AuthGate"],
+            payload={
+                "run_id": run_id,
+                "miss_family": family,
+                "train_seed": train_seed,
+                "gtest_seed": gtest_seed,
+                "family_chosen_from_slice": slice_choice,
+                "catalog_solved": False,
+            },
+        )
+    except Exception:
+        pass
+
     run_population(
         None,
         run_id=extra_id,
@@ -354,4 +377,22 @@ def run_loop_m(
         if key in body:
             raise AssertionError(f"banned key in Loop M body: {key}")
     assert_no_denylist_payload(body)
+    try:
+        from packages.lab.events import emit_loop_end
+
+        emit_loop_end(
+            "M",
+            phase="evolve",
+            pass_=loop_pass,
+            payload={
+                "ap_delta": body["comparison"]["ap_delta"],
+                "catalog_solved": False,
+                "genuine_fp_ok": fpr_ok,
+                "ap_verdict": ap_v,
+                "n_extra": n_extra,
+                "gtest_seed": gtest_seed,
+            },
+        )
+    except Exception:
+        pass
     return body
