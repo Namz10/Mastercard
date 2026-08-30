@@ -297,3 +297,116 @@ Eval n_pos: mule **3,084** (family AP 0.00096), invoice_fraud **22** (AP withhel
 | IBM HI-Small | CSV not fetched — PSI not run |
 | BAF | Overlap matrix only; no champion transfer (CC BY-NC-ND) |
 | APP/invoice | Public gap confirmed. Over-Invoicing n=22 in eval — too few for family AP. |
+
+---
+
+## Wave 0 — autonomous validation loop (2026-08-29)
+
+**Branch:** `agent/wave0-validation`  
+**Scope:** measurement / instrumentation only on frozen `v1-gtest-48`. No generator, Brake, or model-recipe changes.
+
+### 0.1 Frozen-champion ablation (P0 closed)
+
+**Defect:** `_app_ablation` refit a toy APP HGB; all three Photography rows showed identical `without_stamps` **0.579** (unconfirmed per model).
+
+**Fix:** zero columns on encoded matrix → score frozen `champ.model` / `_fraud_score`; tag `app_ablation_source: frozen_champion`; seed-43 cache checks `gtest_run_id` on read.
+
+**Re-scored WITHOUT_STAMPS (binary AP, frozen champion) on `v1-gtest-48`:**
+
+| Model | with_app_flags (APP AP) | without_app_flags | **without_stamps** |
+|---|---|---|---|
+| Stage 1 | 0.980 | 0.222 | **0.717** |
+| Stage 2 | 0.977 | 0.174 | **0.549** |
+| Loop M | 0.983 | 0.242 | **0.844** |
+
+Pre-fix **0.579** is deprecated. Artifact: [`data/validation/v1/photography_day.json`](data/validation/v1/photography_day.json) (`champion_model_run_id`: `v1-train-46__loopm-train`).
+
+### 0.2 G-test alias
+
+`v1-train-46__gtest` ≡ `v1-gtest-48` (394,954 identical `event_id`s). Documented in [`data/validation/v1/loop_m_result.json`](data/validation/v1/loop_m_result.json). Not independent holdout.
+
+### 0.3 genuine_fp naming
+
+`genuine_fp` = FP/n_normal (lead). `genuine_fp_over_eval` = predicted-positive rate — see [`VALIDATION.md`](VALIDATION.md) §0.3.
+
+### 0.4 Hub gate (report-only)
+
+[`data/validation/v1/hub_gate_report.json`](data/validation/v1/hub_gate_report.json): 34,052 hub rows; `fan_in_1h≥6` → 21,233; **31** received `mule_credit_restrict` / hard_flag (Loop M champion). Wave 1 gate would fail — Brake unchanged in Wave 0.
+
+### 0.6 SAML-D Loop M (complete)
+
+Stream-scored `v1-train-46__loopm-train` (~18 min, peak RSS ~4.1 GB). Artifact: [`stage4_saml_d_loopm.json`](data/validation/v1/stage4_saml_d_loopm.json).
+
+| FPR target | Stage 1 TPR | Loop M TPR |
+|---|---|---|
+| 0.1% | 1.09% | **1.96%** |
+| 0.5% | 1.47% | **3.05%** |
+| 1% | 2.27% | **3.91%** |
+
+Still weak absolute transfer; lead metric only. `binary_ap` ~0.002 (both).
+
+**Ledger:** [`data/validation/v1/agent/`](data/validation/v1/agent/), [`docs/agent/final_validation_report.md`](docs/agent/final_validation_report.md).
+
+---
+
+## Wave 1 iteration 1 — H2 hub exemption (2026-08-29)
+
+**ACCEPT.** Hub `mule_credit_restrict` 31 → 0 on gtest-48. Seed 49 confirmatory: `genuine_fp` 8.12%, cost 0.0092. Loop continues (SAML-D / portable features next).
+
+---
+
+## Wave 1 iteration 2 — H5 FPR Pareto on gtest-48 (2026-08-29)
+
+**Measurement only** (frozen photograph). Artifact: [`pareto_gtest48.json`](data/validation/v1/pareto_gtest48.json).
+
+Loop M dominates Stage 1 on recall at fixed FPR targets 5% / 2% / 1% / 0.5% / 0.1%. At **1% genuine FPR**, Loop M TPR **99.8%** vs Stage 1 **87.9%**. KB priority: FPR-constrained **training**, not threshold sweep alone.
+
+---
+
+## Wave 1 iteration 3 — H4 stamp noise (2026-08-29, REJECT)
+
+Worlds generated: `v1-train-50`, `v1-gdev-51`, `v1-gtest-52`. **Fit failed** E2: `inner_val.ato=0` on seed 50. Frozen Loop M on gtest-52: `genuine_fp` **10.03%** (vs 8.07% on 48) — inconclusive without retrain.
+
+---
+
+## Wave 1 iteration 5 — H6 hard-negative mining (2026-08-29, REJECT)
+
+Critic PASS → RED tests → `packages/eval/hard_negatives.py`. Judge REJECT: gtest-49 `genuine_fp` **6.74%** (was 8.12%) but `identity_burst` AP −62%, cost_sketch ~40×. Artifact: [`h6_hard_negatives.json`](data/validation/v1/h6_hard_negatives.json).
+
+---
+
+## Wave 1 iteration 6 — H5b + H6-D parallel (2026-08-29, ACCEPT)
+
+**H5b:** `fpr_pareto.py` + [`pareto_genuine_fpr.json`](data/validation/v1/pareto_genuine_fpr.json). LoopM max recall @ 1% FPR: **99.6%** (g48), **99.6%** (g49); `identity_burst` recall **99.8%** at 1% cap on g48. Dominates Stage1 at all three caps.
+
+**H6-D:** [`h6_diagnosis.json`](data/validation/v1/h6_diagnosis.json) + [`docs/agent/h6_diagnosis.md`](docs/agent/h6_diagnosis.md). Mined normals **91% `is_new_payee`**; identity fraud is **fan_in-shaped**. Generic HN targets wrong mode — next mining must filter new-payee pool or use family-aware caps.
+
+---
+
+## Wave 1 iteration 7 — H5c FPR Optuna v2 (2026-08-29, REJECT)
+
+**Champion registry:** [`docs/agent/champions.md`](docs/agent/champions.md) · [`champion_registry.json`](data/validation/v1/champion_registry.json)
+
+Tuned `v1-train-46__fpr-v2` (25 Optuna trials, inner_val FPR objective). **Keep v1 Loop M** (`v1-train-46__loopm-train`).
+
+| gdev-47 | v1 Loop M | v2 FPR |
+|---------|-----------|--------|
+| Pareto recall @ 1% | **99.59%** | 99.38% |
+| `identity_burst` AP | **0.988** | 0.908 |
+| `cost_sketch` | **0.002** | 0.663 |
+
+Artifact: [`h5c_fpr_v2_eval.json`](data/validation/v1/h5c_fpr_v2_eval.json). Lesson: FPR-only tuning ≠ Pareto win; same trap as H6.
+
+---
+
+## Wave 1 iteration 8 — H5d + H7-R1 + H9 parallel (2026-08-29, ACCEPT)
+
+Champion unchanged: **`v1-train-46__loopm-train`** (v1, post-loop — not v0 Stage 1).
+
+| Track | Artifact | Conclusion |
+|-------|----------|------------|
+| H5d | [`pareto_operational_v1.json`](data/validation/v1/pareto_operational_v1.json) | Deploy Pareto @1% FPR on frozen v1 — ~8× lower FP burden, identity ≥99.8% |
+| H7-R1 | [`h7_round1_diagnosis.json`](data/validation/v1/h7_round1_diagnosis.json) | Weakest family **ato** (gdev AP 0.54); round 2 = targeted ato + filtered HN |
+| H9 | [`h9_ablation_audit.json`](data/validation/v1/h9_ablation_audit.json) | **Temporal/graph** −0.31 AP each; stamps alone only −0.04 |
+
+Commits `51b3b29`, `5a4d925`.

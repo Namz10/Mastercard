@@ -1,0 +1,10 @@
+{
+  "run_id": "v1-train-46",
+  "world_seed": 46,
+  "n_customers": 2400,
+  "n_merchants": 120,
+  "sim_days": 90,
+  "recipe_hash": null,
+  "wall_clock_seconds": 3.872,
+  "row_count": 396060
+}

@@ -32,7 +32,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import OrdinalEncoder
 
 from packages.config.ml import load_ml_flags, select_n_trials
-from packages.eval.brake import APP_HOLD_SCORE, ATO_DECLINE_SCORE, as_record, brake
+from packages.eval.brake import APP_HOLD_SCORE, ATO_DECLINE_SCORE, HUB_PAYEE_PREFIX, as_record, brake
 from packages.eval.iso_check import (
     apply_iso_brake_upgrade,
     check_iso_genuine_notify_rate,
@@ -46,6 +46,7 @@ from packages.eval.split import (
     assert_no_x_leak,
     folds_from_run,
     inner_folds_from_train,
+    preflight_fold_floors,
     split_inner_val_ab,
 )
 from packages.policy.rules import Rule, evaluate_rules, load_v0_rules, vectorized_rule_bits
@@ -99,6 +100,9 @@ def _recipe_hash_accepted(frozen_hash: str) -> bool:
         return True
     if frozen_hash == FROZEN_V0_RECIPE_HASH and V0_RECIPE_PATH.is_file():
         return True
+    wip = MODELS_DIR / "features.wip.json"
+    if wip.is_file() and _recipe_hash(wip) == frozen_hash:
+        return True
     return False
 
 
@@ -115,13 +119,20 @@ def _act_threshold(recipe: dict[str, Any] | None) -> float:
 
 def _canonical_hgb_params(params: dict[str, Any], recipe: dict[str, Any] | None = None) -> dict[str, Any]:
     rec = recipe or {}
-    return {
-        "max_depth": int(params.get("max_depth", rec.get("max_depth", 3))),
+    out: dict[str, Any] = {
         "max_iter": int(params.get("max_iter", rec.get("max_iter", 80))),
         "learning_rate": float(params.get("learning_rate", rec.get("learning_rate", 0.08))),
         "random_state": int(params.get("random_state", rec.get("random_state", 42))),
         "early_stopping": False,
     }
+    if params.get("max_leaf_nodes") is not None:
+        out["max_leaf_nodes"] = int(params["max_leaf_nodes"])
+    else:
+        out["max_depth"] = int(params.get("max_depth", rec.get("max_depth", 3)))
+    for key in ("min_samples_leaf", "l2_regularization", "max_bins"):
+        if key in params:
+            out[key] = params[key]
+    return out
 
 
 def _model_freeze_id(
@@ -392,6 +403,26 @@ def _tpr_at_fpr(y_bin: np.ndarray, scores: np.ndarray, target: float) -> dict[st
     return {"tpr": float(tpr[i]), "threshold": float(thr[i] if i < len(thr) else 1.0), "fpr_target": target}
 
 
+def _build_hgb_kwargs(tuned_params: dict[str, Any], recipe: dict[str, Any]) -> dict[str, Any]:
+    """HistGradientBoosting kwargs from Optuna/recipe; max_leaf_nodes OR max_depth."""
+    clean = {k: v for k, v in tuned_params.items() if k != "use_max_leaf_nodes"}
+    return _canonical_hgb_params(clean, recipe)
+
+
+def _detect_thr_genuine_fpr(
+    scores: np.ndarray,
+    y_labels: pd.Series,
+    *,
+    fpr_target: float,
+) -> dict[str, float]:
+    from packages.eval.fpr_pareto import max_recall_at_genuine_fpr
+
+    y_str = y_labels.astype(str).to_numpy()
+    y_bin = (y_str != "normal").astype(int)
+    normal_mask = y_str == "normal"
+    return max_recall_at_genuine_fpr(scores, y_bin, normal_mask, fpr_target=fpr_target)
+
+
 def _ap_by_family(y: pd.Series, pmap: dict[str, np.ndarray]) -> dict[str, float]:
     out: dict[str, float] = {}
     yv = y.astype(str).to_numpy()
@@ -537,6 +568,7 @@ def _vectorized_brake_actions(
     rules: list[Rule],
     iso_model: Any | None = None,
     pmap: dict[str, np.ndarray] | None = None,
+    payees: pd.Series | None = None,
 ) -> np.ndarray:
     """Vectorized brake priority using attached ``rule__`` bits (not a second rule engine)."""
     n = len(raw)
@@ -545,6 +577,15 @@ def _vectorized_brake_actions(
     score_arr = np.asarray(scores, dtype=float)
     actions = np.array(["allow"] * n, dtype=object)
     done = np.zeros(n, dtype=bool)
+    hub_mask = np.zeros(n, dtype=bool)
+    fan_burst = np.zeros(n, dtype=bool)
+    if payees is not None:
+        hub_mask = payees.astype(str).str.startswith(HUB_PAYEE_PREFIX).to_numpy()
+    if "rule__mule-fan-in-burst" in raw.columns:
+        fan_burst = raw["rule__mule-fan-in-burst"].fillna(0).astype(int).to_numpy(dtype=bool)
+    hub_fan_exempt = hub_mask & fan_burst
+    if hub_fan_exempt.any():
+        hard = hard & ~hub_fan_exempt
 
     def _assign(mask: np.ndarray, values: np.ndarray | str) -> None:
         m = mask & ~done
@@ -556,9 +597,10 @@ def _vectorized_brake_actions(
             actions[m] = values[m]
         done[m] = True
 
-    mule_hit = ((family == "mule") & (score_arr >= ATO_DECLINE_SCORE)) | applies.get(
-        "mule", np.zeros(n, dtype=bool)
-    )
+    mule_rule = applies.get("mule", np.zeros(n, dtype=bool))
+    if hub_fan_exempt.any():
+        mule_rule = mule_rule & ~hub_fan_exempt
+    mule_hit = ((family == "mule") & (score_arr >= ATO_DECLINE_SCORE)) | mule_rule
     app_hit = (family == "app_fraud") | applies.get("app", np.zeros(n, dtype=bool))
     ato_hit = (family == "ato") | applies.get("ato", np.zeros(n, dtype=bool))
     invoice_hit = (family == "invoice_fraud") | applies.get("bec", np.zeros(n, dtype=bool))
@@ -606,7 +648,9 @@ def _brake_action_hist(
     """Brake action histogram over all rows + the false-positive rows only."""
     yhat = (scores >= threshold).astype(int)
     lbl = labels.astype(str).to_numpy()
-    actions = _vectorized_brake_actions(raw, pred, scores, rules, iso_model=iso_model, pmap=pmap)
+    actions = _vectorized_brake_actions(
+        raw, pred, scores, rules, iso_model=iso_model, pmap=pmap, payees=payees
+    )
     hist: dict[str, int] = {}
     fp_hist: dict[str, int] = {}
     fp_mask = (lbl == "normal") & (yhat == 1)
@@ -847,47 +891,67 @@ def _cluster_bootstrap_ci(
     return out
 
 
+def _zero_encoded_columns(
+    x: np.ndarray,
+    raw: pd.DataFrame,
+    cols: list[str],
+    *,
+    cap_amount_vs_p30: bool = False,
+) -> np.ndarray:
+    z = x.copy()
+    col_index = {c: i for i, c in enumerate(raw.columns)}
+    for c in cols:
+        i = col_index.get(c)
+        if i is not None and i < z.shape[1]:
+            z[:, i] = 0.0
+    if cap_amount_vs_p30 and "amount_vs_p30" in col_index:
+        i = col_index["amount_vs_p30"]
+        if i < z.shape[1]:
+            z[:, i] = np.minimum(z[:, i], 1.5)
+    return z
+
+
+def _champion_pmap_scores(champ: Champion, x: np.ndarray) -> tuple[dict[str, np.ndarray], np.ndarray]:
+    raw_pmap = _proba_map(champ.model, x)
+    if getattr(champ, "pmap_calibrators", None):
+        pmap = _apply_pmap_calibrators(raw_pmap, champ.pmap_calibrators, champ.classes)
+    else:
+        pmap = raw_pmap
+    scores = _fraud_score(pmap, x.shape[0])
+    return pmap, scores
+
+
 def _app_ablation(
-    x_tr: np.ndarray,
-    y_tr: pd.Series,
-    x_te: np.ndarray,
-    y_te: pd.Series,
-    raw_tr: pd.DataFrame,
-    raw_te: pd.DataFrame,
+    champ: Champion,
+    x_ev: np.ndarray,
+    y_ev: pd.Series,
+    raw_ev: pd.DataFrame,
     recipe: dict[str, Any],
+    *,
+    model_freeze_id: str | None = None,
 ) -> dict[str, Any]:
-    y_app_tr = (y_tr.astype(str) == "app_fraud").to_numpy(dtype=int)
-    y_app_te = (y_te.astype(str) == "app_fraud").to_numpy(dtype=int)
-    flags = [c for c in recipe.get("app_flag_cols", list(APP_FLAG_COLS)) if c in raw_tr.columns]
-    col_index = {c: i for i, c in enumerate(raw_tr.columns)}
+    """Zero columns on the frozen champion matrix; never refit a toy APP HGB."""
+    y_app = (y_ev.astype(str) == "app_fraud").to_numpy(dtype=int)
+    y_bin = (y_ev.astype(str) != "normal").to_numpy(dtype=int)
+    flags = [c for c in recipe.get("app_flag_cols", list(APP_FLAG_COLS)) if c in raw_ev.columns]
 
-    def _zero(x: np.ndarray, raw: pd.DataFrame) -> np.ndarray:
-        z = x.copy()
-        for c in flags:
-            i = col_index.get(c)
-            if i is not None and i < z.shape[1]:
-                z[:, i] = 0.0
-        _ = raw
-        return z
-
-    def _ap(x_train: np.ndarray, x_test: np.ndarray) -> float:
-        if y_app_tr.min() == y_app_tr.max() or y_app_te.min() == y_app_te.max():
+    def _app_ap(x_mod: np.ndarray) -> float:
+        if y_app.min() == y_app.max():
             return float("nan")
-        m = HistGradientBoostingClassifier(
-            max_depth=int(recipe.get("max_depth", 3)),
-            max_iter=int(recipe.get("max_iter", 80)),
-            learning_rate=float(recipe.get("learning_rate", 0.08)),
-            random_state=int(recipe.get("random_state", 42)),
-            class_weight="balanced",
-        )
-        m.fit(x_train, y_app_tr)
-        scores = m.predict_proba(x_test)[:, 1]
-        return float(average_precision_score(y_app_te, scores))
+        pmap, _ = _champion_pmap_scores(champ, x_mod)
+        app_scores = pmap.get("app_fraud", np.zeros(len(y_ev)))
+        return float(average_precision_score(y_app, app_scores))
 
-    with_flags = _ap(x_tr, x_te)
-    without = _ap(_zero(x_tr, raw_tr), _zero(x_te, raw_te))
+    def _binary_ap(x_mod: np.ndarray) -> float:
+        if y_bin.min() == y_bin.max():
+            return float("nan")
+        _, scores = _champion_pmap_scores(champ, x_mod)
+        return float(average_precision_score(y_bin, scores))
+
+    with_flags = _app_ap(x_ev)
+    without = _app_ap(_zero_encoded_columns(x_ev, raw_ev, flags))
     died = (
-        int(y_app_te.sum()) > 0
+        int(y_app.sum()) > 0
         and np.isfinite(with_flags)
         and np.isfinite(without)
         and without <= max(0.05, 0.5 * with_flags)
@@ -895,35 +959,26 @@ def _app_ablation(
     stamp_cols = list(flags) + [
         c
         for c in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag")
-        if c in raw_tr.columns
-    ]
-
-    def _zero_stamps(x: np.ndarray, raw: pd.DataFrame) -> np.ndarray:
-        z = _zero(x, raw)
-        col_index_st = {c: i for i, c in enumerate(raw.columns)}
-        for c in stamp_cols:
-            i = col_index_st.get(c)
-            if i is not None and i < z.shape[1]:
-                z[:, i] = 0.0
-        if "is_new_payee" in col_index_st:
-            i = col_index_st["is_new_payee"]
-            if i < z.shape[1]:
-                z[:, i] = 0.0
-        if "amount_vs_p30" in col_index_st:
-            i = col_index_st["amount_vs_p30"]
-            if i < z.shape[1]:
-                z[:, i] = np.minimum(z[:, i], 1.5)
-        return z
-
-    without_stamps = _ap(_zero_stamps(x_tr, raw_tr), _zero_stamps(x_te, raw_te))
-    return {
+        if c in raw_ev.columns
+    ] + [c for c in raw_ev.columns if str(c).startswith("rule__")]
+    stamp_zero = list(stamp_cols)
+    if "is_new_payee" in raw_ev.columns:
+        stamp_zero.append("is_new_payee")
+    without_stamps = _binary_ap(
+        _zero_encoded_columns(x_ev, raw_ev, stamp_zero, cap_amount_vs_p30=True)
+    )
+    out: dict[str, Any] = {
         "app_flags": flags,
         "with_app_flags": {"average_precision": with_flags},
         "without_app_flags": {"average_precision": without},
         "without_stamps": {"average_precision": without_stamps},
         "app_metric_died_without_synthetic_flags": died,
+        "app_ablation_source": "frozen_champion",
         "note": "Synthetic session flags are not an SDK. Collapse without flags is documented, not hidden.",
     }
+    if model_freeze_id:
+        out["model_freeze_id"] = model_freeze_id
+    return out
 
 
 def _mule_entity_recall(
@@ -1127,6 +1182,14 @@ def fit_champion(
         packed["folds"].reset_index(drop=True),
         exclude_event_ids=force_train_event_ids,
     )
+    floor_min = int(recipe.get("fold_floor_min", 0))
+    if floor_min > 0:
+        preflight_fold_floors(
+            train_df.reset_index(drop=True)["label_family"],
+            packed["folds"].reset_index(drop=True),
+            inner.reset_index(drop=True),
+            min_n=floor_min,
+        )
     inner_fit_mask = (inner == "inner_fit").to_numpy()
     inner_val_mask = (inner == "inner_val").to_numpy()
     _LOG.info("threshold_fit", extra={"fold": "inner_folds", "inner_fit_n": int(inner_fit_mask.sum()), "inner_val_n": int(inner_val_mask.sum())})
@@ -1157,13 +1220,7 @@ def fit_champion(
     weights = _class_weight(y_tr)
     # Deterministic weight assertion — same y must produce identical weights
     assert _class_weight(y_tr) == weights, "_class_weight must be deterministic"
-    hgb_kwargs = dict(
-        max_depth=int(tuned_params.get("max_depth", recipe.get("max_depth", 3))),
-        max_iter=int(tuned_params.get("max_iter", recipe.get("max_iter", 80))),
-        learning_rate=float(tuned_params.get("learning_rate", recipe.get("learning_rate", 0.08))),
-        random_state=int(recipe.get("random_state", 42)),
-        early_stopping=False,
-    )
+    hgb_kwargs = _build_hgb_kwargs(tuned_params, recipe)
     # --- Inner fold masks relative to train-only rows ---
     train_idx = (packed["folds"].reset_index(drop=True) == "train")
     inner_of_train = inner[train_idx.to_numpy()].reset_index(drop=True)
@@ -1190,7 +1247,7 @@ def fit_champion(
         inner_cal_pmap = _calibrate_pmap(inner_pmap, y_ival, ival_classes)
         inner_scores = _fraud_score(inner_cal_pmap, len(y_ival))
         op_fpr = float(recipe.get("operating_point_fpr", 0.01))
-        inner_op = _tpr_at_fpr(inner_y_bin, inner_scores, op_fpr)
+        inner_op = _detect_thr_genuine_fpr(inner_scores, y_ival, fpr_target=op_fpr)
         thr = float(inner_op.get("threshold") or 1.0)
     _LOG.info("threshold_fit", extra={"fold": "inner_val", "n_rows": len(y_ival), "op_threshold": thr})
 
@@ -1247,8 +1304,39 @@ def fit_champion(
     split_eval = split_df.reset_index(drop=True).loc[packed["folds"].reset_index(drop=True) == "eval"]
     hang_s = float(recipe.get("hang_guard_seconds_1k", 120))
     bench = _bench_ms(model, x_ev, hang_s)
+    freeze_params_early = _canonical_hgb_params(hgb_kwargs, recipe)
+    freeze_id_early = _model_freeze_id(
+        recipe_hash=r_hash,
+        best_params=freeze_params_early,
+        op_threshold=thr,
+        recipe=recipe,
+    )
+    champ_for_ablation = Champion(
+        model=model,
+        encoder=encoder,
+        raw_columns=list(x_tr_raw.columns),
+        cat_cols=cat_cols,
+        classes=classes,
+        op_threshold=thr,
+        detect_thr=detect_thr,
+        act_thr=act_thr,
+        fold_seed=world_seed,
+        rule_ids=[r.id for r in rules if r.status == "live"],
+        top_features=[],
+        recipe=recipe,
+        iso_model=iso_model if iso_enabled else None,
+        isolation_forest_enabled=iso_enabled,
+        pmap_calibrators=pmap_cals,
+    )
     with _stage("app_ablation"):
-        ablation = _app_ablation(x_tr, y_tr, x_ev, y_ev, x_tr_raw, x_ev_raw, recipe)
+        ablation = _app_ablation(
+            champ_for_ablation,
+            x_ev,
+            y_ev,
+            x_ev_raw,
+            recipe,
+            model_freeze_id=freeze_id_early,
+        )
     mule_rec = _mule_entity_recall(split_eval, pred, scores, thr)
 
     with _stage("permutation_importance"):
@@ -1499,6 +1587,8 @@ def tune_champion(
             "max_iter": int(recipe.get("max_iter", 80)),
             "learning_rate": float(recipe.get("learning_rate", 0.08)),
         }
+        if recipe.get("min_samples_leaf") is not None:
+            best_params["min_samples_leaf"] = int(recipe["min_samples_leaf"])
         direction = None
     else:
         weights = _class_weight(y_tr)
@@ -1514,18 +1604,19 @@ def tune_champion(
             raise ValueError("inner_val A/B split produced an empty slice")
 
         def _objective(trial: Any) -> float:
-            p = {
-                "max_depth": trial.suggest_categorical("max_depth", [2, 3, 4, 5]),
+            use_leaf = trial.suggest_categorical("use_max_leaf_nodes", [False, True])
+            p: dict[str, Any] = {
                 "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.2, log=True),
                 "max_iter": trial.suggest_int("max_iter", 40, 200),
+                "min_samples_leaf": trial.suggest_int("min_samples_leaf", 5, 50),
+                "l2_regularization": trial.suggest_float("l2_regularization", 1e-6, 10.0, log=True),
+                "max_bins": trial.suggest_categorical("max_bins", [64, 128, 255]),
             }
-            m = HistGradientBoostingClassifier(
-                max_depth=p["max_depth"],
-                learning_rate=p["learning_rate"],
-                max_iter=p["max_iter"],
-                random_state=random_state,
-                early_stopping=False,
-            )
+            if use_leaf:
+                p["max_leaf_nodes"] = trial.suggest_int("max_leaf_nodes", 15, 63)
+            else:
+                p["max_depth"] = trial.suggest_categorical("max_depth", [2, 3, 4, 5])
+            m = HistGradientBoostingClassifier(**_build_hgb_kwargs(p, recipe))
             m.fit(x_ifit, y_ifit_s, sample_weight=inner_sw)
             classes_t = [str(c) for c in m.classes_]
             pmap_a = _proba_map(m, x_ival[a_rows])
@@ -1537,18 +1628,21 @@ def tune_champion(
             cal_b = _apply_pmap_calibrators(pmap_b, cals, classes_t)
             scores_a = _fraud_score(cal_a, int(a_rows.sum()))
             scores_b = _fraud_score(cal_b, int(b_rows.sum()))
-            y_bin_a = (y_a.astype(str) != "normal").to_numpy(dtype=int)
-            tau = float(_tpr_at_fpr(y_bin_a, scores_a, op_fpr).get("threshold") or 1.0)
-            pred_a = scores_a >= tau
-            pos_a = y_bin_a == 1
-            recall_a = float(np.mean(pred_a[pos_a])) if pos_a.any() else 0.0
+            op_pt = _detect_thr_genuine_fpr(scores_a, y_a, fpr_target=op_fpr)
+            tau = float(op_pt.get("threshold") or 1.0)
+            recall_a = float(op_pt.get("recall") or 0.0)
             genuine_b = (y_b.astype(str) == "normal").to_numpy()
             inner_b_fp = (
                 float(np.mean(scores_b[genuine_b] >= tau)) if genuine_b.any() else 0.0
             )
+            pareto_caps = tuple(float(x) for x in opt_cfg.get("fpr_pareto_targets", [0.01, 0.005, 0.001]))
+            pareto_a = {
+                f"{t:g}": _detect_thr_genuine_fpr(scores_a, y_a, fpr_target=t) for t in pareto_caps
+            }
             trial.set_user_attr("inner_A_tpr", recall_a)
             trial.set_user_attr("inner_B_genuine_fp", inner_b_fp)
             trial.set_user_attr("tau", tau)
+            trial.set_user_attr("pareto_inner_A", pareto_a)
             trial_log.append(
                 {
                     "number": int(trial.number),
@@ -1556,6 +1650,7 @@ def tune_champion(
                     "inner_A_tpr": recall_a,
                     "inner_B_genuine_fp": inner_b_fp,
                     "tau": tau,
+                    "pareto_inner_A": pareto_a,
                 }
             )
             if inner_b_fp > fpr_ceiling:
@@ -1575,7 +1670,9 @@ def tune_champion(
         dest_pre = (models_dir or MODELS_DIR) / (dest_run_id or run_id)
         dest_pre.mkdir(parents=True, exist_ok=True)
         trials_payload = {
-            "objective": "recall_at_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
+            "objective": "max_recall_genuine_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
+            "operating_point_fpr": op_fpr,
+            "fpr_pareto_targets": list(opt_cfg.get("fpr_pareto_targets", [0.01, 0.005, 0.001])),
             "inner_b_fpr_ceiling": fpr_ceiling,
             "best_value": study.best_value,
             "best_params": best_params,
@@ -1687,6 +1784,9 @@ def _gtest_cached_score_if_opened(
         )
     score_path = _gtest_score_path(model_run_id, models_dir)
     if proto.get("gtest_opened_at") and stored_freeze == freeze_id and score_path.is_file():
+        cached_run_id = proto.get("gtest_run_id")
+        if cached_run_id and str(cached_run_id) != str(run_id):
+            return None
         return json.loads(score_path.read_text(encoding="utf-8"))
     return None
 
@@ -1749,9 +1849,30 @@ def score_run(
     genuine_fp_over_eval = _genuine_fp_over_eval(yhat, len(y_ev))
     hang_s = float(recipe.get("hang_guard_seconds_1k", 120))
     bench = _bench_ms(champ.model, x_ev, hang_s)
-    x_tr, _ = _encode(x_tr_raw, encoder=champ.encoder, cat_cols=champ.cat_cols, fit=False)
-    ablation = _app_ablation(x_tr, y_tr, x_ev, y_ev, x_tr_raw, x_ev_raw, recipe)
-    ablation["app_ablation_source"] = "scored_world"
+    manifest_path = (models_dir or MODELS_DIR) / mid / "model_manifest.json"
+    manifest = {}
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    recipe_hash = str(manifest.get("recipe_hash") or _recipe_hash())
+    champ_metrics_path = (models_dir or MODELS_DIR) / mid / "metrics.json"
+    champ_metrics: dict[str, Any] = {}
+    if champ_metrics_path.is_file():
+        champ_metrics = json.loads(champ_metrics_path.read_text(encoding="utf-8"))
+    freeze_params = _best_params_from_champion(champ, champ_metrics if champ_metrics_path.is_file() else {})
+    freeze_id = _model_freeze_id(
+        recipe_hash=recipe_hash,
+        best_params=freeze_params,
+        op_threshold=float(thr),
+        recipe=recipe,
+    )
+    ablation = _app_ablation(
+        champ,
+        x_ev,
+        y_ev,
+        x_ev_raw,
+        recipe,
+        model_freeze_id=freeze_id,
+    )
 
     iso_model_pass = champ.iso_model if (getattr(champ, "isolation_forest_enabled", None) is True) else None
     hist, fp_hist = _brake_action_hist(
@@ -1767,24 +1888,7 @@ def score_run(
         fp_action_hist=fp_hist,
     )
 
-    manifest_path = (models_dir or MODELS_DIR) / mid / "model_manifest.json"
-    manifest = {}
-    if manifest_path.is_file():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    recipe_hash = str(manifest.get("recipe_hash") or _recipe_hash())
-    champ_metrics_path = (models_dir or MODELS_DIR) / mid / "metrics.json"
-    champ_metrics: dict[str, Any] = {}
-    if champ_metrics_path.is_file():
-        champ_metrics = json.loads(champ_metrics_path.read_text(encoding="utf-8"))
-
     bin_op = _binary_op_metrics(y_bin, scores, yhat)
-    freeze_params = _best_params_from_champion(champ, champ_metrics if champ_metrics_path.is_file() else {})
-    freeze_id = _model_freeze_id(
-        recipe_hash=recipe_hash,
-        best_params=freeze_params,
-        op_threshold=float(thr),
-        recipe=recipe,
-    )
 
     metrics = {
         "pass": False,

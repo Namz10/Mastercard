@@ -11,6 +11,27 @@ load_project_env()
 
 
 @pytest.fixture(autouse=True)
+def _zero_fold_floor_for_fit_unit_tests(request, monkeypatch):
+    """Small synthetic populations cannot meet v1 fold_floor_min=15."""
+    nodeid = request.node.nodeid
+    if not any(
+        token in nodeid
+        for token in ("test_eval_fit", "test_ml_validation", "test_post_g43_protocol")
+    ):
+        return
+    from packages.eval import fit as fit_mod
+
+    original = fit_mod.load_recipe
+
+    def patched(path=None):
+        recipe = dict(original(path))
+        recipe["fold_floor_min"] = 0
+        return recipe
+
+    monkeypatch.setattr(fit_mod, "load_recipe", patched)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_llm_env(request, monkeypatch):
     """Offline tests cannot see the operator's Groq/OmniRoute keys.
 

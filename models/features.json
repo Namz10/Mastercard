@@ -55,8 +55,9 @@
     "timeout_seconds": 600,
     "timeout_ci": 60,
     "min_inner_val_fraud_pos": 50,
-    "objective": "recall_at_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
-    "inner_b_fpr_ceiling": 0.02
+    "objective": "max_recall_genuine_fpr_inner_val_A_subject_to_inner_B_genuine_fp",
+    "inner_b_fpr_ceiling": 0.02,
+    "fpr_pareto_targets": [0.05, 0.02, 0.01, 0.005, 0.001]
   },
   "calibration": {
     "stage1_binary": true,

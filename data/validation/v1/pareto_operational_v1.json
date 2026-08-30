@@ -1,0 +1,191 @@
+{
+  "model_run_id": "v1-train-46__loopm-train",
+  "worlds": {
+    "v1-gdev-47": {
+      "run_id": "v1-gdev-47",
+      "model_run_id": "v1-train-46__loopm-train",
+      "n_rows": 397902,
+      "n_normal": 390431,
+      "n_fraud": 7471,
+      "default_op": {
+        "detect_thr": 0.00054571955600069,
+        "genuine_fp": 0.07865154150157135,
+        "recall": 1.0,
+        "cost_sketch_proxy": 0.07717478173017477,
+        "n_fp_normal": 30708,
+        "n_fn_fraud": 0
+      },
+      "pareto_ops": {
+        "0.01": {
+          "threshold": 0.017159287853479976,
+          "genuine_fp": 0.009945419293037694,
+          "recall": 0.995850622406639,
+          "family_recall": {
+            "app_fraud": 0.993046776232617,
+            "ato": 0.9949748743718593,
+            "identity_burst": 0.9980519480519481,
+            "invoice_fraud": 1.0,
+            "mule": 0.995293379353624
+          },
+          "cost_sketch_proxy": 0.05125246023275899,
+          "n_fp_normal": 3883,
+          "n_fn_fraud": 31
+        },
+        "0.005": {
+          "threshold": 0.21523879730613216,
+          "genuine_fp": 0.004981674098624341,
+          "recall": 0.9941105608352295,
+          "family_recall": {
+            "app_fraud": 0.9911504424778761,
+            "ato": 0.9949748743718593,
+            "identity_burst": 0.9980519480519481,
+            "invoice_fraud": 0.9973821989528796,
+            "mule": 0.9927831816755569
+          },
+          "cost_sketch_proxy": 0.06378252993301088,
+          "n_fp_normal": 1945,
+          "n_fn_fraud": 44
+        },
+        "0.001": {
+          "threshold": 0.9280720593647624,
+          "genuine_fp": 0.000991212275664586,
+          "recall": 0.9843394458573149,
+          "family_recall": {
+            "app_fraud": 0.984197218710493,
+            "ato": 0.9371859296482412,
+            "identity_burst": 0.9863636363636363,
+            "invoice_fraud": 0.9960732984293194,
+            "mule": 0.9865076874803891
+          },
+          "cost_sketch_proxy": 0.1575781427206364,
+          "n_fp_normal": 387,
+          "n_fn_fraud": 117
+        }
+      }
+    },
+    "v1-gtest-48": {
+      "run_id": "v1-gtest-48",
+      "model_run_id": "v1-train-46__loopm-train",
+      "n_rows": 394954,
+      "n_normal": 387536,
+      "n_fraud": 7418,
+      "default_op": {
+        "detect_thr": 0.00054571955600069,
+        "genuine_fp": 0.08067637587217703,
+        "recall": 0.9998651927743327,
+        "cost_sketch_proxy": 0.08050918975390048,
+        "n_fp_normal": 31265,
+        "n_fn_fraud": 1
+      },
+      "pareto_ops": {
+        "0.01": {
+          "threshold": 0.02271230935407731,
+          "genuine_fp": 0.009250753478386524,
+          "recall": 0.9956861687786466,
+          "family_recall": {
+            "app_fraud": 0.9910941475826972,
+            "ato": 0.9924050632911392,
+            "identity_burst": 0.9980544747081712,
+            "invoice_fraud": 1.0,
+            "mule": 0.9962049335863378
+          },
+          "cost_sketch_proxy": 0.05221531864972721,
+          "n_fp_normal": 3585,
+          "n_fn_fraud": 32
+        },
+        "0.005": {
+          "threshold": 0.30223374985227025,
+          "genuine_fp": 0.004288633830147393,
+          "recall": 0.9947425181989754,
+          "family_recall": {
+            "app_fraud": 0.989821882951654,
+            "ato": 0.9924050632911392,
+            "identity_burst": 0.9980544747081712,
+            "invoice_fraud": 1.0,
+            "mule": 0.9946236559139785
+          },
+          "cost_sketch_proxy": 0.05678290300242164,
+          "n_fp_normal": 1662,
+          "n_fn_fraud": 39
+        },
+        "0.001": {
+          "threshold": 0.9213687795399403,
+          "genuine_fp": 0.0009805540646546384,
+          "recall": 0.9866540846589377,
+          "family_recall": {
+            "app_fraud": 0.9783715012722646,
+            "ato": 0.9493670886075949,
+            "identity_burst": 0.9889753566796369,
+            "invoice_fraud": 1.0,
+            "mule": 0.9911448450347881
+          },
+          "cost_sketch_proxy": 0.13442129077345494,
+          "n_fp_normal": 380,
+          "n_fn_fraud": 99
+        }
+      }
+    },
+    "v1-gtest-49": {
+      "run_id": "v1-gtest-49",
+      "model_run_id": "v1-train-46__loopm-train",
+      "n_rows": 396655,
+      "n_normal": 389200,
+      "n_fraud": 7455,
+      "default_op": {
+        "detect_thr": 0.00054571955600069,
+        "genuine_fp": 0.08118705035971223,
+        "recall": 1.0,
+        "cost_sketch_proxy": 0.0796611665048972,
+        "n_fp_normal": 31598,
+        "n_fn_fraud": 0
+      },
+      "pareto_ops": {
+        "0.01": {
+          "threshold": 0.02233022111149363,
+          "genuine_fp": 0.00987667009249743,
+          "recall": 0.9961099932930919,
+          "family_recall": {
+            "app_fraud": 0.9949141767323586,
+            "ato": 0.9848866498740554,
+            "identity_burst": 0.9980645161290322,
+            "invoice_fraud": 0.9986842105263158,
+            "mule": 0.9965354330708661
+          },
+          "cost_sketch_proxy": 0.048591108402229605,
+          "n_fp_normal": 3844,
+          "n_fn_fraud": 29
+        },
+        "0.005": {
+          "threshold": 0.2854378176323614,
+          "genuine_fp": 0.004586330935251798,
+          "recall": 0.9953051643192489,
+          "family_recall": {
+            "app_fraud": 0.993006993006993,
+            "ato": 0.982367758186398,
+            "identity_burst": 0.9980645161290322,
+            "invoice_fraud": 0.9986842105263158,
+            "mule": 0.9959055118110236
+          },
+          "cost_sketch_proxy": 0.05144848916434576,
+          "n_fp_normal": 1785,
+          "n_fn_fraud": 35
+        },
+        "0.001": {
+          "threshold": 0.9195392189279571,
+          "genuine_fp": 0.0009943473792394656,
+          "recall": 0.9855130784708249,
+          "family_recall": {
+            "app_fraud": 0.9828353464717101,
+            "ato": 0.8967254408060453,
+            "identity_burst": 0.9935483870967742,
+            "invoice_fraud": 0.9986842105263158,
+            "mule": 0.9908661417322835
+          },
+          "cost_sketch_proxy": 0.14584487423970277,
+          "n_fp_normal": 387,
+          "n_fn_fraud": 108
+        }
+      }
+    }
+  }
+}

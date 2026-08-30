@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -21,7 +22,7 @@ def test_tune_champion_never_reads_outer_eval_in_objective():
     assert "outer_fp =" not in src
 
 
-def test_gtest_ablation_recomputed_on_scored_world(fitted: dict):
+def test_gtest_ablation_recomputed_on_frozen_champion(fitted: dict):
     body = fit_mod.score_run(
         "fit-c",
         model_run_id="fit-c",
@@ -30,7 +31,7 @@ def test_gtest_ablation_recomputed_on_scored_world(fitted: dict):
         all_rows=True,
     )
     ab = body["metrics"]["app_ablation"]
-    assert ab["app_ablation_source"] == "scored_world"
+    assert ab["app_ablation_source"] == "frozen_champion"
 
 
 def test_genuine_fp_uses_n_normal_denom(fitted: dict):
@@ -76,3 +77,16 @@ def test_champion_manifest_has_detect_and_act_thr(fitted: dict):
     metrics = fitted["body"]["metrics"]
     assert "detect_thr" in metrics or "op_threshold" in metrics
     assert "act_thr" in metrics or "op_threshold" in metrics
+
+
+@pytest.mark.skipif(
+    not Path("data/runs/v1-gtest-48/split.parquet").is_file()
+    or not Path("data/runs/v1-train-46__gtest/split.parquet").is_file(),
+    reason="v1 gtest worlds not generated",
+)
+def test_v1_gtest_alias_event_ids_equal():
+    """Wave 0.2 — Loop M __gtest is not an independent holdout."""
+    a = pd.read_parquet("data/runs/v1-gtest-48/split.parquet")["event_id"]
+    b = pd.read_parquet("data/runs/v1-train-46__gtest/split.parquet")["event_id"]
+    assert len(a) == len(b) == 394954
+    assert a.equals(b)

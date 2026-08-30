@@ -1,0 +1,16 @@
+{
+  "recipe_hash": "8423e6807b707f6767fce051524c934dfdbafff45d1c9464d718abcf3b9afeba",
+  "run_id": "v1-train-46__loopm-train",
+  "model_run_id": "v1-train-46__loopm-train",
+  "model_freeze_id": "e2f6cf866ddc8f053218e2d9bd460431c69a1d7e140effb1f88ddcd6dd55d009",
+  "best_params": {
+    "max_depth": 3,
+    "max_iter": 80,
+    "learning_rate": 0.08,
+    "random_state": 42,
+    "early_stopping": false
+  },
+  "op_threshold": 0.00054571955600069,
+  "detect_thr": 0.00054571955600069,
+  "act_thr": 0.5
+}

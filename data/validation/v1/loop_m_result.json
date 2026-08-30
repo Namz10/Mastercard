@@ -73,5 +73,9 @@
   "model_run_id_before": "v1-train-46",
   "model_run_id_after": "v1-train-46__loopm-train",
   "gtest_run_id": "v1-train-46__gtest",
+  "gtest_alias": {
+    "aliased_run_id": "v1-gtest-48",
+    "note": "v1-train-46__gtest is a second generate of world_seed 48; event_id sequences are byte-identical to v1-gtest-48 (394,954 rows). Not independent holdout confirmation."
+  },
   "pass": true
 }

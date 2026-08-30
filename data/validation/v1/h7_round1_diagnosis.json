@@ -1,0 +1,65 @@
+{
+  "status": "ok",
+  "round": 1,
+  "run_id": "v1-gdev-47",
+  "model_run_id": "v1-train-46__loopm-train",
+  "max_rounds": 3,
+  "promote_gate": "gdev_only",
+  "confirmatory_run_id": "v1-gtest-49",
+  "forbidden_promote_run_ids": [
+    "v1-gtest-48",
+    "v1-gtest-49"
+  ],
+  "weakest_family": "ato",
+  "pick_reason": "lowest gdev AP among families with n_pos>=30",
+  "detect_thr": 0.00054571955600069,
+  "borderline_band": {
+    "lo": 0.000436575644800552,
+    "hi": 0.0006548634672008279,
+    "frac": 0.2
+  },
+  "ap_by_family": {
+    "app_fraud": 0.9850734790001605,
+    "ato": 0.5372708487512933,
+    "identity_burst": 0.9387703266983748,
+    "invoice_fraud": 0.9998666188059392,
+    "mule": 0.9917798768476195
+  },
+  "n_pos": {
+    "app_fraud": 1582,
+    "ato": 398,
+    "identity_burst": 1540,
+    "invoice_fraud": 764,
+    "mule": 3187
+  },
+  "mistake_buckets": {
+    "fp_normals_all": 30708,
+    "fp_normals_excl_new_payee": 16986,
+    "fp_normals_new_payee_only": 13722,
+    "fn_by_family": {
+      "app_fraud": 0,
+      "ato": 0,
+      "identity_burst": 0,
+      "invoice_fraud": 0,
+      "mule": 0
+    },
+    "fn_weakest_family": 0,
+    "borderline_near_thr_all": 11856,
+    "borderline_by_family": {
+      "app_fraud": 0,
+      "ato": 0,
+      "identity_burst": 1,
+      "invoice_fraud": 0,
+      "mule": 0
+    },
+    "borderline_normals_excl_new_payee": 11366
+  },
+  "h6_d_filters": {
+    "hn_pool_excludes_is_new_payee": true,
+    "no_blind_top_k_mining": true
+  },
+  "recommended_intervention": [
+    "Loop M: append ato positives from extra seed (train only)",
+    "Hard negatives: device/session-shaped normals; exclude is_new_payee=1 (H6-D)"
+  ]
+}

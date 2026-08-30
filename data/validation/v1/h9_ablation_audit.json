@@ -1,0 +1,314 @@
+{
+  "model_run_id": "v1-train-46__loopm-train",
+  "run_ids": [
+    "v1-gdev-47",
+    "v1-gtest-48"
+  ],
+  "groups": [
+    "app_flags",
+    "stamps",
+    "velocity",
+    "temporal",
+    "merchant",
+    "graph"
+  ],
+  "ablation_source": "frozen_champion",
+  "worlds": {
+    "v1-gdev-47": {
+      "baseline_binary_ap": 0.9947755665789036,
+      "without_stamps": {
+        "binary_ap": 0.8458213219053138,
+        "delta_vs_baseline": -0.14895424467358986,
+        "source": "frozen_champion"
+      },
+      "app_flags": {
+        "columns_zeroed": [
+          "call_active_flag",
+          "copy_paste_payee_flag",
+          "pause_ms",
+          "urgency_pressure"
+        ],
+        "binary_ap": 0.8773581038429069,
+        "delta_vs_baseline": -0.11741746273599674,
+        "delta_vs_without_stamps": 0.03153678193759313
+      },
+      "stamps": {
+        "columns_zeroed": [
+          "beneficiary_changed",
+          "gstin_checksum_ok",
+          "lookalike_domain_flag",
+          "rule__call-and-paste-new-payee",
+          "rule__new-payee-large-new-device",
+          "rule__mule-fan-in-burst",
+          "rule__smurf-under-cap",
+          "rule__rail-hop-burst",
+          "rule__seasoning-burst",
+          "rule__invoice-beneficiary-swap",
+          "rule__pause-paste-session",
+          "rule__calm-down-known-usual-device",
+          "is_new_payee"
+        ],
+        "binary_ap": 0.9560523991689439,
+        "delta_vs_baseline": -0.038723167409959736,
+        "delta_vs_without_stamps": 0.11023107726363013
+      },
+      "velocity": {
+        "columns_zeroed": [
+          "burst_velocity",
+          "txn_velocity_24h",
+          "fan_in_1h",
+          "fan_out_1h",
+          "fan_in_24h",
+          "fan_out_24h"
+        ],
+        "binary_ap": 0.9263655311794409,
+        "delta_vs_baseline": -0.06841003539946278,
+        "delta_vs_without_stamps": 0.08054420927412709
+      },
+      "temporal": {
+        "columns_zeroed": [
+          "hours_since_prev_txn",
+          "hours_since_payee",
+          "account_age_days"
+        ],
+        "binary_ap": 0.6869676539236464,
+        "delta_vs_baseline": -0.3078079126552572,
+        "delta_vs_without_stamps": -0.15885366798166733
+      },
+      "merchant": {
+        "columns_zeroed": [
+          "amount_vs_p30",
+          "amount_vs_7d_mean"
+        ],
+        "binary_ap": 0.9321723185001017,
+        "delta_vs_baseline": -0.06260324807880191,
+        "delta_vs_without_stamps": 0.08635099659478795
+      },
+      "graph": {
+        "columns_zeroed": [
+          "fan_in_unique_payers_1h",
+          "fan_in_unique_payers_24h",
+          "payee_fan_out_1h",
+          "in_out_asymmetry_24h",
+          "unique_payees_7d",
+          "payee_history_count"
+        ],
+        "binary_ap": 0.6880562595467363,
+        "delta_vs_baseline": -0.3067193070321673,
+        "delta_vs_without_stamps": -0.15776506235857746
+      },
+      "largest_drop_vs_baseline": [
+        {
+          "group": "temporal",
+          "delta_vs_baseline": -0.3078079126552572,
+          "binary_ap": 0.6869676539236464
+        },
+        {
+          "group": "graph",
+          "delta_vs_baseline": -0.3067193070321673,
+          "binary_ap": 0.6880562595467363
+        },
+        {
+          "group": "app_flags",
+          "delta_vs_baseline": -0.11741746273599674,
+          "binary_ap": 0.8773581038429069
+        },
+        {
+          "group": "velocity",
+          "delta_vs_baseline": -0.06841003539946278,
+          "binary_ap": 0.9263655311794409
+        },
+        {
+          "group": "merchant",
+          "delta_vs_baseline": -0.06260324807880191,
+          "binary_ap": 0.9321723185001017
+        },
+        {
+          "group": "stamps",
+          "delta_vs_baseline": -0.038723167409959736,
+          "binary_ap": 0.9560523991689439
+        }
+      ],
+      "largest_drop_vs_without_stamps": [
+        {
+          "group": "temporal",
+          "delta_vs_without_stamps": -0.15885366798166733,
+          "binary_ap": 0.6869676539236464
+        },
+        {
+          "group": "graph",
+          "delta_vs_without_stamps": -0.15776506235857746,
+          "binary_ap": 0.6880562595467363
+        },
+        {
+          "group": "app_flags",
+          "delta_vs_without_stamps": 0.03153678193759313,
+          "binary_ap": 0.8773581038429069
+        },
+        {
+          "group": "velocity",
+          "delta_vs_without_stamps": 0.08054420927412709,
+          "binary_ap": 0.9263655311794409
+        },
+        {
+          "group": "merchant",
+          "delta_vs_without_stamps": 0.08635099659478795,
+          "binary_ap": 0.9321723185001017
+        },
+        {
+          "group": "stamps",
+          "delta_vs_without_stamps": 0.11023107726363013,
+          "binary_ap": 0.9560523991689439
+        }
+      ]
+    },
+    "v1-gtest-48": {
+      "baseline_binary_ap": 0.9955977030200724,
+      "without_stamps": {
+        "binary_ap": 0.8440462149651711,
+        "delta_vs_baseline": -0.15155148805490137,
+        "source": "frozen_champion"
+      },
+      "app_flags": {
+        "columns_zeroed": [
+          "call_active_flag",
+          "copy_paste_payee_flag",
+          "pause_ms",
+          "urgency_pressure"
+        ],
+        "binary_ap": 0.878278453829347,
+        "delta_vs_baseline": -0.11731924919072545,
+        "delta_vs_without_stamps": 0.03423223886417592
+      },
+      "stamps": {
+        "columns_zeroed": [
+          "beneficiary_changed",
+          "gstin_checksum_ok",
+          "lookalike_domain_flag",
+          "rule__call-and-paste-new-payee",
+          "rule__new-payee-large-new-device",
+          "rule__mule-fan-in-burst",
+          "rule__smurf-under-cap",
+          "rule__rail-hop-burst",
+          "rule__seasoning-burst",
+          "rule__invoice-beneficiary-swap",
+          "rule__pause-paste-session",
+          "rule__calm-down-known-usual-device",
+          "is_new_payee"
+        ],
+        "binary_ap": 0.9554889441598751,
+        "delta_vs_baseline": -0.04010875886019738,
+        "delta_vs_without_stamps": 0.111442729194704
+      },
+      "velocity": {
+        "columns_zeroed": [
+          "burst_velocity",
+          "txn_velocity_24h",
+          "fan_in_1h",
+          "fan_out_1h",
+          "fan_in_24h",
+          "fan_out_24h"
+        ],
+        "binary_ap": 0.9278582929540444,
+        "delta_vs_baseline": -0.06773941006602802,
+        "delta_vs_without_stamps": 0.08381207798887336
+      },
+      "temporal": {
+        "columns_zeroed": [
+          "hours_since_prev_txn",
+          "hours_since_payee",
+          "account_age_days"
+        ],
+        "binary_ap": 0.6829454341022733,
+        "delta_vs_baseline": -0.3126522689177992,
+        "delta_vs_without_stamps": -0.1611007808628978
+      },
+      "merchant": {
+        "columns_zeroed": [
+          "amount_vs_p30",
+          "amount_vs_7d_mean"
+        ],
+        "binary_ap": 0.9352119701275601,
+        "delta_vs_baseline": -0.06038573289251237,
+        "delta_vs_without_stamps": 0.091165755162389
+      },
+      "graph": {
+        "columns_zeroed": [
+          "fan_in_unique_payers_1h",
+          "fan_in_unique_payers_24h",
+          "payee_fan_out_1h",
+          "in_out_asymmetry_24h",
+          "unique_payees_7d",
+          "payee_history_count"
+        ],
+        "binary_ap": 0.687929081966683,
+        "delta_vs_baseline": -0.30766862105338944,
+        "delta_vs_without_stamps": -0.15611713299848806
+      },
+      "largest_drop_vs_baseline": [
+        {
+          "group": "temporal",
+          "delta_vs_baseline": -0.3126522689177992,
+          "binary_ap": 0.6829454341022733
+        },
+        {
+          "group": "graph",
+          "delta_vs_baseline": -0.30766862105338944,
+          "binary_ap": 0.687929081966683
+        },
+        {
+          "group": "app_flags",
+          "delta_vs_baseline": -0.11731924919072545,
+          "binary_ap": 0.878278453829347
+        },
+        {
+          "group": "velocity",
+          "delta_vs_baseline": -0.06773941006602802,
+          "binary_ap": 0.9278582929540444
+        },
+        {
+          "group": "merchant",
+          "delta_vs_baseline": -0.06038573289251237,
+          "binary_ap": 0.9352119701275601
+        },
+        {
+          "group": "stamps",
+          "delta_vs_baseline": -0.04010875886019738,
+          "binary_ap": 0.9554889441598751
+        }
+      ],
+      "largest_drop_vs_without_stamps": [
+        {
+          "group": "temporal",
+          "delta_vs_without_stamps": -0.1611007808628978,
+          "binary_ap": 0.6829454341022733
+        },
+        {
+          "group": "graph",
+          "delta_vs_without_stamps": -0.15611713299848806,
+          "binary_ap": 0.687929081966683
+        },
+        {
+          "group": "app_flags",
+          "delta_vs_without_stamps": 0.03423223886417592,
+          "binary_ap": 0.878278453829347
+        },
+        {
+          "group": "velocity",
+          "delta_vs_without_stamps": 0.08381207798887336,
+          "binary_ap": 0.9278582929540444
+        },
+        {
+          "group": "merchant",
+          "delta_vs_without_stamps": 0.091165755162389,
+          "binary_ap": 0.9352119701275601
+        },
+        {
+          "group": "stamps",
+          "delta_vs_without_stamps": 0.111442729194704,
+          "binary_ap": 0.9554889441598751
+        }
+      ]
+    }
+  }
+}
