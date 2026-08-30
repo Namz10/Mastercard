@@ -40,7 +40,7 @@ class LoopMRequest(BaseModel):
     run_id: str
     miss_family: str
     train_seed: int = 42
-    gtest_seed: int = 43
+    gtest_seed: int = 48
     family_chosen_from_slice: str = Field(default="gdev44", description="inner_val | diagnostic | gdev44")
     n_customers: int | None = None
     n_merchants: int | None = None

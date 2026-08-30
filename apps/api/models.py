@@ -30,7 +30,7 @@ class AtlasRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-
+    ui_action: Mapped[str] = mapped_column(String(12), default='pending')  # new column for UI decision
 
 class OsintChunk(Base):
     __tablename__ = "osint_chunks"

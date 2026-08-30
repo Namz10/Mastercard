@@ -168,6 +168,13 @@ export interface LoopMComparison {
 export interface LoopMResponse {
   run_id: string;
   miss_family: string;
+  catalog_solved?: boolean;
+  train_seed?: number;
+  gtest_seed?: number;
+  n_extra?: number;
+  extra_row_cap?: number;
+  extra_row_cap_frac?: number;
+  genuine_fpr_eps?: number;
   comparison: LoopMComparison;
   metrics: {
     pass: boolean;
@@ -176,6 +183,7 @@ export interface LoopMResponse {
   };
   model_run_id_before: string;
   model_run_id_after: string;
+  pass?: boolean;
 }
 
 export interface MergedTechnique {

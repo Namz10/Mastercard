@@ -1,7 +1,7 @@
 """Identify / HITL API routes."""
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
@@ -27,6 +27,16 @@ class IdentifyRunRequest(BaseModel):
 
 
 class HitlDecision(BaseModel):
+    action: str = Field(description="approve | reject | reject_unsafe | edit")
+    spec_patch: dict[str, Any] | None = None
+
+class HitlBatchDecision(BaseModel):
+    vector_id: str
+    action: str = Field(description="approve | reject | reject_unsafe | edit")
+    spec_patch: dict[str, Any] | None = None
+
+class HitlBatchRequest(BaseModel):
+    decisions: List[HitlBatchDecision]
     action: str = Field(description="approve | reject | reject_unsafe | edit")
     spec_patch: dict[str, Any] | None = None
 
@@ -118,6 +128,53 @@ def hitl_queue(db: Annotated[Session, Depends(get_db)]) -> dict:
         "count": len(rows),
         "items": items,
     }
+@router.get("/state")
+def get_identify_state(db: Annotated[Session, Depends(get_db)]) -> dict:
+    """Return all proposed vectors with their UI actions."""
+    rows = (
+        db.query(AtlasRow)
+        .filter(AtlasRow.status == "proposed")
+        .order_by(AtlasRow.updated_at.desc())
+        .all()
+    )
+    items = []
+    for row in rows:
+        items.append(
+            {
+                "vector_id": row.vector_id,
+                "ui_action": getattr(row, "ui_action", "pending"),
+                "spec": dict(row.spec or {}),
+            }
+        )
+    return {"count": len(rows), "items": items}
+
+@router.post("/hitl")
+def bulk_hitl_update(request: HitlBatchRequest, db: Annotated[Session, Depends(get_db)]) -> dict:
+    """Bulk update UI actions for multiple vectors."""
+    updated = 0
+    for decision in request.decisions:
+        action = decision.action or request.action
+        spec_patch = decision.spec_patch or request.spec_patch
+        fake_body = HitlDecision(action=action, spec_patch=spec_patch)
+        hitl_decision(decision.vector_id, fake_body, db)
+        updated += 1
+    return {"updated": updated}
+
+@router.patch("/hitl/{vector_id}")
+def patch_vector_ui_action(
+    vector_id: str, body: HitlDecision, db: Annotated[Session, Depends(get_db)]
+) -> dict:
+    """Update ui_action for a single vector."""
+    row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="vector_id not found")
+    action = body.action.lower().strip()
+    if action not in {"approve", "reject", "reject_unsafe", "edit", "pending"}:
+        raise HTTPException(status_code=400, detail=f"invalid action: {action}")
+    row.ui_action = action
+    db.commit()
+    db.refresh(row)
+    return {"vector_id": vector_id, "ui_action": row.ui_action}
 
 
 def _transition(db: Session, vector_id: str, status: str, patch: dict | None = None) -> dict:

@@ -4,6 +4,7 @@ import time
 
 from pydantic import ValidationError
 
+from packages.agents.limits import resolve_limit
 from packages.agents.llm import extract_from_document
 from packages.agents.settings import get_identify_settings
 from packages.agents.state import IdentifyState
@@ -38,10 +39,13 @@ def extractor(state: IdentifyState) -> IdentifyState:
     proposed: list[dict] = []
     errors = list(state.get("errors") or [])
     max_chars = identify.identify_max_extract_chars
+    max_docs = resolve_limit(identify.identify_max_docs) or 3
     sleep_s = max(0, identify.identify_extract_sleep_ms) / 1000.0
     extracts_done = 0
 
     for item in candidates:
+        if max_docs is not None and extracts_done >= max_docs:
+            break
         url = item.get("url", "")
         if not url or not is_allowlisted_url(url):
             continue

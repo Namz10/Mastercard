@@ -10,6 +10,7 @@ export function useSimulation() {
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["generate-latest"] });
     void qc.invalidateQueries({ queryKey: ["coverage-map"] });
+    void qc.invalidateQueries({ queryKey: ["alerts"] });
   };
 
   const population = useMutation({
@@ -18,26 +19,37 @@ export function useSimulation() {
         world_seed: 42,
         n_customers: 2400,
         n_merchants: 120,
-        sim_days: 90,
-        pin: true,
+        sim_days: 30,
       }),
     onSuccess: (data) => {
       setRunId(data.run_id);
+      // Persist full generate run response
+      try {
+        localStorage.setItem(`generate_${data.run_id}`, JSON.stringify(data));
+      } catch (e) {
+        console.error("Failed to store generate result", e);
+      }
       invalidate();
     },
   });
 
   const canary = useMutation({
-    mutationFn: () =>
+    mutationFn: (campaign_id: string) =>
       api.post<GenerateRunResponse>("/generate/canary", {
-        campaign_id: "fincen-fin-2024-alert004",
+        campaign_id,
         world_seed: 42,
         n_customers: 120,
         n_merchants: 20,
-        sim_days: 90,
+        sim_days: 30,
       }),
     onSuccess: (data) => {
       setRunId(data.run_id);
+      // Persist full generate canary response
+      try {
+        localStorage.setItem(`generate_${data.run_id}`, JSON.stringify(data));
+      } catch (e) {
+        console.error("Failed to store generate result", e);
+      }
       invalidate();
     },
   });

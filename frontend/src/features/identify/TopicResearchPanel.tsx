@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useIdentifyMutations } from "./useIdentify";
+import { useIdentifySession } from "./useIdentifySession";
 
 export function TopicResearchPanel() {
-  const [topic, setTopic] = useState("");
+  const { session, startNewTopic } = useIdentifySession();
+  const [topic, setTopic] = useState(session.topic ?? "");
   const { runResearch } = useIdentifyMutations();
 
   return (
@@ -19,7 +21,11 @@ export function TopicResearchPanel() {
         <Button
           variant="primary"
           disabled={!topic.trim() || runResearch.isPending}
-          onClick={() => runResearch.mutate(topic.trim())}
+          onClick={() =>
+            runResearch.mutate(topic.trim(), {
+              onSuccess: () => startNewTopic(topic.trim()),
+            })
+          }
           data-demo="research-button"
         >
           {runResearch.isPending ? "Researching…" : "Research"}
@@ -34,12 +40,20 @@ export function TopicResearchPanel() {
             Research completed (Run: {runResearch.data.run_id})
           </p>
           <p className="text-xs text-ink-muted">
-            Found <strong>{runResearch.data.scout_candidate_count}</strong> scout candidates and proposed <strong>{runResearch.data.proposed_count}</strong> threat vectors (Curator kept {runResearch.data.curator_kept_count}).
+            Found <strong>{runResearch.data.scout_candidate_count}</strong> scout candidates and proposed{" "}
+            <strong>{runResearch.data.proposed_count}</strong> threat vectors (Curator kept{" "}
+            {runResearch.data.curator_kept_count}).
           </p>
           <p className="text-xs text-signal-success font-medium pt-1">
-            ↓ Candidate threat vectors are ready below in the HITL Queue. Approve candidate vector(s) to add them to the catalog for generation.
+            ↓ Candidate threat vectors are ready below in the HITL Queue. Approve candidate vector(s) to add them to
+            the catalog for generation.
           </p>
         </div>
+      ) : null}
+      {session.topic && !runResearch.isSuccess ? (
+        <p className="text-xs text-ink-muted font-mono">
+          Research complete for topic: <span className="text-ink">{session.topic}</span>
+        </p>
       ) : null}
     </div>
   );
