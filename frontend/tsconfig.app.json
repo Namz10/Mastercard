@@ -22,10 +22,24 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "strict": true,
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/components/ui/PixelBlast.canvas.tsx",
+    "src/features/arms-race",
+    "src/features/copilot",
+    "src/features/simulation",
+    "src/features/demo",
+    "src/features/identify/HitlQueueTable.tsx",
+    "src/features/identify/TopicResearchPanel.tsx",
+    "src/features/identify/useIdentifySession.ts",
+    "src/features/decisioning/DecisioningPage.tsx",
+    "src/features/decisioning/useDecisioning.ts",
+    "src/features/decisioning/useDecisioningState.ts",
+    "src/hooks/useGenerateRun.ts",
+    "src/hooks/useLoopMRun.ts"
+  ]
 }

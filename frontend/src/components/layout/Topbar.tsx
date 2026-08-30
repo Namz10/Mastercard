@@ -5,20 +5,30 @@ export function PageHeader({
   census,
   caption,
   actions,
+  secondaryActions,
+  strip,
 }: {
   title: string;
   census?: ReactNode;
   caption?: string;
   actions?: ReactNode;
+  secondaryActions?: ReactNode;
+  strip?: ReactNode;
 }) {
   return (
-    <header className="h-12 shrink-0 flex items-center justify-between gap-4 mb-4 pb-3 border-b border-border">
-      <div className="flex items-baseline gap-4 min-w-0">
-        <h1 className="font-serif text-2xl font-medium text-ink shrink-0">{title}</h1>
-        {census}
-        {caption ? <p className="text-[13px] text-ink-faint truncate hidden lg:block">{caption}</p> : null}
+    <header className="shrink-0 mb-2">
+      <div className="h-12 flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="font-sans text-[22px] font-semibold text-ink shrink-0 tracking-tight">{title}</h1>
+          {census}
+          {caption ? <p className="text-[12px] text-ink-faint truncate hidden xl:block max-w-[36ch]">{caption}</p> : null}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {secondaryActions}
+          {actions}
+        </div>
       </div>
-      {actions ? <div className="flex items-center gap-2 shrink-0">{actions}</div> : null}
+      {strip ? <div className="mt-1 mb-1">{strip}</div> : null}
     </header>
   );
 }

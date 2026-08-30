@@ -8,7 +8,7 @@ export function useRecordedPacks() {
   const loadScore = useCallback(async () => {
     const score = await api.get<ScoreResponse>("/demo/recorded/score");
     setDefendScore(score, score.model_run_id);
-    setSourceChip("frozen", COPY.chip.frozen);
+    setSourceChip("recorded", COPY.defend.frozen);
     return score;
   }, []);
 

@@ -18,6 +18,7 @@ export default defineConfig({
             if (req.url?.includes("/stream")) {
               proxyRes.headers["cache-control"] = "no-cache";
               proxyRes.headers["content-type"] = "text/event-stream";
+              proxyRes.headers["x-accel-buffering"] = "no";
             }
           });
         },

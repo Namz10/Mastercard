@@ -70,6 +70,19 @@ export async function postSse(
       }
     }
   }
+  if (buffer.trim()) {
+    const line = buffer.trim();
+    if (line.startsWith("data:")) {
+      const json = line.slice(5).trim();
+      if (json) {
+        try {
+          onEvent(JSON.parse(json) as SseEvent);
+        } catch {
+          /* ignore malformed */
+        }
+      }
+    }
+  }
 }
 
 export const api = {

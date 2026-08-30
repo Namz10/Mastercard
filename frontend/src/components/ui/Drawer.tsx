@@ -41,7 +41,7 @@ export function Drawer({
         aria-hidden={!open}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-mono text-sm font-medium">{title}</h2>
+          <h2 className="font-sans text-[14px] font-medium text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="text-ink-faint hover:text-ink text-sm">
             Close
           </button>

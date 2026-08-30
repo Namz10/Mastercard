@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { FitResponse, LoopMResponse, ScoreResponse } from "@/lib/api-types";
+import type { FitResponse, LoopMResponse, ScoreMetrics, ScoreResponse } from "@/lib/api-types";
 import { missFamilyToTechnique, worstApFamily } from "@/lib/format";
 import {
   setDefendScore,
@@ -12,10 +12,31 @@ import {
 import { COPY } from "@/lib/copy";
 import { useRecordedPacks } from "@/hooks/useRecordedPacks";
 
+function readTprValues(tprAtFpr: ScoreMetrics["tpr_at_fpr"]): number[] {
+  if (!tprAtFpr) return [];
+  return Object.values(tprAtFpr).map((entry) => {
+    if (typeof entry === "number") return entry;
+    if (entry && typeof entry === "object" && "tpr" in entry) return (entry as { tpr: number }).tpr;
+    return 0;
+  });
+}
+
+/** Photography-day and other legacy packs show ~8–10% FPR or a flat curve — not booth champion. */
+export function scoreLooksBroken(metrics: ScoreMetrics): boolean {
+  if (metrics.genuine_fp > 0.01) return true;
+  const recalls = readTprValues(metrics.tpr_at_fpr);
+  if (recalls.length >= 2 && Math.max(...recalls) - Math.min(...recalls) < 0.001) return true;
+  if (metrics.recall_at_op >= 0.995 && metrics.genuine_fp > 0.005) return true;
+  return false;
+}
+
 export function useDefend() {
   const session = useSessionSnapshot();
   const { loadScore, loadLoop } = useRecordedPacks();
   const booted = useRef(false);
+  const scoreLoadInflight = useRef(false);
+  const [retrainError, setRetrainError] = useState<string | null>(null);
+  const [retrainLive, setRetrainLive] = useState(false);
 
   const score = useMutation({
     mutationFn: async () => {
@@ -27,6 +48,7 @@ export function useDefend() {
     },
     onSuccess: (data) => {
       setDefendScore(data, data.model_run_id);
+      setSourceChip("live");
     },
   });
 
@@ -34,7 +56,7 @@ export function useDefend() {
     mutationFn: async () => {
       const runId = session.generate.runId;
       const current = session.defend.score;
-      if (!runId || !current) throw new Error("no score");
+      if (!runId || !current) throw new Error("no generate run");
       const missFamily = worstApFamily(current.metrics.ap_by_family);
       return api.post<LoopMResponse>("/defend/loop-m", {
         run_id: runId,
@@ -63,47 +85,77 @@ export function useDefend() {
         missFamilyToTechnique(data.miss_family),
         data as unknown as Record<string, unknown>,
       );
+      setRetrainLive(true);
+      setRetrainError(null);
     },
   });
+
+  const loadFrozenOrLive = async (preferLive: boolean) => {
+    if (scoreLoadInflight.current) return;
+    scoreLoadInflight.current = true;
+    try {
+      if (preferLive && session.generate.runId) {
+        try {
+          await score.mutateAsync();
+          return;
+        } catch {
+          /* fall through to frozen champion pack */
+        }
+      }
+      try {
+        await loadScore();
+      } catch {
+        if (!session.defend.score) setSourceChip("recorded", COPY.defend.frozen);
+      }
+    } finally {
+      scoreLoadInflight.current = false;
+    }
+  };
 
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
-    if (session.defend.score) return;
-    void (async () => {
-      try {
-        await loadScore();
-      } catch {
-        if (session.generate.runId) {
-          try {
-            await score.mutateAsync();
-          } catch {
-            setSourceChip("frozen", COPY.defend.frozen);
-          }
-        }
-      }
-    })();
-    // boot once
+    const existing = session.defend.score;
+    if (existing && !scoreLooksBroken(existing.metrics)) return;
+    void loadFrozenOrLive(Boolean(session.generate.runId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const prevRunId = useRef(session.generate.runId);
+  useEffect(() => {
+    const runId = session.generate.runId;
+    if (runId === prevRunId.current) return;
+    prevRunId.current = runId;
+    if (!runId) return;
+    void loadFrozenOrLive(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.generate.runId]);
+
+  useEffect(() => {
+    const existing = session.defend.score;
+    if (!existing || !scoreLooksBroken(existing.metrics)) return;
+    void loadFrozenOrLive(Boolean(session.generate.runId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.defend.score]);
+
+  const canRetrain = Boolean(session.generate.runId && session.defend.score);
+
   const overlayRetrain = async () => {
+    if (!canRetrain) return;
+    setRetrainError(null);
     try {
       await retrain.mutateAsync();
     } catch {
-      const loop = await loadLoop();
-      const family = typeof loop.miss_family === "string" ? loop.miss_family : "app_fraud";
-      if (session.defend.score) {
-        setRetrainResult(
-          session.defend.score,
-          session.defend.modelRunId ?? session.defend.score.model_run_id,
-          missFamilyToTechnique(family),
-          loop,
-        );
+      setRetrainLive(false);
+      setRetrainError(COPY.defend.retrainFail);
+      setSourceChip("frozen", COPY.defend.retrainFail);
+      try {
+        await loadLoop();
+      } catch {
+        /* recorded overlay optional */
       }
-      setSourceChip("frozen", COPY.defend.updated);
     }
   };
 
-  return { session, score, retrain, overlayRetrain, loadScore };
+  return { session, score, retrain, overlayRetrain, loadScore, retrainError, retrainLive, canRetrain };
 }

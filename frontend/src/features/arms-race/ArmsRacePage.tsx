@@ -1,3 +1,4 @@
+/** Quarantined GFF 2026 — off nav. Proof-only lab. Do not restore to chrome. */
 import { useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";

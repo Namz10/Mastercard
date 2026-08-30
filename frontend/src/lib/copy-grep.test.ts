@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const FORBIDDEN =
   /HITL|Loop M|inner_val|Scout|Curator|Seed Atlas|Researching|Coming soon|Planned|Decisioning|Arms Race|Simulation Console|AI-powered/;
+const VISUAL = /rounded-2xl|#2563EB|#6366F1/;
 
 function walk(dir: string, acc: string[] = []): string[] {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -37,6 +38,9 @@ describe("forbidden glass copy", () => {
         if (FORBIDDEN.test(s) && !s.includes("identify-hitl") && !s.includes("/identify/hitl") && !s.includes("loop-m") && !s.includes("loopm")) {
           leaks.push(`${file}: ${s}`);
         }
+      }
+      if (VISUAL.test(text) && !file.includes("/arms-race/") && !file.includes("/simulation/") && !file.includes("Copilot")) {
+        leaks.push(`${file}: visual token`);
       }
     }
     expect(leaks).toEqual([]);

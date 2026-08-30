@@ -18,9 +18,31 @@ export function formatInr(value: number | null | undefined): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+export function formatIstClock(d = new Date()): string {
+  return d.toLocaleTimeString("en-GB", {
+    hour12: false,
+    timeZone: "Asia/Kolkata",
+    fractionalSecondDigits: 3,
+  });
+}
+
+/** `captured 30 Aug, 22:32 IST` */
+export function formatCapturedIst(d = new Date()): string {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  return `captured ${parts.day} ${parts.month}, ${parts.hour}:${parts.minute} IST`;
+}
+
 export const FAMILY_LABEL: Record<string, string> = {
   normal: "quiet",
-  mule: "mule",
+  mule: "mule layering",
   identity_burst: "identity burst",
   ato: "ATO",
   app_fraud: "APP scam",
@@ -35,8 +57,21 @@ export const FAMILY_TO_TECHNIQUE: Record<string, string> = {
   invoice_fraud: "T24",
 };
 
+export const TECHNIQUE_TO_FAMILY: Record<string, string> = Object.fromEntries(
+  Object.entries(FAMILY_TO_TECHNIQUE).map(([family, id]) => [id, family]),
+);
+
 export function missFamilyToTechnique(family: string): string {
   return FAMILY_TO_TECHNIQUE[family] ?? "T13";
+}
+
+export function familyFromTechnique(techniqueId: string): string | null {
+  const n = parseInt(techniqueId.replace(/^T/i, ""), 10);
+  if (Number.isNaN(n)) return TECHNIQUE_TO_FAMILY[techniqueId] ?? null;
+  if (n <= 7) return "mule";
+  if (n <= 12) return n === 9 || n === 12 ? "ato" : "identity_burst";
+  if (n <= 19) return "app_fraud";
+  return "invoice_fraud";
 }
 
 export function worstApFamily(apByFamily: Record<string, { ap: number } | number> | undefined): string {

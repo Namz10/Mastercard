@@ -10,6 +10,28 @@ from packages.catalog.status import transition_atlas_status
 from packages.osint.vector_store import DEDUP_THRESHOLD, nearest_catalog_row, register_catalog_embedding
 
 
+def proposal_dedupe_key(spec: dict[str, Any]) -> tuple[str, str, str]:
+    """Stable identity for HITL rows — technique, normalized name, rail."""
+    return (
+        str(spec.get("technique_id") or "").strip().upper(),
+        str(spec.get("name") or "").strip().lower(),
+        str(spec.get("rail") or "").strip().lower(),
+    )
+
+
+def dedupe_atlas_rows(rows: list[AtlasRow]) -> list[AtlasRow]:
+    """Keep the first row per proposal identity (caller should pass newest-first)."""
+    seen: set[tuple[str, str, str]] = set()
+    out: list[AtlasRow] = []
+    for row in rows:
+        key = proposal_dedupe_key(row.spec or {})
+        if not key[0] or key in seen:
+            continue
+        seen.add(key)
+        out.append(row)
+    return out
+
+
 def merge_proposed_spec(
     db: Session,
     spec_dict: dict[str, Any],
@@ -72,12 +94,18 @@ def find_merge_target(
     db: Session,
     spec: dict[str, Any],
 ) -> AtlasRow | None:
-    """Exact vector_id / name+rail+technique, then pgvector cosine ≥ 0.92."""
+    """Exact vector_id / dedupe key / name+rail+technique, then pgvector cosine ≥ 0.92."""
     vector_id = spec.get("vector_id")
     if vector_id:
         row = db.query(AtlasRow).filter(AtlasRow.vector_id == vector_id).one_or_none()
         if row:
             return row
+
+    key = proposal_dedupe_key(spec)
+    if key[0]:
+        for row in db.query(AtlasRow).filter(AtlasRow.technique_id == key[0]).all():
+            if proposal_dedupe_key(row.spec or {}) == key:
+                return row
 
     name = str(spec.get("name") or "")
     rail = str(spec.get("rail") or "")

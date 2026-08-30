@@ -4,7 +4,7 @@ import { COPY } from "@/lib/copy";
 import { phaseStatus } from "@/lib/session-store";
 
 const PHASES = [
-  { id: "identify" as const, to: "/", label: COPY.nav.identify },
+  { id: "identify" as const, to: "/identify", label: COPY.nav.identify },
   { id: "generate" as const, to: "/generate", label: COPY.nav.generate },
   { id: "defend" as const, to: "/defend", label: COPY.nav.defend },
 ];
@@ -16,25 +16,38 @@ const STATUS_DOT: Record<string, string> = {
   done: "bg-sage-600",
 };
 
+const REASON: Record<string, string> = {
+  identify: "",
+  generate: "Add at least one attack to the catalog, or continue on catalog seed.",
+  defend: "Defend after fidelity is known (pass or fail).",
+};
+
 export function PhaseStepper() {
   const location = useLocation();
 
   return (
-    <div className="h-9 shrink-0 border-b border-border bg-surface flex items-center px-6 gap-1 text-[13px]">
+    <div className="h-10 shrink-0 glass-sheet rounded-sheet flex items-center px-3 gap-1 text-[13px]">
       {PHASES.map((phase, i) => {
         const status = phaseStatus(phase.id);
-        const active = location.pathname === phase.to || (phase.to === "/" && location.pathname === "/");
+        const active = location.pathname === phase.to;
+        const blocked = status === "idle" && phase.id !== "identify";
         return (
           <div key={phase.id} className="flex items-center gap-1">
-            {i > 0 ? <span className="text-ink-faint px-1">→</span> : null}
+            {i > 0 ? <span className="text-ink-faint px-1.5 opacity-40">→</span> : null}
             <NavLink
               to={phase.to}
+              title={blocked ? REASON[phase.id] : undefined}
               className={clsx(
-                "inline-flex items-center gap-1.5 px-2 py-1 rounded-sm transition-colors duration-100",
-                active ? "text-ink font-medium" : "text-ink-muted hover:text-ink",
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors duration-100",
+                active
+                  ? "bg-accent text-accent-fg font-medium shadow-sm"
+                  : "text-ink-muted hover:text-ink hover:bg-accent-muted",
               )}
             >
-              <span className={clsx("w-1.5 h-1.5 rounded-full", STATUS_DOT[status])} aria-hidden />
+              <span
+                className={clsx("w-1.5 h-1.5 rounded-full", active ? "bg-accent-fg" : STATUS_DOT[status])}
+                aria-hidden
+              />
               {phase.label}
             </NavLink>
           </div>

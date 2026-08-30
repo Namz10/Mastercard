@@ -4,6 +4,10 @@ from apps.api.env import load_project_env
 
 load_project_env()
 
+from apps.api.logging_config import configure_logging
+
+configure_logging()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

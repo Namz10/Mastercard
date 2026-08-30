@@ -218,6 +218,7 @@ Entering Defend **does not wait** on `training.status === completed`. A judge on
 | Add to catalog | one click | Approve API; session.approved++; Continue banner |
 | Dismiss / Mark unsafe | — | Human labels; unsafe tooltip: not safe to simulate |
 | Continue to Generate | ≥1 approved else seed offer | `/generate` |
+| Proposed list empty | after approve / dedup | Show **In catalog** cards from DB (`identify-*` rows, `status=open`) — demo context only; no second Approve |
 
 Log auto-follow until scroll-up >40px; pill “↓ Live · n new”.
 
@@ -504,6 +505,7 @@ export const COPY = {
 | Retrain (Loop M) fail | FROZEN | loop_m_result.json; banner “Could not retrain. Showing locked holdout overlay.” |
 | Postgres/API down | — | Hard error “Service unavailable. Retry.”; `GET /health` |
 | SSE drop | DEGRADED slate banner | “Discovery interrupted. Use a recorded pack (⌘K).” |
+| Proposed attacks empty after approve | — | **Demo fallback:** `GET /identify/hitl` also returns prior **open** rows whose `vector_id` starts with `identify-` (discovered attacks approved in earlier runs). Glass label **In catalog**; read-only — not re-approvable. `count` stays pending-only; full list in `items` with `disposition: review \| in_catalog`. |
 
 Recorded Identify must not complete in <12s wall clock unless Skip.
 
@@ -577,7 +579,7 @@ Do not start page chrome until tokens match DESIGN.md.
 
 1. **Tokens + copy.ts + Shell geometry** (full bleed, stepper, chip, no Copilot). Gate: grep forbidden copy = 0.
 2. **Session store** + clear-on-generate. Gate: unit tests.
-3. **Identify** landscape + SSE + cards + Continue. Gate: airplane 90s Identify still.
+3. **Identify** landscape + SSE + cards + Continue. **Demo:** `GET /identify/hitl` appends prior `identify-*` approvals as `in_catalog` (read-only) so REVIEW does not feel empty after Add. Gate: airplane 90s Identify still.
 4. **Generate** demo scale + eligible strip + Continue.
 5. **Defend** metrics-first (frozen pack or auto-score paints the curve) + second series on retrain + highlight query. Gate: 90s path never clicks Train.
 6. **⌘K + recorded packs + Skip.** Proof surfaces (full population, Fit hyperparams, HITL dump) behind palette / secondary — not chrome.
@@ -594,6 +596,7 @@ Operator intent (top of this file) is the lock. This section is the implementer 
 | Beat | On glass | Scoring axis |
 |---|---|---|
 | Identify | REST landscape T01–T24 + Discover (SSE log, OSINT sources) + Add to catalog | Diversity + feasibility |
+| Identify (demo) | If pending queue empty after approve: **In catalog** cards from DB (`identify-*`, `status=open`) — read-only context, not re-approvable | Feasibility / analyst review without empty panel |
 | Generate | Demo-scale ledger + fidelity chip | Fidelity (India UPI sim) |
 | Defend | **Metrics already populated** — recall @ genuine FPR, Pareto/curve, miss cell | Detection |
 | Loop closer | Retrain from missed fraud **or** a one-line “defense updated” overlay if the frozen pack is faster; then highlight Txx on Identify | Novelty |
@@ -646,7 +649,7 @@ Operator intent and the 90s beat sheet above **do not change**. This section is 
 | SCANNING log | Auto-follow until scroll-up >40px; pill `↓ Live · n new`; drawer-open = detach. **Add/Approve does not steal focus** and does not re-attach. |
 | First log ≤800ms | A **row object** (`COLLECT started`), not a spinner. Reduced-motion: still appears by 800ms, no fade. Recorded **wall clock** stays 12–18s even when motion is instant. |
 | Verb chips | Identify `COLLECT EXTRACT RANK GROUND PROPOSE REPLAY`. Generate `COMMIT INJECT FIDELITY`. Defend `FIT SCORE APPLY RETRAIN`. |
-| REVIEW | Evidence → one disposition (Add / Dismiss / Mark unsafe). Continue copy if `approved = 0`: catalog-seed offer. |
+| REVIEW | Evidence → one disposition (Add / Dismiss / Mark unsafe). Continue copy if `approved = 0`: catalog-seed offer. **Demo fallback:** prior `identify-*` approvals render as **In catalog** (sage badge, no buttons); `count` = pending only. |
 | Drawer | 400px, Esc, focus trap, return focus, z-50. Raw JSON collapsed. OP drawer = protocol words. |
 | Seed | 48px object, copy-on-click, 120ms sage flash. |
 | Eligible strip | Family names, not `vector_id`. |

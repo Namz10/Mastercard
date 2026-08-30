@@ -1,3 +1,4 @@
+/** Quarantined GFF 2026 — off nav. Proof-only lab. Do not restore to chrome. */
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import clsx from "clsx";
