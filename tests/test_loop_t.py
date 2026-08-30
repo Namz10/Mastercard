@@ -64,7 +64,7 @@ def test_loop_m_comparison_n_pos(pop_loop_m: dict, tmp_path: Path):
         "loop-m-p5",
         "app_fraud",
         train_seed=42,
-        gtest_seed=43,
+        gtest_seed=48,
         family_chosen_from_slice="gdev44",
         runs_dir=runs,
         models_dir=models,

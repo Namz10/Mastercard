@@ -1,0 +1,12 @@
+{
+  "stage1_model_run_id": "make-scale-fullmix",
+  "stage2_model_run_id": "make-scale-fullmix-stage2",
+  "optuna_skipped_small_n": false,
+  "binary_ap_delta": -0.000464723544913892,
+  "genuine_fp_delta": 0.09336337849486018,
+  "ap_by_family_delta": {},
+  "noise_chase_flags": [
+    "max_depth_at_5"
+  ],
+  "verdict": "stage2_fp_worse"
+}

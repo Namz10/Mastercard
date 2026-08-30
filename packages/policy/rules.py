@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import yaml
 
 from packages.catalog.features import normalize_feature_names
@@ -245,6 +246,72 @@ def predicate_holds(pred: Predicate, row: dict[str, Any]) -> bool:
         return _compare(row[pred.field], pred.op, pred.value)
     except (TypeError, ValueError):
         return False
+
+
+def _vectorized_coerce(series: pd.Series, expected: Any) -> pd.Series:
+    """Column-wise mirror of ``_coerce`` for vectorized predicate evaluation."""
+    if isinstance(expected, bool):
+        if pd.api.types.is_string_dtype(series) or series.dtype == object:
+            stripped = series.astype(str).str.strip().str.lower()
+            return stripped.isin({"1", "true", "yes"})
+        return series.astype(bool)
+    if isinstance(expected, int) and not isinstance(expected, bool):
+        return pd.to_numeric(series, errors="coerce")
+    if isinstance(expected, float):
+        return pd.to_numeric(series, errors="coerce")
+    return series
+
+
+def _vectorized_compare(left: pd.Series, op: str, expected: Any, valid: pd.Series) -> pd.Series:
+    """Column-wise mirror of ``_compare``; missing/invalid cells stay False."""
+    result = pd.Series(False, index=left.index)
+    if op == "==":
+        cmp = left == expected
+    elif op == "!=":
+        cmp = left != expected
+    elif op == ">=":
+        cmp = left >= expected
+    elif op == "<=":
+        cmp = left <= expected
+    elif op == ">":
+        cmp = left > expected
+    elif op == "<":
+        cmp = left < expected
+    else:
+        return result
+    return cmp.fillna(False) & valid
+
+
+def _vectorized_predicate_holds(df: pd.DataFrame, pred: Predicate) -> pd.Series:
+    """Vectorized ``predicate_holds`` — missing field or None → False."""
+    if pred.field not in df.columns:
+        return pd.Series(False, index=df.index)
+    col = df[pred.field]
+    valid = col.notna()
+    if not bool(valid.any()):
+        return pd.Series(False, index=df.index)
+    try:
+        left = _vectorized_coerce(col, pred.value)
+        return _vectorized_compare(left, pred.op, pred.value, valid)
+    except (TypeError, ValueError):
+        return pd.Series(False, index=df.index)
+
+
+def vectorized_rule_bits(df: pd.DataFrame, rules: list[Rule] | None = None) -> pd.DataFrame:
+    """Return ``rule__<id>`` 0/1 columns for live rules (same semantics as ``evaluate_rules``)."""
+    loaded = rules if rules is not None else load_v0_rules()
+    live = [r for r in loaded if r.status == "live"]
+    out: dict[str, pd.Series] = {}
+    for rule in live:
+        col = f"rule__{rule.id}"
+        if not rule.predicates:
+            out[col] = pd.Series(0, index=df.index, dtype=int)
+            continue
+        fired = _vectorized_predicate_holds(df, rule.predicates[0])
+        for pred in rule.predicates[1:]:
+            fired = fired & _vectorized_predicate_holds(df, pred)
+        out[col] = fired.astype(int)
+    return pd.DataFrame(out, index=df.index)
 
 
 def rule_fires(rule: Rule, row: dict[str, Any]) -> bool:

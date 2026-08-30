@@ -1,7 +1,8 @@
-.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow defend-fit defend-gtest defend-gdev defend-loop-m defend-remediate defend-validate
+.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow defend-fit defend-gtest defend-gdev defend-loop-m defend-remediate defend-validate stage4-saml-d
 
 PYTHONPATH ?= $(CURDIR)
 export PYTHONPATH
+export PYTHONUNBUFFERED ?= 1
 
 ifneq (,$(wildcard $(CURDIR)/.venv/Scripts/python.exe))
 PY := $(CURDIR)/.venv/Scripts/python.exe
@@ -55,16 +56,32 @@ generate-scale:
 	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='make-scale-fullmix', n_customers=2400, n_merchants=120, sim_days=90, world_seed=42, pin=True, runs_dir=Path('data/runs')); db.close(); assert r['event_count']>50000, r['event_count']; assert 'simulatable_signals' not in r; assert r['fidelity']['pass'] is True, r['fidelity']; print('scale OK', r['event_count'], r['parquet_path'], r['fidelity']['pass'])"
 
 defend-fit:
-	$(PY) -c "from packages.eval.fit import fit_champion; r=fit_champion('make-scale-fullmix', world_seed=42); print('fit OK', r['run_id'], r['metrics']['recipe_hash'])"
+	PYTHONUNBUFFERED=1 $(PY) -c "from packages.eval.fit import fit_champion; r=fit_champion('make-scale-fullmix', world_seed=42); print('fit OK', r['run_id'], r['metrics']['recipe_hash'])"
 
 defend-gtest:
-	$(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gtest', world_seed=43, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gtest', model_run_id='make-scale-fullmix', all_rows=True); print('gtest OK', s['run_id'], s['metrics']['ap_by_family'])"
+	PYTHONUNBUFFERED=1 $(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gtest', world_seed=43, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gtest', model_run_id='make-scale-fullmix', all_rows=True); print('gtest OK', s['run_id'], s.get('model_freeze_id'), s['metrics'].get('binary_ap'), s['metrics']['ap_by_family'])"
 
 defend-gdev:
-	$(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gdev', world_seed=44, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gdev', model_run_id='make-scale-fullmix', all_rows=True); print('gdev OK', s['run_id'], s['metrics']['ap_by_family'])"
+	PYTHONUNBUFFERED=1 $(PY) -c "import json; from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; from packages.eval.fit import score_run; init_db(); seed_catalog(reset=True); db=SessionLocal(); sidecar = json.loads(Path('data/runs/make-scale-fullmix/sidecar.json').read_text()) if Path('data/runs/make-scale-fullmix/sidecar.json').is_file() else {}; nc = sidecar.get('n_customers', 2400); nm = sidecar.get('n_merchants', 120); sd = sidecar.get('sim_days', 90); r=run_population(db, run_id='make-gdev', world_seed=44, n_customers=nc, n_merchants=nm, sim_days=sd, pin=True, runs_dir=Path('data/runs')); db.close(); s=score_run('make-gdev', model_run_id='make-scale-fullmix', all_rows=True); print('gdev OK', s['run_id'], s['metrics']['ap_by_family'])"
 
 defend-loop-m:
-	@echo "Loop M requires POST /defend/loop-m with body: {\"miss_family\": \"<family>\", \"family_chosen_from_slice\": \"gdev44\"}"
+	@echo "Loop M requires POST /defend/loop-m with body:"
+	@echo '{"run_id":"v1-train-46","miss_family":"<family>","gtest_seed":48,"family_chosen_from_slice":"gdev44","n_customers":2400,"n_merchants":120,"sim_days":90,"pin":true}'
+
+generate-v1-train-46:
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='v1-train-46', n_customers=2400, n_merchants=120, sim_days=90, world_seed=46, pin=True, runs_dir=Path('data/runs')); db.close(); print('v1 train 46 OK', r['event_count'])"
+
+generate-v1-gdev-47:
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='v1-gdev-47', n_customers=2400, n_merchants=120, sim_days=90, world_seed=47, pin=True, runs_dir=Path('data/runs')); db.close(); print('v1 gdev 47 OK', r['event_count'])"
+
+generate-v1-gtest-48:
+	$(PY) -c "from pathlib import Path; from apps.api.env import load_project_env; load_project_env(); from apps.api.db import SessionLocal, init_db; from apps.api.seed import seed_catalog; from packages.sim.runner import run_population; init_db(); seed_catalog(reset=True); db=SessionLocal(); r=run_population(db, run_id='v1-gtest-48', n_customers=2400, n_merchants=120, sim_days=90, world_seed=48, pin=True, runs_dir=Path('data/runs')); db.close(); print('v1 gtest 48 OK', r['event_count'])"
+
+generate-v1-gtest-49:
+	$(PY) -c "from pathlib import Path; from packages.sim.runner import run_population; r=run_population(None, run_id='v1-gtest-49', n_customers=2400, n_merchants=120, sim_days=90, world_seed=49, pin=True, runs_dir=Path('data/runs')); print('v1 gtest 49 OK', r['event_count'])"
+
+stage4-saml-d:
+	OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONUNBUFFERED=1 nice -n 15 $(PY) -c "from packages.eval.saml_d import score_saml_d, write_stage4_artifacts; b=score_saml_d(); p=write_stage4_artifacts(b); print(b.get('status'), p, b.get('tpr_at_fpr'))"
 
 defend-remediate:
 	@echo "Phase 8 Loop T remediation cycle requires a configured LLM provider (AEGIS_LLM_*) and G-dev + train runs."

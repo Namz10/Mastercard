@@ -16,7 +16,7 @@ from packages.sim.runner import run_population
 def test_defend_fit_and_score_http(postgres_required, tmp_path):
     init_db()
     seed_catalog(reset=True)
-    run_id = "defend-cd-http"
+    run_id = "defend-cd-http-test"
     run_population(
         None,
         run_id=run_id,
@@ -67,7 +67,7 @@ def test_defend_fit_and_score_http(postgres_required, tmp_path):
                 "run_id": run_id,
                 "miss_family": "app_fraud",
                 "train_seed": 42,
-                "gtest_seed": 43,
+                "gtest_seed": 48,
             },
         )
         assert loop.status_code == 200, loop.text

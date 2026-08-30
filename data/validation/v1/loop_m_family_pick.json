@@ -1,0 +1,27 @@
+{
+  "family_chosen_from_slice": "gdev44",
+  "target_family": "identity_burst",
+  "gdev_ap_by_family": {
+    "app_fraud": 0.9818812539315177,
+    "ato": 0.5354062526287141,
+    "identity_burst": 0.3193265079746359,
+    "invoice_fraud": 0.999866544073162,
+    "mule": 0.9933898689775511
+  },
+  "n_pos": {
+    "app_fraud": 1582,
+    "ato": 398,
+    "identity_burst": 1540,
+    "invoice_fraud": 764,
+    "mule": 3187,
+    "normal": 390431
+  },
+  "pick_reason": "lowest gdev AP among families with n_pos>=30",
+  "chosen_at_stage": 1,
+  "gdev_run_id": "v1-gdev-47",
+  "train_run_id": "v1-train-46",
+  "gdev_ap": 0.3193265079746359,
+  "gdev_n_pos": 1540,
+  "stage1_model_freeze_id": "74fbf71102a01c3a126847adb00f8fa1f3be757d465dcdf6db35ae5c4397cf45",
+  "picked_at": "2026-08-29 13:18:45 UTC"
+}

@@ -1,0 +1,50 @@
+{
+  "run_id": "v1-train-46",
+  "mode": "population",
+  "world_seed": 46,
+  "n_customers": 2400,
+  "n_merchants": 120,
+  "sim_days": 90,
+  "pin": true,
+  "vector_id": null,
+  "technique_id": null,
+  "injector_id": null,
+  "seasoning_clamped": true,
+  "seasoning_days_effective": 63,
+  "knobs_used": {
+    "graph_mule": {
+      "fan_in_1h": 18,
+      "fan_out_ttl_hours": 4.0,
+      "smurf_cap_ratio": 0.85,
+      "mule_account_age_days": 3
+    },
+    "identity_burst": {
+      "seasoning_days": 150,
+      "seasoning_txn_count": 45,
+      "liveness_score": 0.9,
+      "doc_consistency": 0.88,
+      "kyc_tier": "tier2"
+    },
+    "ato": {
+      "seasoning_days": 90,
+      "seasoning_txn_count": 20,
+      "liveness_score": 0.75,
+      "doc_consistency": 0.9,
+      "device_hash_shift": true,
+      "kyc_tier": "tier2"
+    },
+    "app_session": {
+      "call_active_flag": true,
+      "copy_paste_payee_flag": true,
+      "pause_ms": 1800,
+      "urgency_pressure": 0.85,
+      "new_payee": true
+    }
+  },
+  "mix": {
+    "n_app": 1578,
+    "n_funnel": 2798,
+    "ident_burst": 1529,
+    "ato_burst": 396
+  }
+}

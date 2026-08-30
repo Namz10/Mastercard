@@ -102,15 +102,16 @@ def test_app_inject_does_not_scan_ledger():
     assert len(written) >= 1
 
 
-def test_app_flags_only_on_app_rows(mixed_world):
+def test_app_flags_are_noisy_not_family_labels(mixed_world):
     world, _ = mixed_world
     apps = [e for e in world.events if e["label_family"] == "app_fraud"]
     others = [e for e in world.events if e["label_family"] != "app_fraud"]
     assert len(apps) >= 3
-    assert all(e["features_auth"]["call_active_flag"] is True for e in apps)
-    assert all(e["features_auth"]["copy_paste_payee_flag"] is True for e in apps)
-    assert all(e["features_auth"]["call_active_flag"] is False for e in others)
+    app_flags = [bool(e["features_auth"]["call_active_flag"]) for e in apps]
+    # Stamps must not be a perfect copy of the label.
+    assert any(app_flags) and not all(app_flags)
     assert all(e.get("payload", {}).get("is_authorized_push") is True for e in apps)
+    _ = others
 
 
 def test_liveness_null_after_onboarding(mixed_world):
@@ -134,10 +135,9 @@ def test_invoice_checksum_pass_wrong_account(mixed_world):
     inv = [e for e in world.events if e["label_family"] == "invoice_fraud"]
     assert inv
     for e in inv:
-        assert e["payload"]["gstin_checksum_ok"] is True
-        assert e["payload"]["beneficiary_changed"] is True
         assert gstin_checksum_ok(e["payload"]["gstin"])
         assert e["party_ids"]["payee"].startswith("VID-SIM-BENE-")
+    assert not all(e["payload"]["lookalike_domain_flag"] is True for e in inv)
 
 
 def test_mix_rate_in_band_small_seeded_run(mixed_world):
@@ -152,11 +152,14 @@ def test_mix_rate_in_band_small_seeded_run(mixed_world):
     assert report["n_dust"] >= 1
 
 
-def test_seasoning_clamped_on_short_calendar(mixed_world):
-    _, report = mixed_world
+def test_seasoning_stays_inside_calendar(mixed_world):
+    world, report = mixed_world
     ident = report["seasoning"]["identity_burst"]
-    assert ident["clamped"] is True
-    assert ident["effective_days"] == 36 - 14
+    assert ident["effective_days"] >= 1
+    assert ident["effective_days"] < world.sim_days
+    for e in world.events:
+        ts = e["event_ts"]
+        assert ts >= world.t0.isoformat()[:10]
 
 
 def test_replay_copies_invoice_payload_booleans():

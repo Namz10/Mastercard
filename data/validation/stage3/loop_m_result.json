@@ -1,0 +1,350 @@
+{
+  "run_id": "make-scale-fullmix",
+  "miss_family": "ato",
+  "catalog_solved": false,
+  "catalog_status": "open",
+  "train_seed": 42,
+  "gtest_seed": 43,
+  "extra_seed": 10049,
+  "n_extra": 106,
+  "extra_row_cap": 59139,
+  "extra_row_cap_frac": 0.15,
+  "ap_equal_eps": 0.05,
+  "genuine_fpr_eps": 0.02,
+  "comparison": {
+    "family": "ato",
+    "family_chosen_from_slice": "gdev44",
+    "ap_before": 0.4260021549548903,
+    "ap_after": 0.4867701090435605,
+    "ap_delta": 0.060767954088670195,
+    "ap_verdict": "improved",
+    "genuine_fp_before": 0.050124435054620976,
+    "genuine_fp_after": 0.06672685930014553,
+    "genuine_fp_ok": true,
+    "genuine_fp_note": "genuine FPR not worse beyond frozen epsilon",
+    "n_pos_before": {
+      "app_fraud": 1578,
+      "ato": 108,
+      "identity_burst": 108,
+      "invoice_fraud": 762,
+      "mule": 29,
+      "normal": 388382
+    },
+    "n_pos_after": {
+      "app_fraud": 1578,
+      "ato": 108,
+      "identity_burst": 108,
+      "invoice_fraud": 762,
+      "mule": 29,
+      "normal": 388382
+    }
+  },
+  "metrics": {
+    "pass": true,
+    "protocol": "g_test_new_seed",
+    "gtest_before": {
+      "pass": true,
+      "schema_version": "2",
+      "protocol": "g_test_full_population",
+      "n_eval": 390967,
+      "ap_by_family": {
+        "app_fraud": 1.0,
+        "ato": 0.4260021549548903,
+        "identity_burst": 0.48103874201203556,
+        "invoice_fraud": 0.9999999999999999,
+        "mule": 0.024723200985496456
+      },
+      "n_pos": {
+        "app_fraud": 1578,
+        "ato": 108,
+        "identity_burst": 108,
+        "invoice_fraud": 762,
+        "mule": 29,
+        "normal": 388382
+      },
+      "not_comparable": {
+        "app_fraud": false,
+        "ato": false,
+        "identity_burst": false,
+        "invoice_fraud": false,
+        "mule": true
+      },
+      "cost_sketch": {
+        "unit": "lab_not_india",
+        "miss_weight": 10.0,
+        "fp_notify_weight": 1.0,
+        "fp_hold_weight": 3.0,
+        "fp_decline_weight": 8.0,
+        "fn_rate": 0.005029013539651838,
+        "fp_action_hist": {
+          "allow": 18771,
+          "decline": 40,
+          "mule_credit_restrict": 749,
+          "step_up": 37
+        },
+        "expected_cost": 0.05110861879793077,
+        "notes": [
+          "cost_sketch_action_missing:notify",
+          "cost_sketch_action_missing:hold"
+        ]
+      },
+      "tpr_at_fpr": {
+        "0.001": {
+          "tpr": 0.9914893617021276,
+          "threshold": 0.4086898871157715,
+          "fpr_target": 0.001
+        },
+        "0.005": {
+          "tpr": 0.9918762088974855,
+          "threshold": 0.05505930238772461,
+          "fpr_target": 0.005
+        },
+        "0.01": {
+          "tpr": 0.9926499032882011,
+          "threshold": 0.017527369985957275,
+          "fpr_target": 0.01
+        }
+      },
+      "genuine_fp": 0.050124435054620976,
+      "f1_at_op": 0.2078047992243678,
+      "binary_ap": 0.9924731135559858,
+      "precision_at_op": 0.11601786278136136,
+      "recall_at_op": 0.9949709864603482,
+      "confusion_matrix": {
+        "tn": 368785,
+        "fp": 19597,
+        "fn": 13,
+        "tp": 2572
+      },
+      "app_ablation": {
+        "app_flags": [
+          "call_active_flag",
+          "copy_paste_payee_flag",
+          "pause_ms",
+          "urgency_pressure"
+        ],
+        "with_app_flags": {
+          "average_precision": 1.0
+        },
+        "without_app_flags": {
+          "average_precision": 1.0
+        },
+        "app_metric_died_without_synthetic_flags": false,
+        "note": "Synthetic session flags are not an SDK. Collapse without flags is documented, not hidden.",
+        "app_ablation_source": "champion_fit"
+      },
+      "authgate_ms": {
+        "p50_ms_per_row": 4.189606999716489,
+        "p99_ms_per_row": 5.201540851194289,
+        "n": 1000,
+        "batch_seconds_1k": 0.0072842260015022475,
+        "note": "Laptop in-process predict. Not a Mastercard issuer SLA."
+      },
+      "mule_entity_recall": 1.0,
+      "feature_columns": [
+        "rail",
+        "kyc_tier",
+        "account_age_days",
+        "payee_history_count",
+        "amount_vs_p30",
+        "fan_in_1h",
+        "fan_out_1h",
+        "fan_in_unique_payers_1h",
+        "is_new_payee",
+        "is_new_device",
+        "burst_velocity",
+        "call_active_flag",
+        "copy_paste_payee_flag",
+        "pause_ms",
+        "urgency_pressure",
+        "beneficiary_changed",
+        "gstin_checksum_ok",
+        "lookalike_domain_flag",
+        "rule__call-and-paste-new-payee",
+        "rule__new-payee-large-new-device",
+        "rule__mule-fan-in-burst",
+        "rule__smurf-under-cap",
+        "rule__rail-hop-burst",
+        "rule__seasoning-burst",
+        "rule__invoice-beneficiary-swap",
+        "rule__pause-paste-session",
+        "rule__calm-down-known-usual-device"
+      ],
+      "top_features": [
+        "rail",
+        "kyc_tier",
+        "account_age_days",
+        "payee_history_count",
+        "amount_vs_p30"
+      ],
+      "split": "g_test_full_population",
+      "inner_val_protocol": "last_20pct_train_calendar",
+      "recipe_hash": "19ec558dd466815531f4fb4390a858ff7a7ad32b46376ed50faeaab84c87b65e",
+      "model_freeze_id": "cc177e2643d122891da3fa0c6bfd4075f7b76e2bd5221784c8d4a377e204c074",
+      "op_threshold": 0.00011786163367200064,
+      "best_params": {
+        "max_depth": 3,
+        "max_iter": 80,
+        "learning_rate": 0.08,
+        "random_state": 42,
+        "early_stopping": false
+      },
+      "gtest_opened_at": "2026-08-29T10:44:37.789502+00:00",
+      "pass_reasons": []
+    },
+    "gtest_after": {
+      "pass": true,
+      "schema_version": "2",
+      "protocol": "g_test_full_population",
+      "n_eval": 390967,
+      "ap_by_family": {
+        "app_fraud": 1.0,
+        "ato": 0.4867701090435605,
+        "identity_burst": 0.39162722212567935,
+        "invoice_fraud": 1.0,
+        "mule": 0.02153837404114479
+      },
+      "n_pos": {
+        "app_fraud": 1578,
+        "ato": 108,
+        "identity_burst": 108,
+        "invoice_fraud": 762,
+        "mule": 29,
+        "normal": 388382
+      },
+      "not_comparable": {
+        "app_fraud": false,
+        "ato": false,
+        "identity_burst": false,
+        "invoice_fraud": false,
+        "mule": true
+      },
+      "cost_sketch": {
+        "unit": "lab_not_india",
+        "miss_weight": 10.0,
+        "fp_notify_weight": 1.0,
+        "fp_hold_weight": 3.0,
+        "fp_decline_weight": 8.0,
+        "fn_rate": 0.00038684719535783365,
+        "fp_action_hist": {
+          "allow": 24467,
+          "decline": 42,
+          "mule_credit_restrict": 1530,
+          "step_up": 49
+        },
+        "expected_cost": 0.004727879525061352,
+        "notes": [
+          "cost_sketch_action_missing:notify",
+          "cost_sketch_action_missing:hold"
+        ]
+      },
+      "tpr_at_fpr": {
+        "0.001": {
+          "tpr": 0.9914893617021276,
+          "threshold": 0.471327360867705,
+          "fpr_target": 0.001
+        },
+        "0.005": {
+          "tpr": 0.9922630560928434,
+          "threshold": 0.07308948969110995,
+          "fpr_target": 0.005
+        },
+        "0.01": {
+          "tpr": 0.9926499032882011,
+          "threshold": 0.0162143115899539,
+          "fpr_target": 0.01
+        }
+      },
+      "genuine_fp": 0.06672685930014553,
+      "f1_at_op": 0.16533896407204787,
+      "binary_ap": 0.9925795888652567,
+      "precision_at_op": 0.09012276785714286,
+      "recall_at_op": 0.9996131528046421,
+      "confusion_matrix": {
+        "tn": 362294,
+        "fp": 26088,
+        "fn": 1,
+        "tp": 2584
+      },
+      "app_ablation": {
+        "app_flags": [
+          "call_active_flag",
+          "copy_paste_payee_flag",
+          "pause_ms",
+          "urgency_pressure"
+        ],
+        "with_app_flags": {
+          "average_precision": 1.0
+        },
+        "without_app_flags": {
+          "average_precision": 1.0
+        },
+        "app_metric_died_without_synthetic_flags": false,
+        "note": "Synthetic session flags are not an SDK. Collapse without flags is documented, not hidden.",
+        "app_ablation_source": "champion_fit"
+      },
+      "authgate_ms": {
+        "p50_ms_per_row": 4.2420870004207245,
+        "p99_ms_per_row": 5.520782619878445,
+        "n": 1000,
+        "batch_seconds_1k": 0.009026472000186914,
+        "note": "Laptop in-process predict. Not a Mastercard issuer SLA."
+      },
+      "mule_entity_recall": 1.0,
+      "feature_columns": [
+        "rail",
+        "kyc_tier",
+        "account_age_days",
+        "payee_history_count",
+        "amount_vs_p30",
+        "fan_in_1h",
+        "fan_out_1h",
+        "fan_in_unique_payers_1h",
+        "is_new_payee",
+        "is_new_device",
+        "burst_velocity",
+        "call_active_flag",
+        "copy_paste_payee_flag",
+        "pause_ms",
+        "urgency_pressure",
+        "beneficiary_changed",
+        "gstin_checksum_ok",
+        "lookalike_domain_flag",
+        "rule__call-and-paste-new-payee",
+        "rule__new-payee-large-new-device",
+        "rule__mule-fan-in-burst",
+        "rule__smurf-under-cap",
+        "rule__rail-hop-burst",
+        "rule__seasoning-burst",
+        "rule__invoice-beneficiary-swap",
+        "rule__pause-paste-session",
+        "rule__calm-down-known-usual-device"
+      ],
+      "top_features": [
+        "call_active_flag",
+        "fan_out_1h",
+        "fan_in_unique_payers_1h",
+        "payee_history_count",
+        "rule__calm-down-known-usual-device"
+      ],
+      "split": "g_test_full_population",
+      "inner_val_protocol": "last_20pct_train_calendar",
+      "recipe_hash": "19ec558dd466815531f4fb4390a858ff7a7ad32b46376ed50faeaab84c87b65e",
+      "model_freeze_id": "2ad26a64146cd2482a15a7a1188c6b802c3f0476b4581b1af66f48093e8e7812",
+      "op_threshold": 3.639096433982747e-05,
+      "best_params": {
+        "max_depth": 3,
+        "max_iter": 80,
+        "learning_rate": 0.08,
+        "random_state": 42,
+        "early_stopping": false
+      },
+      "gtest_opened_at": "2026-08-29T10:44:42.196664+00:00",
+      "pass_reasons": []
+    }
+  },
+  "model_run_id_before": "make-scale-fullmix",
+  "model_run_id_after": "make-scale-fullmix__loopm-train",
+  "gtest_run_id": "make-scale-fullmix__gtest",
+  "note": "Extra miss-family rows appended to a train copy only; G-test is a new population at gtest_seed. AP is reported even if it drops. solved is not auto-set."
+}

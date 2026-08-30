@@ -16,10 +16,11 @@ Fold = Literal["train", "eval"]
 _LOG = logging.getLogger(__name__)
 
 SPLIT_ONLY_COLUMNS = frozenset(
-    {"event_id", "event_ts", "payer", "payee", "amount_minor"}
+    {"event_id", "event_ts", "payer", "payee", "amount_minor", "campaign_id"}
 )
 MULE_PAYEE_PREFIXES = ("VID-SIM-U-", "VID-SIM-APP-", "VID-SIM-CHAIN-")
 CUSTOMER_PREFIX = "VID-SIM-C-"
+INNER_FOLD_FLOOR = 15
 
 
 class LeakError(AssertionError):
@@ -30,18 +31,30 @@ def _parse_ts(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, utc=True, format="ISO8601")
 
 
-def calendar_cut(ts: pd.Series) -> pd.Timestamp:
-    """First 2/3 of *this run's* calendar → train candidate; last 1/3 → eval."""
+def calendar_cut(
+    ts: pd.Series,
+    *,
+    horizon_end: pd.Timestamp | None = None,
+    sim_days: int | None = None,
+    t0: pd.Timestamp | None = None,
+) -> pd.Timestamp:
+    """First 2/3 of the configured horizon → train candidate; last 1/3 → eval."""
     parsed = _parse_ts(ts)
-    t0 = parsed.min()
-    t1 = parsed.max()
-    if pd.isna(t0) or pd.isna(t1):
+    t0_val = t0 if t0 is not None else parsed.min()
+    if sim_days is not None and not pd.isna(t0_val):
+        horizon_end = t0_val + pd.Timedelta(days=float(sim_days))
+    elif horizon_end is None:
+        t1 = parsed.max()
+        if pd.isna(t0_val) or pd.isna(t1):
+            raise ValueError("event_ts required for time cut")
+        if t0_val == t1:
+            order = parsed.index.to_numpy()
+            cut_i = max(1, int(len(order) * 2 / 3))
+            return parsed.iloc[cut_i - 1]
+        horizon_end = t1
+    if pd.isna(t0_val) or horizon_end is None or pd.isna(horizon_end):
         raise ValueError("event_ts required for time cut")
-    if t0 == t1:
-        order = parsed.index.to_numpy()
-        cut_i = max(1, int(len(order) * 2 / 3))
-        return parsed.iloc[cut_i - 1]
-    return t0 + (t1 - t0) * (2.0 / 3.0)
+    return t0_val + (horizon_end - t0_val) * (2.0 / 3.0)
 
 
 def _mule_payees(payees: pd.Series) -> list[str]:
@@ -74,6 +87,7 @@ def assign_folds(
     seed: int = 42,
     customer_holdout_frac: float = 0.15,
     mule_holdout_frac: float = 0.30,
+    sim_days: int | None = None,
 ) -> pd.Series:
     """
     eval if last 1/3 calendar **or** payer/payee in entity holdout.
@@ -83,22 +97,30 @@ def assign_folds(
         raise ValueError("split artifact missing event_ts")
     work = split_df.reset_index(drop=True)
     parsed = _parse_ts(work["event_ts"])
-    t0, t1 = parsed.min(), parsed.max()
-    if pd.isna(t0) or pd.isna(t1):
-        raise ValueError("event_ts required for time cut")
-    if t0 == t1:
-        late = pd.Series(np.arange(len(work)) >= max(1, int(len(work) * 2 / 3)), index=work.index)
-    else:
-        cut = t0 + (t1 - t0) * (2.0 / 3.0)
+    t0 = parsed.min()
+    if sim_days is not None:
+        cut = calendar_cut(parsed, sim_days=sim_days, t0=t0)
         late = parsed >= cut
+    else:
+        t1 = parsed.max()
+        if pd.isna(t0) or pd.isna(t1):
+            raise ValueError("event_ts required for time cut")
+        if t0 == t1:
+            late = pd.Series(np.arange(len(work)) >= max(1, int(len(work) * 2 / 3)), index=work.index)
+        else:
+            cut = t0 + (t1 - t0) * (2.0 / 3.0)
+            late = parsed >= cut
 
     rng = np.random.default_rng(seed)
     mule_ids = _mule_payees(work["payee"])
     cust_ids = _customers(pd.concat([work["payer"], work["payee"]], ignore_index=True))
 
     n_mule_hold = 0
-    if len(mule_ids) >= 2:
+    if len(mule_ids) >= 20:
         n_mule_hold = min(len(mule_ids) - 1, max(1, int(round(len(mule_ids) * mule_holdout_frac))))
+    elif len(mule_ids) >= 2:
+        n_mule_hold = min(len(mule_ids) - 1, max(1, int(round(len(mule_ids) * mule_holdout_frac))))
+
     n_cust_hold = 0
     if len(cust_ids) >= 2:
         n_cust_hold = min(len(cust_ids) - 1, max(1, int(round(len(cust_ids) * customer_holdout_frac))))
@@ -122,16 +144,27 @@ def inner_folds_from_train(
     folds: pd.Series,
     *,
     fraction: float = 0.20,
+    exclude_event_ids: frozenset[str] | None = None,
 ) -> pd.Series:
     """Carve inner_fit / inner_val from outer train by last 20% of calendar span.
 
     Never shuffled — deterministic calendar cut identical in style to
     :func:`calendar_cut` but measured from the *end* of the span.
+
+    ``exclude_event_ids`` (Loop M extras forced into train) are ignored when
+    measuring the calendar span and always assigned ``inner_fit`` so they
+    cannot turn inner_val into a single-family slice.
     """
     mask = (folds == "train").to_numpy()
     if not mask.any():
         raise ValueError("outer train fold is empty; cannot create inner folds")
-    ts = _parse_ts(split_df.loc[mask, "event_ts"])
+    extra = np.zeros(len(split_df), dtype=bool)
+    if exclude_event_ids:
+        extra = split_df["event_id"].astype(str).isin(exclude_event_ids).to_numpy()
+    span_mask = mask & ~extra
+    if not span_mask.any():
+        raise ValueError("outer train fold is empty after excluding extra event_ids")
+    ts = _parse_ts(split_df.loc[span_mask, "event_ts"])
     t0, t1 = ts.min(), ts.max()
     if pd.isna(t0) or pd.isna(t1):
         raise ValueError("event_ts required for inner fold calendar cut")
@@ -139,6 +172,8 @@ def inner_folds_from_train(
     inner = pd.Series("inner_fit", index=folds.index, name="inner_fold")
     inner.loc[mask & (_parse_ts(split_df["event_ts"]) >= cut).to_numpy()] = "inner_val"
     inner.loc[~mask] = "outer_eval"
+    if extra.any():
+        inner.loc[extra & mask] = "inner_fit"
     # Guard: both inner folds must be non-empty
     if not (inner == "inner_val").any():
         raise ValueError(
@@ -159,6 +194,89 @@ def inner_folds_from_train(
         },
     )
     return inner
+
+
+def split_inner_val_ab(
+    split_df: pd.DataFrame,
+    inner_val_mask: pd.Series | np.ndarray,
+    *,
+    mode: str = "calendar_50_50",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Split inner_val into disjoint A (objective) and B (FPR constraint) slices."""
+    if mode != "calendar_50_50":
+        raise ValueError(f"unsupported inner_val A/B mode: {mode}")
+    mask = np.asarray(inner_val_mask, dtype=bool)
+    if not mask.any():
+        raise ValueError("inner_val mask is empty")
+    ts = _parse_ts(split_df.loc[mask, "event_ts"])
+    t0, t1 = ts.min(), ts.max()
+    if pd.isna(t0) or pd.isna(t1) or t0 == t1:
+        order = np.where(mask)[0]
+        mid = max(1, len(order) // 2)
+        a = np.zeros(len(split_df), dtype=bool)
+        b = np.zeros(len(split_df), dtype=bool)
+        a[order[:mid]] = True
+        b[order[mid:]] = True
+        return a, b
+    cut = t0 + (t1 - t0) * 0.5
+    late = (_parse_ts(split_df["event_ts"]) >= cut).to_numpy()
+    a = mask & ~late
+    b = mask & late
+    if not a.any() or not b.any():
+        order = np.where(mask)[0]
+        mid = max(1, len(order) // 2)
+        a = np.zeros(len(split_df), dtype=bool)
+        b = np.zeros(len(split_df), dtype=bool)
+        a[order[:mid]] = True
+        b[order[mid:]] = True
+    return a, b
+
+
+def assert_fold_n_pos(
+    y: pd.Series,
+    folds: pd.Series,
+    inner: pd.Series,
+    *,
+    min_n: int = INNER_FOLD_FLOOR,
+) -> None:
+    """Fail loud when inner_fit/inner_val/eval lack fraud positives per family."""
+    y = y.reset_index(drop=True)
+    folds = folds.reset_index(drop=True)
+    inner = inner.reset_index(drop=True)
+    if not (len(y) == len(folds) == len(inner)):
+        raise ValueError(
+            f"assert_fold_n_pos length mismatch: y={len(y)} folds={len(folds)} inner={len(inner)} "
+            "(pass full-run labels, not train-only y)"
+        )
+    slices = {
+        "inner_fit": inner == "inner_fit",
+        "inner_val": inner == "inner_val",
+        "eval": folds == "eval",
+    }
+    fraud_fams = sorted(LABEL_FAMILIES - {"normal"})
+    shortfalls: list[str] = []
+    for slice_name, mask in slices.items():
+        sub = y.loc[mask]
+        for fam in fraud_fams:
+            n = int((sub.astype(str) == fam).sum())
+            if n < min_n:
+                shortfalls.append(f"{slice_name}.{fam}={n}<{min_n}")
+    if shortfalls:
+        raise ValueError(
+            "fold n_pos floor not met (generator/calendar may need E1/E2 fixes): "
+            + ", ".join(shortfalls)
+        )
+
+
+def preflight_fold_floors(
+    y: pd.Series,
+    folds: pd.Series,
+    inner: pd.Series,
+    *,
+    min_n: int = INNER_FOLD_FLOOR,
+) -> None:
+    """Fail fast before expensive fit stages if E2 per-slice family floors are not met."""
+    assert_fold_n_pos(y, folds, inner, min_n=min_n)
 
 
 def assert_no_x_leak(columns: list[str] | pd.Index) -> None:
@@ -216,9 +334,10 @@ def folds_from_run(
     *,
     seed: int = 42,
     force_train_event_ids: frozenset[str] | None = None,
+    sim_days: int | None = None,
 ) -> dict[str, Any]:
     train_df, split_df = align_run(train_df, split_df)
-    folds = assign_folds(split_df, seed=seed)
+    folds = assign_folds(split_df, seed=seed, sim_days=sim_days)
     if force_train_event_ids:
         force = split_df["event_id"].astype(str).isin(force_train_event_ids)
         folds = folds.copy()

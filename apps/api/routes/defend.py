@@ -10,6 +10,7 @@ from apps.api.db import get_db
 from packages.catalog.query import get_spec_by_vector_id
 from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
 from packages.eval.fit import (
+    GtestFreezeMismatchError,
     RecipeHashMismatchError,
     fit_champion,
     score_run,
@@ -52,6 +53,10 @@ class TuneRequest(BaseModel):
     world_seed: int = 42
     n_trials: int | None = Field(default=None, description="Overrides recipe n_trials (CI uses 10)")
     timeout: float | None = Field(default=None, description="Overrides recipe timeout_seconds")
+    dest_run_id: str | None = Field(
+        default=None,
+        description="Write tuned champion here; required after Stage 1 G-test so Stage 1 freeze is not overwritten",
+    )
 
 
 class LoopTMineRequest(BaseModel):
@@ -151,6 +156,8 @@ def defend_score(body: ScoreRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecipeHashMismatchError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except GtestFreezeMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (ValueError, AssertionError) as exc:
@@ -166,7 +173,10 @@ def defend_tune(body: TuneRequest) -> dict:
             world_seed=body.world_seed,
             n_trials=body.n_trials,
             timeout=body.timeout,
+            dest_run_id=body.dest_run_id,
         )
+    except GtestFreezeMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecipeHashMismatchError as exc:

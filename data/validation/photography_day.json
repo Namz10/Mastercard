@@ -1,0 +1,95 @@
+[
+  {
+    "model_run_id": "make-scale-fullmix",
+    "run_id": "make-gtest",
+    "model_freeze_id": "cc177e2643d122891da3fa0c6bfd4075f7b76e2bd5221784c8d4a377e204c074",
+    "binary_ap": 0.9924731135559858,
+    "genuine_fp": 0.050124435054620976,
+    "precision_at_op": 0.11601786278136136,
+    "recall_at_op": 0.9949709864603482,
+    "ap_by_family": {
+      "app_fraud": 1.0,
+      "ato": 0.4260021549548903,
+      "identity_burst": 0.48103874201203556,
+      "invoice_fraud": 0.9999999999999999,
+      "mule": 0.024723200985496456
+    },
+    "n_pos": {
+      "app_fraud": 1578,
+      "ato": 108,
+      "identity_burst": 108,
+      "invoice_fraud": 762,
+      "mule": 29,
+      "normal": 388382
+    },
+    "not_comparable": {
+      "app_fraud": false,
+      "ato": false,
+      "identity_burst": false,
+      "invoice_fraud": false,
+      "mule": true
+    }
+  },
+  {
+    "model_run_id": "make-scale-fullmix-stage2",
+    "run_id": "make-gtest",
+    "model_freeze_id": "fd3902c0c082bdbc5fd60a487c41f4ce98d480c32ece81bc8191ab8ee5dbf4ff",
+    "binary_ap": 0.9920083900110719,
+    "genuine_fp": 0.14348781354948115,
+    "precision_at_op": 0.04404948537931975,
+    "recall_at_op": 1.0,
+    "ap_by_family": {
+      "app_fraud": 1.0,
+      "ato": 0.48871361735389096,
+      "identity_burst": 0.45692022598352955,
+      "invoice_fraud": 1.0,
+      "mule": 0.02148046901882936
+    },
+    "n_pos": {
+      "app_fraud": 1578,
+      "ato": 108,
+      "identity_burst": 108,
+      "invoice_fraud": 762,
+      "mule": 29,
+      "normal": 388382
+    },
+    "not_comparable": {
+      "app_fraud": false,
+      "ato": false,
+      "identity_burst": false,
+      "invoice_fraud": false,
+      "mule": true
+    }
+  },
+  {
+    "model_run_id": "make-scale-fullmix__loopm-train",
+    "run_id": "make-gtest",
+    "model_freeze_id": "2ad26a64146cd2482a15a7a1188c6b802c3f0476b4581b1af66f48093e8e7812",
+    "binary_ap": 0.9925795888652567,
+    "genuine_fp": 0.06672685930014553,
+    "precision_at_op": 0.09012276785714286,
+    "recall_at_op": 0.9996131528046421,
+    "ap_by_family": {
+      "app_fraud": 1.0,
+      "ato": 0.4867701090435605,
+      "identity_burst": 0.39162722212567935,
+      "invoice_fraud": 1.0,
+      "mule": 0.02153837404114479
+    },
+    "n_pos": {
+      "app_fraud": 1578,
+      "ato": 108,
+      "identity_burst": 108,
+      "invoice_fraud": 762,
+      "mule": 29,
+      "normal": 388382
+    },
+    "not_comparable": {
+      "app_fraud": false,
+      "ato": false,
+      "identity_burst": false,
+      "invoice_fraud": false,
+      "mule": true
+    }
+  }
+]

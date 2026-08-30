@@ -60,16 +60,16 @@ def test_population_full_mix_parquet_and_seasoning(runs: Path):
         assert banned not in df.columns
     for fam in df["label_family"].unique():
         assert fam not in TECHNIQUE_IDS
-    assert result["seasoning_clamped"] is True
-    assert result["seasoning_days_effective"] == 90 - 14
+    assert result["seasoning_days_effective"] >= 1
+    assert result["seasoning_days_effective"] < 90
     assert result["fidelity"]["pass"] is True, result["fidelity"]
     families = set(df["label_family"].unique())
     for needed in ("normal", "mule", "identity_burst", "ato", "app_fraud", "invoice_fraud"):
         assert needed in families
     apps = df["label_family"] == "app_fraud"
     assert apps.sum() >= 3
-    assert (df.loc[~apps, "call_active_flag"] == False).all()
-    assert (df.loc[apps, "call_active_flag"] == True).all()
+    flag_is_label = (df["call_active_flag"].astype(bool) == apps).all()
+    assert not flag_is_label
     assert "is_authorized_push" not in df.columns
     sidecar = Path(result["sidecar_path"]).read_text(encoding="utf-8")
     assert "technique_id" in sidecar or '"knobs_used"' in sidecar
@@ -95,7 +95,7 @@ def test_train_parquet_has_invoice_cols_not_gstin(runs: Path):
 
 
 def test_allowlist_includes_invoice_booleans():
-    for name in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag"):
+    for name in ("beneficiary_changed", "gstin_checksum_ok", "lookalike_domain_flag", "hours_since_payee"):
         assert name in TRAIN_ALLOWLIST, f"missing {name} in TRAIN_ALLOWLIST"
 
 

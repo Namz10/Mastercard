@@ -1,0 +1,14 @@
+{
+  "status": "skipped",
+  "reason": "insufficient_fn",
+  "n_fn": 0,
+  "n_genuine": 387538,
+  "n_genuine_gate": null,
+  "loop_t_drafts_proposed": 0,
+  "loop_t_drafts_approved": [],
+  "family": "ato",
+  "train_run_id": "make-scale-fullmix",
+  "gdev_run_id": "make-gdev",
+  "live_rules_digest": "8ff77520da7817c8b0972c31d9f771825c06c6dba73bcbead4620635be4618bd",
+  "remaining_proposed": 0
+}

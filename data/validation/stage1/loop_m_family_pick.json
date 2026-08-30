@@ -1,0 +1,22 @@
+{
+  "family_chosen_from_slice": "gdev44",
+  "target_family": "ato",
+  "gdev_ap_by_family": {
+    "app_fraud": 1.0,
+    "ato": 0.26267239787506735,
+    "identity_burst": 0.3495314320054677,
+    "invoice_fraud": 0.9999999999999999,
+    "mule": 0.03076815064286488
+  },
+  "n_pos": {
+    "app_fraud": 1577,
+    "ato": 105,
+    "identity_burst": 104,
+    "invoice_fraud": 752,
+    "mule": 29,
+    "normal": 387538
+  },
+  "pick_reason": "lowest gdev AP among families with n_pos>=30; mule excluded (n_pos=29)",
+  "chosen_at_stage": 1,
+  "stage1_model_freeze_id": "cc177e2643d122891da3fa0c6bfd4075f7b76e2bd5221784c8d4a377e204c074"
+}

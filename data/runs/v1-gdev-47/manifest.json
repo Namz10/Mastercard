@@ -1,0 +1,10 @@
+{
+  "run_id": "v1-gdev-47",
+  "world_seed": 47,
+  "n_customers": 2400,
+  "n_merchants": 120,
+  "sim_days": 90,
+  "recipe_hash": null,
+  "wall_clock_seconds": 3.92,
+  "row_count": 397902
+}

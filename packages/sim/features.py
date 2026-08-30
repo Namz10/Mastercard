@@ -12,7 +12,17 @@ from packages.sim.ledger import empty_app_flags
 logger = logging.getLogger(__name__)
 
 HOUR = timedelta(hours=1)
+DAY = timedelta(days=1)
+WEEK = timedelta(days=7)
 P30 = timedelta(days=30)
+
+
+def _count_since(edges: deque, cutoff: datetime) -> int:
+    return sum(1 for t, _ in edges if t >= cutoff)
+
+
+def _unique_since(edges: deque, cutoff: datetime) -> int:
+    return len({pid for t, pid in edges if t >= cutoff})
 
 
 def parse_ts(value: str | datetime) -> datetime:
@@ -32,6 +42,8 @@ class AccountRuntime:
         "outbound_edges",
         "amount_history",
         "txn_count",
+        "last_txn_ts",
+        "payee_last_ts",
     )
 
     def __init__(
@@ -50,12 +62,14 @@ class AccountRuntime:
         self.outbound_edges: deque[tuple[datetime, str]] = deque()
         self.amount_history: deque[tuple[datetime, int]] = deque()
         self.txn_count = 0
+        self.last_txn_ts: datetime | None = None
+        self.payee_last_ts: dict[str, datetime] = {}
 
     def prune(self, now: datetime) -> None:
-        cutoff_h = now - HOUR
-        while self.inbound_edges and self.inbound_edges[0][0] < cutoff_h:
+        cutoff_w = now - WEEK
+        while self.inbound_edges and self.inbound_edges[0][0] < cutoff_w:
             self.inbound_edges.popleft()
-        while self.outbound_edges and self.outbound_edges[0][0] < cutoff_h:
+        while self.outbound_edges and self.outbound_edges[0][0] < cutoff_w:
             self.outbound_edges.popleft()
         cutoff_30 = now - P30
         while self.amount_history and self.amount_history[0][0] < cutoff_30:
@@ -108,11 +122,34 @@ class FeatureComputer:
         p30_vals = [a for _, a in payer_acc.amount_history]
         p30_mean = (sum(p30_vals) / len(p30_vals)) if p30_vals else None
         amount_vs_p30 = (amount_minor / p30_mean) if p30_mean and p30_mean > 0 else 1.0
-        fan_in_1h = len(payee_acc.inbound_edges)
-        fan_in_unique_payers_1h = len({pid for _, pid in payee_acc.inbound_edges})
-        fan_out_1h = len(payer_acc.outbound_edges)
+        cut_1h = ts - HOUR
+        cut_24h = ts - DAY
+        cut_7d = ts - WEEK
+        fan_in_1h = _count_since(payee_acc.inbound_edges, cut_1h)
+        fan_in_unique_payers_1h = _unique_since(payee_acc.inbound_edges, cut_1h)
+        fan_out_1h = _count_since(payer_acc.outbound_edges, cut_1h)
+        fan_in_24h = _count_since(payee_acc.inbound_edges, cut_24h)
+        fan_out_24h = _count_since(payer_acc.outbound_edges, cut_24h)
+        fan_in_unique_payers_24h = _unique_since(payee_acc.inbound_edges, cut_24h)
+        txn_velocity_24h = _count_since(payer_acc.outbound_edges, cut_24h)
+        burst_velocity = float(_unique_since(payer_acc.outbound_edges, cut_1h))
         is_new_device = device_hash != payer_acc.device_hash
-        burst_velocity = float(len({pid for _, pid in payer_acc.outbound_edges}))
+        if payer_acc.last_txn_ts is None:
+            hours_since_prev_txn = 168.0
+        else:
+            hours_since_prev_txn = max(0.0, (ts - payer_acc.last_txn_ts).total_seconds() / 3600.0)
+        last_to_payee = payer_acc.payee_last_ts.get(payee)
+        if last_to_payee is None:
+            hours_since_payee = 720.0
+        else:
+            hours_since_payee = max(0.0, (ts - last_to_payee).total_seconds() / 3600.0)
+        amt_7d = [a for t, a in payer_acc.amount_history if t >= cut_7d]
+        mean_7d = (sum(amt_7d) / len(amt_7d)) if amt_7d else None
+        amount_vs_7d_mean = (amount_minor / mean_7d) if mean_7d and mean_7d > 0 else 1.0
+        unique_payees_7d = float(_unique_since(payer_acc.outbound_edges, cut_7d))
+        payee_fan_out_1h = _count_since(payee_acc.outbound_edges, cut_1h)
+        payee_out_24h = _count_since(payee_acc.outbound_edges, cut_24h)
+        in_out_asymmetry_24h = float(fan_in_24h - payee_out_24h)
 
         flags = empty_app_flags() if app_flags is None else {**empty_app_flags(), **app_flags}
 
@@ -126,6 +163,16 @@ class FeatureComputer:
             "is_new_payee": is_new_payee,
             "is_new_device": is_new_device,
             "burst_velocity": burst_velocity,
+            "fan_in_24h": fan_in_24h,
+            "fan_out_24h": fan_out_24h,
+            "fan_in_unique_payers_24h": fan_in_unique_payers_24h,
+            "txn_velocity_24h": txn_velocity_24h,
+            "hours_since_prev_txn": round(hours_since_prev_txn, 4),
+            "hours_since_payee": round(hours_since_payee, 4),
+            "amount_vs_7d_mean": round(amount_vs_7d_mean, 4),
+            "unique_payees_7d": unique_payees_7d,
+            "payee_fan_out_1h": payee_fan_out_1h,
+            "in_out_asymmetry_24h": in_out_asymmetry_24h,
             "kyc_tier": payer_acc.kyc_tier,
             "device_hash": device_hash,
             "liveness_score": liveness_score,
@@ -143,6 +190,8 @@ class FeatureComputer:
         payer_acc.outbound_edges.append((ts, payee))
         payer_acc.amount_history.append((ts, amount_minor))
         payer_acc.txn_count += 1
+        payer_acc.last_txn_ts = ts
+        payer_acc.payee_last_ts[payee] = ts
         payee_acc.inbound_edges.append((ts, payer))
         payee_acc.txn_count += 1
         if is_new_device:
@@ -206,7 +255,7 @@ def replay_features(
             payee=payee,
             amount_minor=int(ev["amount_minor"]),
             device_hash=str(fa.get("device_hash") or fc.accounts[payer].device_hash),
-            app_flags=flags if ev.get("label_family") == "app_fraud" else empty_app_flags(),
+            app_flags=flags,
             liveness_score=fa.get("liveness_score"),
             doc_consistency=fa.get("doc_consistency"),
             debit=True,

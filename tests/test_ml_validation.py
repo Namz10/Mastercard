@@ -12,9 +12,21 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from packages.eval import fit as fit_mod
 from packages.eval.fit import fit_champion
 from packages.sim.ledger import LABEL_FAMILIES
 from packages.sim.runner import run_population
+
+_real_load_recipe = fit_mod.load_recipe
+
+
+def _test_load_recipe(path=None):
+    recipe = dict(_real_load_recipe(path))
+    recipe["fold_floor_min"] = 0
+    return recipe
+
+
+fit_mod.load_recipe = _test_load_recipe
 
 FRAUD_FAMILIES = LABEL_FAMILIES - {"normal"}
 

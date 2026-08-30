@@ -64,8 +64,9 @@ def test_gd2_train_invoice_rows_beneficiary_changed(pop42: dict):
         assert col in train.columns
     invoice = train[train["label_family"].astype(str) == "invoice_fraud"]
     if len(invoice) > 0:
-        assert invoice["beneficiary_changed"].all(), (
-            "invoice_fraud rows must all carry beneficiary_changed=True"
+        assert invoice["beneficiary_changed"].any(), "invoice_fraud must include some beneficiary_changed rows"
+        assert not invoice["beneficiary_changed"].all(), (
+            "invoice_fraud must not be 100% beneficiary_changed (E1 hard-negatives)"
         )
 
 
@@ -104,7 +105,7 @@ def test_gd3_seed43_all_rows_score_no_overwrite(pop42: dict, tmp_path: Path):
 
 
 def test_gd4_loop_m_extra_disjoint_from_gtest(pop42: dict, tmp_path: Path):
-    """GD.4 — run_loop_m app_fraud with train_seed=42, gtest_seed=43 produces the
+    """GD.4 — run_loop_m app_fraud with train_seed=42, gtest_seed=48 produces the
     documented extra sidecar seed 10049 and extra ids disjoint from the G-test ids."""
     runs = _runs(pop42)
     models = tmp_path / "models"
@@ -112,12 +113,12 @@ def test_gd4_loop_m_extra_disjoint_from_gtest(pop42: dict, tmp_path: Path):
         "gd-train",
         "app_fraud",
         train_seed=42,
-        gtest_seed=43,
+        gtest_seed=48,
         family_chosen_from_slice="gdev44",
         runs_dir=runs,
         models_dir=models,
     )
-    assert body["gtest_seed"] == 43
+    assert body["gtest_seed"] == 48
     assert body["extra_seed"] == 42 + 10_007 == 10049
 
     # extra ids disjoint from G-test ids

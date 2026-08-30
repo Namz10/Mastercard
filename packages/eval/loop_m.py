@@ -11,6 +11,7 @@ import pandas as pd
 
 from packages.eval.fit import (
     JSON_BAN,
+    RESERVED_WORLD_SEEDS,
     assert_no_denylist_payload,
     fit_champion,
     load_recipe,
@@ -120,8 +121,19 @@ def _write_augmented(
     new_ids = [f"evt-lm-{i:010d}" for i in range(len(extra_tr))]
     extra_sp = extra_sp.copy()
     extra_sp["event_id"] = new_ids
-    t0 = pd.to_datetime(split_df["event_ts"], utc=True, format="ISO8601").min()
-    shifted = t0 + pd.to_timedelta(np.arange(len(extra_sp)), unit="s")
+    rng = np.random.default_rng(42)
+    fam_ts = split_df.loc[split_df["label_family"].astype(str) == family, "event_ts"]
+    parsed = pd.to_datetime(split_df["event_ts"], utc=True, format="ISO8601")
+    t_lo = parsed.min()
+    t_hi = parsed.max()
+    if len(fam_ts) >= 2:
+        src = pd.to_datetime(fam_ts, utc=True, format="ISO8601").to_numpy()
+        picks = rng.choice(src, size=len(extra_sp), replace=True)
+        jitter = pd.to_timedelta(rng.integers(-6 * 3600, 6 * 3600, size=len(extra_sp)), unit="s")
+        shifted = pd.to_datetime(picks, utc=True) + jitter
+    else:
+        span = (t_hi - t_lo) if pd.notna(t_lo) and pd.notna(t_hi) and t_hi > t_lo else pd.Timedelta(days=1)
+        shifted = t_lo + pd.to_timedelta(rng.random(len(extra_sp)) * span.value, unit="ns")
     extra_sp["event_ts"] = [ts.isoformat() for ts in shifted]
     out_tr = pd.concat([train_df, extra_tr], ignore_index=True)
     out_sp = pd.concat([split_df, extra_sp], ignore_index=True)
@@ -163,7 +175,7 @@ def run_loop_m(
     miss_family: str,
     *,
     train_seed: int = 42,
-    gtest_seed: int = 43,
+    gtest_seed: int = 48,
     family_chosen_from_slice: str = "gdev44",
     n_customers: int | None = None,
     n_merchants: int | None = None,
@@ -177,6 +189,11 @@ def run_loop_m(
         raise ValueError(f"miss_family must be a fraud label_family, got {family}")
     if gtest_seed == train_seed:
         raise ValueError("G-test seed must differ from train seed")
+    if gtest_seed in RESERVED_WORLD_SEEDS and gtest_seed != 48:
+        raise ValueError(f"G-test seed {gtest_seed} is reserved for photography protocol")
+    extra_seed = train_seed + 10_007
+    if extra_seed in RESERVED_WORLD_SEEDS:
+        raise ValueError(f"Loop M extra_seed {extra_seed} collides with reserved photography seeds")
     slice_choice = str(family_chosen_from_slice or "").strip().lower()
     if "gtest" in slice_choice or "43" in slice_choice:
         raise ValueError(f"Forbidden slice for miss family selection: {family_chosen_from_slice}. Must be inner_val | diagnostic | gdev44.")
@@ -188,6 +205,8 @@ def run_loop_m(
     loop_cfg = dict(recipe.get("loop_m") or {})
     ap_eps = float(loop_cfg.get("ap_equal_eps", 0.05))
     fpr_eps = float(loop_cfg.get("genuine_fpr_eps", 0.02))
+    other_rel = float(loop_cfg.get("other_family_rel_drop_eps", 0.05))
+    n_pos_floor = int(recipe.get("n_pos_not_comparable_below", 30))
     cap_frac = float(loop_cfg.get("extra_row_cap_frac", 0.15))
     sidecar = _sidecar(run_id, runs)
     scale = _scale(
@@ -197,7 +216,6 @@ def run_loop_m(
         sim_days=sim_days,
         pin=pin,
     )
-    extra_seed = train_seed + 10_007
     extra_id = f"{run_id}__extra-{family}"
     gtest_id = f"{run_id}__gtest"
     aug_id = f"{run_id}__loopm-train"
@@ -265,7 +283,29 @@ def run_loop_m(
             if fpr_ok
             else "genuine FPR worsened beyond epsilon"
         )
-    loop_pass = ap_v in {"improved", "equal"} and fpr_ok
+    other: dict[str, Any] = {}
+    other_ok = True
+    for fam in sorted(FRAUD_FAMILIES):
+        if fam == family:
+            continue
+        n1 = int((after["metrics"].get("n_pos") or {}).get(fam) or 0)
+        b = _ap(before["metrics"], fam)
+        a = _ap(after["metrics"], fam)
+        if n1 < n_pos_floor or b is None or a is None or b <= 0:
+            other[fam] = {"ap_before": b, "ap_after": a, "n_pos": n1, "verdict": "not_comparable"}
+            continue
+        rel = (a - b) / b
+        verdict = "regressed" if rel < -other_rel else ("improved" if a > b else "equal")
+        if verdict == "regressed":
+            other_ok = False
+        other[fam] = {
+            "ap_before": b,
+            "ap_after": a,
+            "n_pos": n1,
+            "relative_delta": rel,
+            "verdict": verdict,
+        }
+    loop_pass = ap_v in {"improved", "equal"} and fpr_ok and other_ok
     body = {
         "run_id": run_id,
         "miss_family": family,
@@ -292,6 +332,9 @@ def run_loop_m(
             "genuine_fp_note": fpr_note,
             "n_pos_before": before["metrics"].get("n_pos", {}),
             "n_pos_after": after["metrics"].get("n_pos", {}),
+            "other_family_ap": other,
+            "other_family_ok": other_ok,
+            "other_family_rel_drop_eps": other_rel,
         },
         "metrics": {
             "pass": loop_pass,

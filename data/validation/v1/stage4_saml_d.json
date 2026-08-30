@@ -1,0 +1,84 @@
+{
+  "status": "scored",
+  "dataset": "SAML-D",
+  "csv_path": "data/externals/SAML-D.csv",
+  "n_rows": 9504852,
+  "n_eval": 3144540,
+  "prevalence_eval": 0.001105090092668562,
+  "prevalence_stated": 0.001039,
+  "model_run_id": "v1-train-46",
+  "op_threshold": 0.0003913305242628784,
+  "binary_ap": 0.002107994444330407,
+  "precision_at_op": 0.0013920784219696978,
+  "recall_at_op": 0.6883453237410072,
+  "tpr_at_fpr": {
+    "0.001": {
+      "tpr": 0.010935251798561151,
+      "threshold": 0.9930084347724915,
+      "fpr_target": 0.001
+    },
+    "0.005": {
+      "tpr": 0.014676258992805755,
+      "threshold": 0.9903770685195923,
+      "fpr_target": 0.005
+    },
+    "0.01": {
+      "tpr": 0.02273381294964029,
+      "threshold": 0.9765749573707581,
+      "fpr_target": 0.01
+    }
+  },
+  "n_pos": {
+    "mule": 3084,
+    "invoice_fraud": 22,
+    "unmapped": 369,
+    "normal": 3141065
+  },
+  "ap_by_mapped_family": {
+    "mule": 0.0009632616049282916,
+    "invoice_fraud": null
+  },
+  "laundering_types": [
+    "Behavioural_Change_1",
+    "Behavioural_Change_2",
+    "Bipartite",
+    "Cash_Withdrawal",
+    "Cycle",
+    "Deposit-Send",
+    "Fan_In",
+    "Fan_Out",
+    "Gather-Scatter",
+    "Layered_Fan_In",
+    "Layered_Fan_Out",
+    "Normal_Cash_Deposits",
+    "Normal_Cash_Withdrawal",
+    "Normal_Fan_In",
+    "Normal_Fan_Out",
+    "Normal_Foward",
+    "Normal_Group",
+    "Normal_Mutual",
+    "Normal_Periodical",
+    "Normal_Plus_Mutual",
+    "Normal_Small_Fan_Out",
+    "Normal_single_large",
+    "Over-Invoicing",
+    "Scatter-Gather",
+    "Single_large",
+    "Smurfing",
+    "Stacked Bipartite",
+    "Structuring"
+  ],
+  "mapped_family_counts": {
+    "invoice_fraud": 22,
+    "mule": 3084,
+    "normal": 3141065,
+    "unmapped": 369
+  },
+  "negative_subsample_ratio": null,
+  "featurecomputer_updates": 9504852,
+  "streamed": true,
+  "score_batch": 2048,
+  "calendar_from_ends": true,
+  "rail_analogue": "upi_like",
+  "note": "Lead TPR@FPR. Streamed FeatureComputer; eval last 1/3 calendar scored in batches. Do not compare binary_ap to generate-dataset G-test AP. Authors: synthetic table will not fully capture real-world unpredictability."
+}

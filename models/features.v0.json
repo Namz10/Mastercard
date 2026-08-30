@@ -1,0 +1,88 @@
+{
+  "estimator": "HistGradientBoostingClassifier",
+  "objective": "average_precision",
+  "random_state": 42,
+  "max_depth": 3,
+  "max_iter": 80,
+  "learning_rate": 0.08,
+  "class_weight": "balanced_from_this_run",
+  "y": "label_family",
+  "split": "time_cut_2_3_plus_entity_holdout",
+  "rule_hit_prefix": "rule__",
+  "app_flag_cols": [
+    "call_active_flag",
+    "copy_paste_payee_flag",
+    "pause_ms",
+    "urgency_pressure"
+  ],
+  "operating_point_fpr": 0.01,
+  "tpr_at_fpr": [
+    0.001,
+    0.005,
+    0.01
+  ],
+  "n_pos_not_comparable_below": 30,
+  "hang_guard_seconds_1k": 120,
+  "early_stopping": false,
+  "inner_val": {
+    "fraction": 0.2,
+    "protocol": "last_20pct_train_calendar",
+    "note": "Last 20% of train calendar span held out for op_threshold selection. Never shuffled."
+  },
+  "loop_m": {
+    "ap_equal_eps": 0.05,
+    "genuine_fpr_eps": 0.02,
+    "extra_row_cap_frac": 0.15
+  },
+  "loop_t": {
+    "fold": "gdev44",
+    "max_depth": 3,
+    "min_samples_leaf": 10,
+    "min_leaf_precision": 0.7,
+    "max_candidates": 5,
+    "max_predicates": 4,
+    "jaccard_duplicate": 0.8,
+    "min_fn": 10,
+    "min_genuine": 30,
+    "rule_promote_genuine_fpr_eps": 0.002,
+    "fp_inbox_threshold": 0.005,
+    "fp_recall_floor": 0.8
+  },
+  "optuna": {
+    "n_trials": 40,
+    "n_trials_ci": 10,
+    "timeout_seconds": 600,
+    "timeout_ci": 60,
+    "min_inner_val_fraud_pos": 50,
+    "objective": "binary_ap_minus_genuine_fp_penalty"
+  },
+  "calibration": {
+    "stage1_binary": true,
+    "stage2_min_n_pos": 50,
+    "ece_n_bins": 10
+  },
+  "isolation_forest": {
+    "enabled_default": false,
+    "contamination": 0.01,
+    "p_normal_floor": 0.95,
+    "stamp_free_features": [
+      "account_age_days",
+      "payee_history_count",
+      "amount_vs_p30",
+      "fan_in_1h",
+      "fan_out_1h",
+      "fan_in_unique_payers_1h",
+      "burst_velocity",
+      "is_new_payee",
+      "is_new_device"
+    ],
+    "genuine_notify_rate_abort": 0.05
+  },
+  "remediation": {
+    "orchestrator_enabled": true,
+    "llm_timeout_seconds": 5,
+    "reviewer_capacity_hint": 3,
+    "note": "Phase 8 Loop T priority arbitrator. When orchestrator_enabled is off, make defend-remediate is a no-op; manual POST /defend/loop-t/mine still works."
+  },
+  "note": "Laptop GBDT AuthGate. Not an issuer SLA. No AutoGluon on the demo path. Synthetic session flags are not an SDK."
+}

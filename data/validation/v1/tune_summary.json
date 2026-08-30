@@ -1,0 +1,13 @@
+{
+  "run_id": "v1-train-46",
+  "model_run_id": "v1-train-46-stage2",
+  "optuna_skipped_small_n": false,
+  "inner_val_fraud_pos": 818,
+  "best_params": {
+    "max_depth": 3,
+    "learning_rate": 0.0286449874364605,
+    "max_iter": 65
+  },
+  "recipe_hash": "8423e6807b707f6767fce051524c934dfdbafff45d1c9464d718abcf3b9afeba",
+  "best_params_path": "/home/aarush_linux/projects/Mastercard/models/v1-train-46-stage2/best_params.json"
+}

@@ -18,16 +18,37 @@ ISO_STAMP_FREE_FEATURES = (
     "burst_velocity",
     "is_new_payee",
     "is_new_device",
+    "fan_in_24h",
+    "fan_out_24h",
+    "fan_in_unique_payers_24h",
+    "txn_velocity_24h",
+    "hours_since_prev_txn",
+    "hours_since_payee",
+    "amount_vs_7d_mean",
+    "unique_payees_7d",
+    "payee_fan_out_1h",
+    "in_out_asymmetry_24h",
 )
+
+
+def _iso_frame(df: pd.DataFrame) -> pd.DataFrame:
+    work = df.reindex(columns=list(ISO_STAMP_FREE_FEATURES), fill_value=0).copy()
+    for col in ISO_STAMP_FREE_FEATURES:
+        if work[col].dtype == bool:
+            work[col] = work[col].astype(int)
+        else:
+            work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0)
+    return work
 
 
 def fit_isolation_forest(
     x_inner_fit_df: pd.DataFrame,
     y_inner_fit: pd.Series,
+    contamination: float = 0.01,
 ) -> IsolationForest:
     """Train Isolation Forest on inner_fit rows where label_family == 'normal' only."""
     normal_mask = (y_inner_fit.astype(str) == "normal").to_numpy()
-    normal_df = x_inner_fit_df.loc[normal_mask, list(ISO_STAMP_FREE_FEATURES)].copy()
+    normal_df = _iso_frame(x_inner_fit_df.loc[normal_mask])
 
     for col in ISO_STAMP_FREE_FEATURES:
         if normal_df[col].dtype == bool:
@@ -35,7 +56,13 @@ def fit_isolation_forest(
         else:
             normal_df[col] = pd.to_numeric(normal_df[col], errors="coerce").fillna(0)
 
-    model = IsolationForest(n_estimators=100, random_state=42, contamination=0.05)
+    try:
+        cont = float(contamination)
+    except (TypeError, ValueError):
+        cont = 0.01
+    if not (0.0 < cont < 0.5):
+        cont = 0.01
+    model = IsolationForest(n_estimators=100, random_state=42, contamination=cont)
     if not normal_df.empty:
         model.fit(normal_df.to_numpy())
     return model
@@ -48,7 +75,7 @@ def check_iso_genuine_notify_rate(
 ) -> float:
     """Check notification rate of Isolation Forest on genuine inner_val rows."""
     normal_mask = (y_inner_val.astype(str) == "normal").to_numpy()
-    normal_df = x_inner_val_df.loc[normal_mask, list(ISO_STAMP_FREE_FEATURES)].copy()
+    normal_df = _iso_frame(x_inner_val_df.loc[normal_mask])
 
     if normal_df.empty:
         return 0.0
@@ -64,6 +91,23 @@ def check_iso_genuine_notify_rate(
     return float(notify_count / len(normal_df))
 
 
+def predict_iso_anomalies_batch(
+    iso_model: IsolationForest,
+    df: pd.DataFrame,
+) -> np.ndarray:
+    """Batch ``predict`` on stamp-free columns; returns bool anomaly mask (True = -1)."""
+    if df.empty:
+        return np.array([], dtype=bool)
+    work = df.reindex(columns=list(ISO_STAMP_FREE_FEATURES), fill_value=0).copy()
+    for col in ISO_STAMP_FREE_FEATURES:
+        if work[col].dtype == bool:
+            work[col] = work[col].astype(int)
+        else:
+            work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0)
+    preds = iso_model.predict(work.to_numpy(dtype=float))
+    return preds == -1
+
+
 def is_iso_anomaly(
     iso_model: IsolationForest,
     row: dict[str, Any] | pd.Series,
@@ -77,7 +121,7 @@ def is_iso_anomaly(
 
     vec = []
     for col in ISO_STAMP_FREE_FEATURES:
-        val = row.get(col, 0) if isinstance(row, dict) else row[col]
+        val = row.get(col, 0) if isinstance(row, dict) else (row[col] if col in row.index else 0)
         if isinstance(val, bool):
             vec.append(int(val))
         else:

@@ -1,0 +1,68 @@
+{
+  "status": "ok",
+  "gdev_run_id": "v1-gdev-47",
+  "feature_means": {
+    "mined_hard_negatives": {
+      "urgency_pressure": 0.0,
+      "call_active_flag": 0.0,
+      "copy_paste_payee_flag": 0.004,
+      "pause_ms": 1.894,
+      "fan_in_1h": 1.248,
+      "fan_in_24h": 14.208,
+      "is_new_payee": 0.906,
+      "is_new_device": 0.002,
+      "burst_velocity": 0.186,
+      "account_age_days": 202.602
+    },
+    "all_normals": {
+      "urgency_pressure": 0.0,
+      "call_active_flag": 0.0,
+      "copy_paste_payee_flag": 0.004092912704165397,
+      "pause_ms": 2.8623700474603706,
+      "fan_in_1h": 1.5398854086893714,
+      "fan_in_24h": 23.41578665628498,
+      "is_new_payee": 0.04949914325450592,
+      "is_new_device": 0.0006070214711434286,
+      "burst_velocity": 0.13404161042540166,
+      "account_age_days": 248.60015470083061
+    },
+    "identity_burst_fraud": {
+      "urgency_pressure": 0.0,
+      "call_active_flag": 0.0,
+      "copy_paste_payee_flag": 0.0,
+      "pause_ms": 0.0,
+      "fan_in_1h": 57.51883116883117,
+      "fan_in_24h": 86.27922077922078,
+      "is_new_payee": 0.0025974025974025974,
+      "is_new_device": 0.0,
+      "burst_velocity": 0.6103896103896104,
+      "account_age_days": 49.92467532467533
+    }
+  },
+  "app_stamp_active_frac": {
+    "mined": 0.004,
+    "identity_burst": 0.0,
+    "all_normals": 0.004092912704165397
+  },
+  "mine_score_stats": {
+    "min": 0.9064511530324437,
+    "median": 0.9479935791402281,
+    "max": 0.9998072069274756,
+    "n_mined": 500,
+    "min_score_gate": 0.00054571955600069
+  },
+  "gtest49_identity_ap": {
+    "before": 0.9580566803725686,
+    "after": 0.36357901039893026
+  },
+  "mechanism_hypotheses": [
+    "Mined normals are overwhelmingly new-payee shaped (is_new_payee ~91% vs 5% baseline) with scores 0.91\u20131.0.",
+    "Identity_burst fraud is fan_in/burst-shaped (fan_in_1h ~58) not new-payee-shaped \u2014 generic HN targets the wrong failure mode.",
+    "Retrain shifts the decision boundary to suppress new-payee highs; identity ranking collateral damage + higher act burden (cost_sketch)."
+  ],
+  "recommended_next": [
+    "Exclude is_new_payee=1 normals from mining pool (or cap top_k <= 50)",
+    "Mine normals that FP on portable fan_in/burst features only \u2014 not APP/new-payee proxies",
+    "Family-aware: skip HN round when identity_burst is not the weakest family on gdev"
+  ]
+}

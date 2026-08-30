@@ -25,6 +25,16 @@ TRAIN_ALLOWLIST = (
     "is_new_payee",
     "is_new_device",
     "burst_velocity",
+    "fan_in_24h",
+    "fan_out_24h",
+    "fan_in_unique_payers_24h",
+    "txn_velocity_24h",
+    "hours_since_prev_txn",
+    "hours_since_payee",
+    "amount_vs_7d_mean",
+    "unique_payees_7d",
+    "payee_fan_out_1h",
+    "in_out_asymmetry_24h",
     "call_active_flag",
     "copy_paste_payee_flag",
     "pause_ms",
@@ -58,6 +68,7 @@ SPLIT_COLUMNS = (
     "payee",
     "amount_minor",
     "label_family",
+    "campaign_id",
 )
 
 
@@ -65,7 +76,6 @@ def train_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for ev in events:
         fa = ev.get("features_auth") or {}
-        is_app = ev["label_family"] == "app_fraud"
         row = {
             "rail": ev["rail"],
             "kyc_tier": ev.get("kyc_tier") or fa.get("kyc_tier"),
@@ -78,10 +88,20 @@ def train_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "is_new_payee": fa.get("is_new_payee"),
             "is_new_device": fa.get("is_new_device"),
             "burst_velocity": fa.get("burst_velocity"),
-            "call_active_flag": bool(fa.get("call_active_flag")) if is_app else False,
-            "copy_paste_payee_flag": bool(fa.get("copy_paste_payee_flag")) if is_app else False,
-            "pause_ms": int(fa.get("pause_ms") or 0) if is_app else 0,
-            "urgency_pressure": float(fa.get("urgency_pressure") or 0.0) if is_app else 0.0,
+            "fan_in_24h": fa.get("fan_in_24h", 0),
+            "fan_out_24h": fa.get("fan_out_24h", 0),
+            "fan_in_unique_payers_24h": fa.get("fan_in_unique_payers_24h", 0),
+            "txn_velocity_24h": fa.get("txn_velocity_24h", 0),
+            "hours_since_prev_txn": fa.get("hours_since_prev_txn", 168.0),
+            "hours_since_payee": fa.get("hours_since_payee", 720.0),
+            "amount_vs_7d_mean": fa.get("amount_vs_7d_mean", 1.0),
+            "unique_payees_7d": fa.get("unique_payees_7d", 0),
+            "payee_fan_out_1h": fa.get("payee_fan_out_1h", 0),
+            "in_out_asymmetry_24h": fa.get("in_out_asymmetry_24h", 0),
+            "call_active_flag": bool(fa.get("call_active_flag")),
+            "copy_paste_payee_flag": bool(fa.get("copy_paste_payee_flag")),
+            "pause_ms": int(fa.get("pause_ms") or 0),
+            "urgency_pressure": float(fa.get("urgency_pressure") or 0.0),
             "beneficiary_changed": bool(fa.get("beneficiary_changed", False)),
             "gstin_checksum_ok": bool(fa.get("gstin_checksum_ok", False)),
             "lookalike_domain_flag": bool(fa.get("lookalike_domain_flag", False)),
@@ -105,6 +125,7 @@ def split_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "payee": parties["payee"],
                 "amount_minor": int(ev["amount_minor"]),
                 "label_family": ev["label_family"],
+                "campaign_id": ev.get("campaign_id"),
             }
         )
     return rows

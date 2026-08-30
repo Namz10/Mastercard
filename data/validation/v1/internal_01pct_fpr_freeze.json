@@ -1,0 +1,138 @@
+{
+  "schema": "internal_fpr_freeze_v1",
+  "model_run_id": "v1-train-46__loopm-train",
+  "champion_version": "v1-loopm",
+  "fpr_target": 0.001,
+  "threshold_selection": {
+    "split": "inner_val",
+    "run_id": "v1-train-46",
+    "fpr_target": 0.001,
+    "n_inner_val": 42399,
+    "n_normal_inner_val": 41581,
+    "n_fraud_inner_val": 818,
+    "selected_threshold": 0.9151932016993464,
+    "inner_val_recall_at_cap": 1.0,
+    "inner_val_genuine_fp_at_cap": 7.214833698083259e-05,
+    "legacy_detect_thr": 0.00054571955600069,
+    "operating_point_fpr_recipe": 0.01,
+    "note": "Threshold from inner_val only; never selected on G-test."
+  },
+  "eval_run_id": "v1-gtest-48",
+  "eval_protocol": "time_cut_eval_fold_only",
+  "frozen_operating_point": {
+    "detect_thr": 0.9151932016993464,
+    "genuine_fp": 0.00031834860848147715,
+    "precision_at_op": 0.9856567689984902,
+    "recall_at_op": 0.9851609657947686,
+    "binary_ap": 0.9984912981431321,
+    "ap_by_family": {
+      "app_fraud": 0.9900763253852783,
+      "ato": 0.0556767427981058,
+      "identity_burst": 0.9844365822097962,
+      "invoice_fraud": 0.9999999999999999,
+      "mule": 0.9942435343917385
+    },
+    "n_pos": {
+      "app_fraud": 726,
+      "ato": 150,
+      "identity_burst": 1018,
+      "invoice_fraud": 326,
+      "mule": 1756,
+      "normal": 179049
+    },
+    "not_comparable": {
+      "app_fraud": false,
+      "ato": false,
+      "identity_burst": false,
+      "invoice_fraud": false,
+      "mule": false
+    },
+    "confusion_matrix": {
+      "tn": 178992,
+      "fp": 57,
+      "fn": 59,
+      "tp": 3917
+    },
+    "action_histogram": {
+      "allow": 177906,
+      "decline": 7,
+      "hold": 761,
+      "mule_credit_restrict": 2505,
+      "notify": 1782,
+      "step_up": 64
+    },
+    "cost_sketch": {
+      "unit": "lab_not_india",
+      "miss_weight": 10.0,
+      "fp_notify_weight": 1.0,
+      "fp_hold_weight": 3.0,
+      "fp_decline_weight": 8.0,
+      "fn_rate": 0.014839034205231388,
+      "fp_action_hist": {
+        "allow": 3,
+        "hold": 41,
+        "mule_credit_restrict": 12,
+        "step_up": 1
+      },
+      "expected_cost": 0.149062381391202,
+      "notes": [
+        "cost_sketch_action_missing:notify",
+        "cost_sketch_action_missing:decline"
+      ]
+    },
+    "family_recall_at_op": {
+      "app_fraud": 0.9848484848484849,
+      "ato": 0.8866666666666667,
+      "identity_burst": 0.9852652259332023,
+      "invoice_fraud": 1.0,
+      "mule": 0.9908883826879271
+    }
+  },
+  "legacy_default_op": {
+    "detect_thr": 0.00054571955600069,
+    "genuine_fp": 0.04001139352914565,
+    "recall_at_op": 0.9997484909456741,
+    "precision_at_op": 0.35685429571774846,
+    "binary_ap": 0.9984912981431321,
+    "ap_by_family": {
+      "app_fraud": 0.9900763253852783,
+      "ato": 0.0556767427981058,
+      "identity_burst": 0.9844365822097962,
+      "invoice_fraud": 0.9999999999999999,
+      "mule": 0.9942435343917385
+    },
+    "cost_sketch": {
+      "unit": "lab_not_india",
+      "miss_weight": 10.0,
+      "fp_notify_weight": 1.0,
+      "fp_hold_weight": 3.0,
+      "fp_decline_weight": 8.0,
+      "fn_rate": 0.00025150905432595576,
+      "fp_action_hist": {
+        "allow": 6943,
+        "decline": 7,
+        "hold": 62,
+        "mule_credit_restrict": 54,
+        "notify": 96,
+        "step_up": 2
+      },
+      "expected_cost": 0.004361832791586289,
+      "notes": []
+    },
+    "action_histogram": {
+      "allow": 177906,
+      "decline": 7,
+      "hold": 761,
+      "mule_credit_restrict": 2505,
+      "notify": 1782,
+      "step_up": 64
+    }
+  },
+  "acceptance": {
+    "genuine_fpr_le_target": true,
+    "no_test_threshold_selection": true,
+    "no_retrain": true,
+    "reference_posthoc_pareto_recall_01pct_g48": 0.9867
+  },
+  "disclaimer": "Internal sim performance only. Not SAML-D or external transfer."
+}

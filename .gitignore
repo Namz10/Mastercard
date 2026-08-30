@@ -235,3 +235,8 @@ __marimo__/
 
 # Cursor
 .cursor/
+
+# External validation datasets (Stage 4 — never commit)
+data/external/
+data/externals/
+**/SAML-D.csv

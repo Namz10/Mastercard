@@ -1,0 +1,7 @@
+{
+  "source": "models/make-scale-fullmix/metrics.json eval fold",
+  "mule_n_pos_eval": 24,
+  "threshold_restart": 15,
+  "action": "proceed",
+  "note": "mule eval n_pos=24 >= 15 proxy; G-test confirmation deferred to Photography Day (expected not_comparable at n_pos=24 < 30)"
+}
