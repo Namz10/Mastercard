@@ -395,7 +395,7 @@ Full `make dev` pipeline is slow. For judges / quick understanding:
 |--|--|
 | **Fork** | `aarush323/markoblitz` |
 | **Branch** | `demo` |
-| **URL** | _[add Netlify URL here]_ |
+| **URL** | https://markoblitz.netlify.app/|
 | **What it is** | Same UI · recorded champion metrics · SSE replay · no Python install |
 
 Product code + this README live on **`main`** / **`feature/frotnend-final`**. Static booth SPA is on branch **`demo`** only.
