@@ -1,14 +1,21 @@
 """Generate API — population + canary_mode handoff from Atlas."""
 
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from apps.api.db import get_db
+from apps.api.streaming import async_stream_worker, log_stream_event, sse_event
 from packages.catalog.campaigns import CAMPAIGNS
 from packages.catalog.query import list_canary_eligible, list_generate_eligible
+from packages.eval.job_progress import reset_job_progress_hook, set_job_progress_hook
 from packages.sim.calibrator import (
     CalibratorProposal,
     fixture_path,
@@ -19,6 +26,7 @@ from packages.sim.calibrator import (
 from packages.sim.runner import run_canary, run_population
 
 router = APIRouter(prefix="/generate", tags=["generate"])
+logger = logging.getLogger(__name__)
 
 
 class PopulationRunRequest(BaseModel):
@@ -105,23 +113,117 @@ def generate_population(
 ) -> dict:
     req = body or PopulationRunRequest()
     try:
-        kwargs: dict = {
-            "vector_id": req.vector_id,
-            "run_id": req.run_id,
-            "world_seed": req.world_seed,
-            "pin": req.pin,
-        }
-        if req.n_customers is not None:
-            kwargs["n_customers"] = req.n_customers
-        if req.n_merchants is not None:
-            kwargs["n_merchants"] = req.n_merchants
-        if req.sim_days is not None:
-            kwargs["sim_days"] = req.sim_days
-        return run_population(db, **kwargs)
+        return run_population(db, **_population_kwargs(req))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _population_kwargs(req: PopulationRunRequest) -> dict:
+    kwargs: dict = {
+        "vector_id": req.vector_id,
+        "run_id": req.run_id,
+        "world_seed": req.world_seed,
+        "pin": req.pin,
+    }
+    if req.n_customers is not None:
+        kwargs["n_customers"] = req.n_customers
+    if req.n_merchants is not None:
+        kwargs["n_merchants"] = req.n_merchants
+    if req.sim_days is not None:
+        kwargs["sim_days"] = req.sim_days
+    return kwargs
+
+
+def _stream_population_worker(
+    req: PopulationRunRequest,
+    db: Session,
+    event_q,
+    t0: float,
+) -> None:
+    import time
+
+    run_id = req.run_id
+    kwargs = _population_kwargs(req)
+
+    def elapsed_ms() -> int:
+        return int((time.time() - t0) * 1000)
+
+    def emit(payload: dict) -> None:
+        log_stream_event("generate", run_id or payload.get("result", {}).get("run_id"), payload)
+        event_q.put(sse_event(payload))
+
+    def on_progress(verb: str, body: str, artifacts: dict | None = None) -> None:
+        payload: dict = {"t": elapsed_ms(), "verb": verb, "body": body, "status": "progress"}
+        if artifacts:
+            payload["artifacts"] = artifacts
+        emit(payload)
+
+    logger.info(
+        "generate population/stream start run_id=%s world_seed=%s n_customers=%s sim_days=%s pin=%s",
+        run_id,
+        kwargs.get("world_seed"),
+        kwargs.get("n_customers"),
+        kwargs.get("sim_days"),
+        kwargs.get("pin"),
+    )
+    token = set_job_progress_hook(on_progress)
+    try:
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "COMMIT",
+                "body": "Simulate payment traffic",
+                "status": "started",
+            }
+        )
+        result = run_population(db, **kwargs)
+        run_id = result.get("run_id", run_id)
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "FIDELITY",
+                "body": "Corpus ready",
+                "status": "done",
+                "result": result,
+            }
+        )
+    except Exception as exc:
+        logger.exception("generate population stream failed run_id=%s", run_id)
+        emit({"t": elapsed_ms(), "status": "error", "reason": str(exc)})
+        raise
+    finally:
+        reset_job_progress_hook(token)
+        event_q.put(None)
+
+
+@router.post("/population/stream")
+async def generate_population_stream(
+    body: PopulationRunRequest | None,
+    db: Annotated[Session, Depends(get_db)],
+) -> StreamingResponse:
+    req = body or PopulationRunRequest()
+    logger.info(
+        "generate population/stream request world_seed=%s n_customers=%s sim_days=%s",
+        req.world_seed,
+        req.n_customers,
+        req.sim_days,
+    )
+
+    async def gen() -> AsyncIterator[str]:
+        import queue
+
+        async for line in async_stream_worker(
+            lambda q, t0: _stream_population_worker(req, db, q, t0),
+        ):
+            yield line
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/canary")

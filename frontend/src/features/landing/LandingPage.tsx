@@ -4,7 +4,7 @@ import GlobeStudy from "@/components/ui/globe-study";
 import { PixelBlast } from "@/components/ui/PixelBlast";
 import { ModeChip } from "@/components/ui/ModeChip";
 import { COPY } from "@/lib/copy";
-import { useSessionSnapshot } from "@/lib/session-store";
+import { beginBoothSession, useSessionSnapshot } from "@/lib/session-store";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const LOOP_STEPS = [
@@ -18,7 +18,7 @@ const LOOP_STEPS = [
     icon: CreditCard,
     step: "02",
     label: COPY.nav.generate,
-    desc: "Synthetic payment traffic at demo scale",
+    desc: "Synthetic payment traffic at population scale",
   },
   {
     icon: ShieldCheck,
@@ -68,7 +68,7 @@ export function LandingPage() {
           <span className="hidden sm:inline text-hairline text-ink-faint select-none" aria-hidden>
             ·
           </span>
-          <Link to="/identify" className="landing-skip-link">
+          <Link to="/identify" className="landing-skip-link" onClick={() => beginBoothSession()}>
             Skip to workspace
           </Link>
         </div>
@@ -140,10 +140,10 @@ export function LandingPage() {
               </ol>
 
               <div className="mt-10 flex flex-wrap items-center gap-3">
-                <Link to="/identify" className="landing-btn-primary">
+                <Link to="/identify" className="landing-btn-primary" onClick={() => beginBoothSession()}>
                   Enter workspace
                 </Link>
-                <Link to="/identify" className="landing-btn-ghost">
+                <Link to="/identify" className="landing-btn-ghost" onClick={() => beginBoothSession()}>
                   Discover threats
                 </Link>
               </div>

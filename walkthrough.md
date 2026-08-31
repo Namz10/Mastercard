@@ -32,19 +32,22 @@ Scout → … → HITL         quiet world + injectors         packages/policy/ 
 
 ```bash
 cd /path/to/Mastercard
-./run.sh --check             # live Tavily+LLM+pgvector+handoffs, then exit
-./run.sh                     # leave API running on :8000
+make install                 # .venv + deps (uv sync, or pip fallback)
+make dev                     # Postgres → seed → API on :8000
 
-# or piecewise
-uv sync --extra dev
-docker compose up -d postgres --wait
+# live product (Tavily + OmniRoute required)
+./run.sh --check             # live gates, then exit
+./run.sh                     # live gates, then API on :8000
+
+# piecewise (same as make dev, without auto-reload grouping)
+make up
 make seed
-make validate-all
+make api
 ```
 
-**Verify offline:** `make validate-all`. **Verify live product:** `./run.sh --check`.
+**Offline verify:** `make validate-all`. **Live product:** `./run.sh --check`.
 
-**Verify (live Tavily + OmniRoute + pgvector):** `make validate-all-live` — requires `TAVILY_API_KEY` and `AEGIS_LLM_API_KEY`.
+**Live Tavily + OmniRoute + pgvector:** `make validate-all-live` — requires `TAVILY_API_KEY` and `AEGIS_LLM_API_KEY`.
 
 ---
 
@@ -143,12 +146,17 @@ make seed
 ## 6. Running the API
 
 ```bash
-docker compose up -d postgres --wait   # if not already up
-make seed
-make api
+make dev                       # recommended: Postgres + seed + API (uses .venv)
 # → http://localhost:8000
 # → http://localhost:8000/docs  (OpenAPI)
+
+# or step by step
+make up
+make seed
+make api
 ```
+
+All `make` Python targets use `.venv/bin/python`. Do not run bare `uvicorn` from a global install.
 
 ---
 
@@ -375,7 +383,7 @@ Reference: [`Docs/defense_architecture.md`](Docs/defense_architecture.md), [`Doc
 
 ```bash
 # 1. Infrastructure
-docker compose up -d postgres --wait && make seed && make api
+make dev
 
 # 2. Identify → proposed (live or fixtures)
 curl -s -X POST http://localhost:8000/identify/run \
@@ -407,6 +415,9 @@ curl -s -X POST http://localhost:8000/defend/miss/t13-upi-impersonation-app
 
 | Command | When |
 |---------|------|
+| `make install` | First clone / after `pyproject.toml` changes |
+| `make dev` | Postgres + seed + API (offline local dev) |
+| `make setup` | Install + Postgres + seed (no API) |
 | `make test` | All pytest |
 | `make validate-all` | Offline full stack (no keys) |
 | `make validate-all-live` | Tavily + OmniRoute + pgvector + embeddings |
@@ -431,7 +442,8 @@ Live search only returns these domains. Expansion = edit `packages/osint/allowli
 
 | Problem | Fix |
 |---------|-----|
-| `No module named 'pydantic'` | `uv sync --extra dev` or `./run.sh`; use `make` (uses `.venv/bin/python`) |
+| `No module named 'sqlalchemy'` (or `pydantic`, etc.) | `make install` then use `make api` / `make dev` (not bare `uvicorn`) |
+| `No .venv found` | `make install` |
 | OmniRoute down | Identify uses fixture rules or abstains; start OmniRoute on :20128 |
 | Tavily 0 results | Query too narrow; check allowlist |
 | pgvector / extension missing | `docker compose up -d postgres --wait`. If you previously used `postgres:16-alpine`, reset volume: `docker compose down -v` |

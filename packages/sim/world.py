@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -11,6 +14,12 @@ import numpy as np
 from packages.sim.features import FeatureComputer, can_pay, replay_features
 from packages.sim.ledger import LabelFamily, make_event, party_id
 from packages.sim.priors import WorldPriors, load_priors, sample_amount_minor, sample_hour
+
+try:
+    from packages.eval.job_progress import emit_job_progress
+except ImportError:  # pragma: no cover
+    def emit_job_progress(_verb: str, _body: str, _artifacts: dict | None = None) -> None:
+        return
 
 PERSONAS = ("salaried", "kirana_shopper", "small_biz", "young_urban")
 
@@ -185,7 +194,22 @@ def generate_quiet_world(
         if rng.random() < 0.04
     }
 
-    for cust in customers:
+    progress_step = max(200, n_customers // 10)
+    verbose = os.environ.get("AEGIS_SIM_VERBOSE", "").lower() in ("1", "true", "yes")
+    t_world = time.perf_counter()
+    if verbose:
+        print(
+            f"[sim] start quiet_world n_customers={n_customers} sim_days={sim_days}",
+            file=sys.stderr,
+            flush=True,
+        )
+    emit_job_progress(
+        "COMMIT",
+        f"Build quiet payment world · {n_customers} customers · {sim_days}d",
+        {"n_customers": n_customers, "customers_done": 0, "event_count": 0},
+    )
+
+    for ci, cust in enumerate(customers, start=1):
         lam = float(priors.persona_txn_per_day[cust.persona or "salaried"]) * sim_days
         n_txn = int(rng.poisson(lam))
         n_txn = max(n_txn, 1)
@@ -285,6 +309,40 @@ def generate_quiet_world(
                 )
             )
             day_spend[day_key] = spent + amount
+
+        if ci % progress_step == 0 or ci == n_customers:
+            emit_job_progress(
+                "COMMIT",
+                f"Quiet traffic — {ci} of {n_customers} customers",
+                {
+                    "customers_done": ci,
+                    "n_customers": n_customers,
+                    "event_count": len(events),
+                },
+            )
+            if verbose:
+                print(
+                    f"[sim] quiet_world customers {ci}/{n_customers} events={len(events)}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
+    if verbose:
+        elapsed = time.perf_counter() - t_world
+        print(
+            f"[sim] done quiet_world ({elapsed:.1f}s, events={len(events)})",
+            file=sys.stderr,
+            flush=True,
+        )
+    emit_job_progress(
+        "COMMIT",
+        f"{len(events):,} quiet events materialized",
+        {
+            "customers_done": n_customers,
+            "n_customers": n_customers,
+            "event_count": len(events),
+        },
+    )
 
     world = WorldResult(
         events=events,

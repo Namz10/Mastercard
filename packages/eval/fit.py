@@ -261,11 +261,32 @@ def _record_gtest_opened(
 
 _LOG = logging.getLogger(__name__)
 
+_FIT_STAGE_BODY: dict[str, str] = {
+    "load_parquet": "Load holdout parquet",
+    "attach_rule_bits": "Attach policy rule bits",
+    "assign_folds": "Assign train and holdout folds",
+    "encode_features": "Encode features",
+    "inner_hgb": "Train detector",
+    "inner_val_threshold": "Choose validation threshold",
+    "isolation_forest": "Isolation forest",
+    "outer_hgb": "Outer model",
+    "outer_eval_calibration": "Calibrate scores",
+    "app_ablation": "APP fraud ablation check",
+    "permutation_importance": "Which features moved the score",
+    "bootstrap_ci": "Checking stability on holdout",
+    "brake_hist": "Policy histogram at the operating point",
+    "persist": "Persist champion model",
+}
+
 
 @contextmanager
 def _stage(name: str):
     """Timed stderr stage log for defend-fit visibility."""
+    from packages.eval.job_progress import emit_job_progress
+
     t0 = time.perf_counter()
+    glass = _FIT_STAGE_BODY.get(name, name.replace("_", " "))
+    emit_job_progress("FIT", glass)
     print(f"[fit] start {name}", file=sys.stderr, flush=True)
     try:
         yield
@@ -806,6 +827,8 @@ def _cluster_bootstrap_ci(
     """Resample payee IDs for mule/invoice rows, payer IDs otherwise."""
     # Cheapest-by-construction: no .fit() calls below this line — only resample + repredict
     # against the already-fitted model. Cost stays O(n_resamples * n_rows), not O(n_resamples * train).
+    from packages.eval.job_progress import emit_job_progress
+
     out: dict[str, dict[str, float]] = {}
     yv = y_eval.astype(str).to_numpy()
     n = len(yv)
@@ -865,6 +888,7 @@ def _cluster_bootstrap_ci(
                 aps.append(ap)
 
             if r_i % 25 == 0:
+                emit_job_progress("FIT", f"Stability — {fam} {r_i} of {n_resamples}")
                 print(
                     f"[fit] bootstrap_ci family={fam} resample {r_i}/{n_resamples}",
                     file=sys.stderr,
@@ -1659,12 +1683,26 @@ def tune_champion(
 
         import optuna
 
+        from packages.eval.job_progress import emit_job_progress
+
         study = optuna.create_study(
             direction="maximize",
             sampler=optuna.samplers.TPESampler(seed=random_state),
             study_name=f"tune-{run_id}",
         )
-        study.optimize(_objective, n_trials=n_trials, timeout=timeout, show_progress_bar=False)
+        def _on_trial(study: Any, trial: Any) -> None:
+            emit_job_progress(
+                "TUNE",
+                f"Trial {trial.number + 1} of {n_trials} on validation",
+            )
+
+        study.optimize(
+            _objective,
+            n_trials=n_trials,
+            timeout=timeout,
+            show_progress_bar=False,
+            callbacks=[_on_trial],
+        )
         best_params = dict(study.best_params)
         direction = "maximize"
         dest_pre = (models_dir or MODELS_DIR) / (dest_run_id or run_id)

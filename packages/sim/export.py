@@ -10,6 +10,12 @@ from typing import Any
 
 import pandas as pd
 
+try:
+    from packages.eval.job_progress import emit_job_progress
+except ImportError:  # pragma: no cover
+    def emit_job_progress(_verb: str, _body: str, _artifacts: dict | None = None) -> None:
+        return
+
 _ROOT = Path(__file__).resolve().parents[2]
 RUNS_DIR = _ROOT / "data" / "runs"
 
@@ -155,6 +161,13 @@ def export_run(
         raise ValueError(f"split columns not in schema: {split_extra}")
     if len(df) != len(sdf):
         raise ValueError("train/split row count mismatch")
+
+    n_rows = len(df)
+    emit_job_progress(
+        "COMMIT",
+        f"Write train/split parquet — {n_rows:,} rows",
+        {"event_count": n_rows},
+    )
 
     tmp_parquet = tmp_folder / "train.parquet"
     tmp_split = tmp_folder / "split.parquet"

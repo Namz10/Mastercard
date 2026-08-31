@@ -1,12 +1,18 @@
 """Defend API — coverage map, Loop I drafts, miss path, fit/score."""
 
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from apps.api.db import get_db
+from apps.api.streaming import async_stream_worker, sse_event
 from packages.catalog.query import get_spec_by_vector_id
 from packages.catalog.status import IllegalStatusTransition, transition_atlas_status
 from packages.eval.fit import (
@@ -16,6 +22,7 @@ from packages.eval.fit import (
     score_run,
     tune_champion,
 )
+from packages.eval.job_progress import reset_job_progress_hook, set_job_progress_hook
 from packages.eval.loop_m import run_loop_m
 from packages.eval.loop_t import mine_fn_rules
 from packages.policy.coverage import build_coverage_map, scout_topics_from_gaps
@@ -24,6 +31,7 @@ from packages.policy.rule_hitl import approve_draft, load_drafts, reject_draft
 from packages.policy.rules import load_v0_rules
 
 router = APIRouter(prefix="/defend", tags=["defend"])
+logger = logging.getLogger(__name__)
 
 
 class FitRequest(BaseModel):
@@ -147,6 +155,58 @@ def defend_fit(body: FitRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _stream_fit_score_worker(body: FitRequest, event_q, t0: float) -> None:
+    import time
+
+    def elapsed_ms() -> int:
+        return int((time.time() - t0) * 1000)
+
+    def emit(payload: dict) -> None:
+        event_q.put(sse_event(payload))
+
+    def on_progress(verb: str, msg: str, artifacts: dict | None = None) -> None:
+        payload: dict = {"t": elapsed_ms(), "verb": verb, "body": msg, "status": "progress"}
+        if artifacts:
+            payload["artifacts"] = artifacts
+        emit(payload)
+
+    token = set_job_progress_hook(on_progress)
+    try:
+        emit({"t": elapsed_ms(), "verb": "FIT", "body": "Fit champion on corpus", "status": "started"})
+        fit = fit_champion(body.run_id, world_seed=body.world_seed)
+        emit({"t": elapsed_ms(), "verb": "SCORE", "body": "Score operating point on locked holdout", "status": "progress"})
+        score = score_run(body.run_id, model_run_id=fit["model_run_id"])
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "SCORE",
+                "body": "Holdout scored",
+                "status": "done",
+                "result": score,
+            }
+        )
+    except Exception as exc:
+        logger.exception("defend fit/stream failed run_id=%s", body.run_id)
+        emit({"t": elapsed_ms(), "status": "error", "reason": str(exc)})
+        raise
+    finally:
+        reset_job_progress_hook(token)
+        event_q.put(None)
+
+
+@router.post("/fit/stream")
+async def defend_fit_stream(body: FitRequest) -> StreamingResponse:
+    async def gen() -> AsyncIterator[str]:
+        async for line in async_stream_worker(lambda q, t0: _stream_fit_score_worker(body, q, t0)):
+            yield line
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post("/score")
 def defend_score(body: ScoreRequest) -> dict:
     """Score eval fold. No Atlas vector_id. No knobs / denylist in JSON."""
@@ -185,6 +245,129 @@ def defend_tune(body: TuneRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (AssertionError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _stream_tune_worker(body: TuneRequest, event_q, t0: float) -> None:
+    import time
+
+    def elapsed_ms() -> int:
+        return int((time.time() - t0) * 1000)
+
+    def emit(payload: dict) -> None:
+        event_q.put(sse_event(payload))
+
+    def on_progress(verb: str, msg: str, artifacts: dict | None = None) -> None:
+        payload: dict = {"t": elapsed_ms(), "verb": verb, "body": msg, "status": "progress"}
+        if artifacts:
+            payload["artifacts"] = artifacts
+        emit(payload)
+
+    token = set_job_progress_hook(on_progress)
+    try:
+        emit({"t": elapsed_ms(), "verb": "TUNE", "body": "Search settings on validation", "status": "started"})
+        result = tune_champion(
+            body.run_id,
+            world_seed=body.world_seed,
+            n_trials=body.n_trials,
+            timeout=body.timeout,
+            dest_run_id=body.dest_run_id,
+        )
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "TUNE",
+                "body": "Best settings found",
+                "status": "done",
+                "result": result,
+            }
+        )
+    except Exception as exc:
+        logger.exception("defend tune/stream failed run_id=%s", body.run_id)
+        emit({"t": elapsed_ms(), "status": "error", "reason": str(exc)})
+        raise
+    finally:
+        reset_job_progress_hook(token)
+        event_q.put(None)
+
+
+@router.post("/tune/stream")
+async def defend_tune_stream(body: TuneRequest) -> StreamingResponse:
+    async def gen() -> AsyncIterator[str]:
+        async for line in async_stream_worker(lambda q, t0: _stream_tune_worker(body, q, t0)):
+            yield line
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _stream_loop_m_worker(body: LoopMRequest, event_q, t0: float) -> None:
+    import time
+
+    def elapsed_ms() -> int:
+        return int((time.time() - t0) * 1000)
+
+    def emit(payload: dict) -> None:
+        event_q.put(sse_event(payload))
+
+    def on_progress(verb: str, msg: str, artifacts: dict | None = None) -> None:
+        payload: dict = {"t": elapsed_ms(), "verb": verb, "body": msg, "status": "progress"}
+        if artifacts:
+            payload["artifacts"] = artifacts
+        emit(payload)
+
+    token = set_job_progress_hook(on_progress)
+    try:
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "RETRAIN",
+                "body": f"Feedback loop — {body.miss_family.replace('_', ' ')}",
+                "status": "started",
+            }
+        )
+        result = run_loop_m(
+            body.run_id,
+            body.miss_family,
+            train_seed=body.train_seed,
+            gtest_seed=body.gtest_seed,
+            family_chosen_from_slice=body.family_chosen_from_slice,
+            n_customers=body.n_customers,
+            n_merchants=body.n_merchants,
+            sim_days=body.sim_days,
+            pin=body.pin,
+        )
+        emit(
+            {
+                "t": elapsed_ms(),
+                "verb": "SCORE",
+                "body": "Before vs after on new holdout",
+                "status": "done",
+                "result": result,
+            }
+        )
+    except Exception as exc:
+        logger.exception("defend loop-m/stream failed run_id=%s", body.run_id)
+        emit({"t": elapsed_ms(), "status": "error", "reason": str(exc)})
+        raise
+    finally:
+        reset_job_progress_hook(token)
+        event_q.put(None)
+
+
+@router.post("/loop-m/stream")
+async def defend_loop_m_stream(body: LoopMRequest) -> StreamingResponse:
+    async def gen() -> AsyncIterator[str]:
+        async for line in async_stream_worker(lambda q, t0: _stream_loop_m_worker(body, q, t0)):
+            yield line
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/loop-m")

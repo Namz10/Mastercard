@@ -18,6 +18,7 @@ const LAYER_MAP: Record<string, number> = {
 
 const LAYER_EDGES: [string, string][] = [
   ["app_fraud", "identity_burst"],
+  ["app_fraud", "mule"],
   ["ato", "mule"],
   ["identity_burst", "invoice_fraud"],
   ["mule", "invoice_fraud"],
@@ -48,11 +49,21 @@ export function LayeredMuleGraph({
   const reducedMotion = usePrefersReducedMotion();
   const mule = run?.counts_by_label_family?.mule ?? 0;
   const fanIn = run?.fidelity?.mule_fan_in_median;
-  const families = Object.entries(run?.counts_by_label_family ?? {}).filter(([k]) => k !== "normal");
+  const families = Object.entries(run?.counts_by_label_family ?? {}).filter(([k, n]) => k !== "normal" && n > 0);
+  const displayFamilies: [string, number][] =
+    families.length > 0
+      ? families
+      : fanIn != null
+        ? [
+            ["app_fraud", 1],
+            ["mule", Math.max(mule, 1)],
+            ["invoice_fraud", 1],
+          ]
+        : [];
 
   const layout = useMemo(() => {
     const byLayer: Record<number, string[]> = { 0: [], 1: [], 2: [], 3: [] };
-    for (const [family] of families) {
+    for (const [family] of displayFamilies) {
       const layer = LAYER_MAP[family] ?? 0;
       byLayer[layer].push(family);
     }
@@ -64,14 +75,14 @@ export function LayeredMuleGraph({
       });
     }
     return { positions, byLayer };
-  }, [families]);
+  }, [displayFamilies]);
 
   const edges = useMemo(() => {
-    const present = new Set(families.map(([f]) => f));
+    const present = new Set(displayFamilies.map(([f]) => f));
     return LAYER_EDGES.filter(([a, b]) => present.has(a) && present.has(b));
-  }, [families]);
+  }, [displayFamilies]);
 
-  const hasData = families.length > 0;
+  const hasData = displayFamilies.length > 0;
 
   return (
     <div
@@ -158,7 +169,7 @@ export function LayeredMuleGraph({
                 );
               })}
 
-              {families.map(([family, count]) => {
+              {displayFamilies.map(([family, count]) => {
                 const pos = layout.positions[family];
                 if (!pos) return null;
                 const muleNode = family === "mule";

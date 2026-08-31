@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -81,3 +83,30 @@ def test_post_calibrate_world_fixture_and_pdf(client: TestClient):
 def test_no_identify_calibrate_world(client: TestClient):
     resp = client.post("/identify/calibrate-world", json={"fixture_id": "good_p2m_table"})
     assert resp.status_code in {404, 405}
+
+
+def test_post_population_stream_emits_progress(client: TestClient):
+    resp = client.post(
+        "/generate/population/stream",
+        json={
+            "n_customers": 40,
+            "n_merchants": 8,
+            "sim_days": 14,
+            "world_seed": 42,
+            "pin": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    events = []
+    for chunk in resp.text.split("\n\n"):
+        line = chunk.strip()
+        if not line.startswith("data:"):
+            continue
+        events.append(json.loads(line[5:].strip()))
+    progress = [e for e in events if e.get("status") == "progress"]
+    assert len(progress) >= 3, [e.get("body") for e in progress]
+    done = [e for e in events if e.get("status") == "done"]
+    assert len(done) == 1
+    assert done[0]["result"]["event_count"] > 0
+    with_artifacts = [e for e in progress if e.get("artifacts")]
+    assert with_artifacts, "expected progress artifacts for UI counters"

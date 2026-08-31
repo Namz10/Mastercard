@@ -106,10 +106,24 @@ cd frontend && npm install && cd ..
 
 ## Quick start (3 terminals)
 
+**One-time setup**
+
+```bash
+make install   # .venv + Python deps
+```
+
+**Terminal 1 — Database + API**
+
+```bash
+make dev     # Postgres → seed → API on :8000 (uses .venv)
+```
+
+Or split across terminals:
+
 **Terminal 1 — Database**
 
 ```bash
-docker compose up -d postgres --wait
+make up
 ```
 
 **Terminal 2 — Backend (API + AI + ML)**
@@ -141,7 +155,7 @@ The Vite dev server proxies `/api/*` → `http://localhost:8000/*`. No API keys 
 ./run.sh --down          # stop Postgres container
 ```
 
-Use `./run.sh` when you want the full live validation path. Use `make api` for day-to-day development (faster, skips e2e gates).
+Use `./run.sh` when you want the full live validation path. Use `make dev` or `make api` for day-to-day development (faster, skips e2e gates).
 
 ---
 
@@ -211,11 +225,13 @@ See [`.env.example`](.env.example) for the full list with dev cost-control examp
 ## Makefile shortcuts
 
 ```bash
-make install          # uv sync --extra dev
+make install          # .venv + deps (uv sync, or pip fallback)
+make setup            # install + Postgres + seed (no API)
+make dev              # Postgres + seed + API on :8000
 make up               # docker compose up -d postgres --wait
 make down             # docker compose down
 make seed             # reset + load catalog YAML → Postgres
-make api              # uvicorn with reload on :8000
+make api              # .venv uvicorn with reload on :8000
 make test             # pytest (offline markers only)
 make validate-all     # offline CI gates
 make validate-all-live  # same as ./run.sh --check
@@ -229,7 +245,9 @@ make defend-fit         # train GBDT champion on a run
 
 | Symptom | Fix |
 |---------|-----|
-| `postgres` connection refused | Run `docker compose up -d postgres --wait`; confirm `DATABASE_URL` uses port **5433** |
+| `No module named 'sqlalchemy'` (or `pydantic`, etc.) | `make install` then `make api` / `make dev` — do not run bare `uvicorn` |
+| `No .venv found` | `make install` |
+| `postgres` connection refused | Run `make up` or `make dev`; confirm `DATABASE_URL` uses port **5433** |
 | `llm.configured: false` | Set `AEGIS_LLM_API_KEY` and check profile/base URL match your provider |
 | OmniRoute / LLM errors | Start OmniRoute on `:20128`, or switch to `generic_openai` + OpenRouter URL |
 | Identify uses fixtures | Set `IDENTIFY_LIVE_SEARCH=true` and `TAVILY_API_KEY` |

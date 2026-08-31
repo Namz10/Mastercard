@@ -23,6 +23,7 @@ export interface AegisSession {
     seed: number | null;
     scale: "demo" | "full";
     fidelityPass: boolean | null;
+    fidelityReasons: string[] | null;
     eventCount: number | null;
     familyCounts: Record<string, number> | null;
     muleFanIn: number | null;
@@ -33,6 +34,9 @@ export interface AegisSession {
     scoreBeforeRetrain: ScoreResponse | null;
     missTechniqueId: string | null;
     loopResult: Record<string, unknown> | null;
+    stage2ModelId: string | null;
+    tuneResult: Record<string, unknown> | null;
+    tunedScore: ScoreResponse | null;
   };
   ui: {
     highlightTechniqueId: string | null;
@@ -42,12 +46,13 @@ export interface AegisSession {
 }
 
 const DEFAULT_SESSION: AegisSession = {
-    identify: { topic: "", runId: null, source: "recorded", proposedIds: [], approved: [] },
+  identify: { topic: "", runId: null, source: "live", proposedIds: [], approved: [] },
   generate: {
     runId: null,
     seed: null,
-    scale: "demo",
+    scale: "full",
     fidelityPass: null,
+    fidelityReasons: null,
     eventCount: null,
     familyCounts: null,
     muleFanIn: null,
@@ -58,8 +63,11 @@ const DEFAULT_SESSION: AegisSession = {
     scoreBeforeRetrain: null,
     missTechniqueId: null,
     loopResult: null,
+    stage2ModelId: null,
+    tuneResult: null,
+    tunedScore: null,
   },
-  ui: { highlightTechniqueId: null, sourceChip: "recorded", recordedReason: null },
+  ui: { highlightTechniqueId: null, sourceChip: "live", recordedReason: null },
 };
 
 let sessionCache: AegisSession = loadSession();
@@ -68,7 +76,8 @@ const listeners = new Set<() => void>();
 function loadSession(): AegisSession {
   if (typeof window === "undefined") return structuredClone(DEFAULT_SESSION);
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.session);
+    localStorage.removeItem(STORAGE_KEYS.session);
+    const raw = sessionStorage.getItem(STORAGE_KEYS.session);
     if (!raw) return structuredClone(DEFAULT_SESSION);
     const parsed = JSON.parse(raw) as Partial<AegisSession>;
     return {
@@ -85,7 +94,8 @@ function loadSession(): AegisSession {
 function persist(next: AegisSession) {
   sessionCache = next;
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(next));
+    sessionStorage.setItem(STORAGE_KEYS.session, JSON.stringify(next));
+    localStorage.removeItem(STORAGE_KEYS.session);
   }
   listeners.forEach((l) => l());
 }
@@ -120,16 +130,36 @@ export function setGenerateRun(
   eventCount: number,
   familyCounts: Record<string, number> | null = null,
   muleFanIn: number | null = null,
+  fidelityReasons: string[] | null = null,
 ) {
   persist({
     ...sessionCache,
-    generate: { runId, seed, scale, fidelityPass, eventCount, familyCounts, muleFanIn },
+    generate: { runId, seed, scale, fidelityPass, fidelityReasons, eventCount, familyCounts, muleFanIn },
     defend: {
       modelRunId: null,
       score: null,
       scoreBeforeRetrain: null,
       missTechniqueId: null,
       loopResult: null,
+      stage2ModelId: null,
+      tuneResult: null,
+      tunedScore: null,
+    },
+  });
+}
+
+export function setTuneResult(
+  tunedScore: ScoreResponse,
+  stage2ModelId: string,
+  tuneResult: Record<string, unknown>,
+) {
+  persist({
+    ...sessionCache,
+    defend: {
+      ...sessionCache.defend,
+      tunedScore,
+      stage2ModelId,
+      tuneResult,
     },
   });
 }
@@ -179,7 +209,9 @@ export function acceptCatalogSeed() {
 }
 
 export function approveAttack(attack: ApprovedAttack) {
-  const approved = sessionCache.identify.approved.some((a) => a.id === attack.id)
+  const approved = sessionCache.identify.approved.some(
+    (a) => a.id === attack.id || a.techniqueId === attack.techniqueId,
+  )
     ? sessionCache.identify.approved
     : [...sessionCache.identify.approved, attack];
   persist({
@@ -189,10 +221,18 @@ export function approveAttack(attack: ApprovedAttack) {
 }
 
 export function setSourceChip(mode: SourceMode, reason?: string | null) {
+  const nextReason = reason !== undefined ? reason : sessionCache.ui.recordedReason;
+  if (
+    sessionCache.ui.sourceChip === mode &&
+    sessionCache.ui.recordedReason === nextReason &&
+    sessionCache.identify.source === mode
+  ) {
+    return;
+  }
   persist({
     ...sessionCache,
     identify: { ...sessionCache.identify, source: mode },
-    ui: { ...sessionCache.ui, sourceChip: mode, recordedReason: reason ?? null },
+    ui: { ...sessionCache.ui, sourceChip: mode, recordedReason: nextReason ?? null },
   });
 }
 
@@ -249,24 +289,37 @@ export function useSessionSnapshot() {
 }
 
 export function resetSessionForTests() {
-  persist({
-    identify: { topic: "", runId: null, source: "recorded", proposedIds: [], approved: [] },
-    generate: {
-      runId: null,
-      seed: null,
-      scale: "demo",
-      fidelityPass: null,
-      eventCount: null,
-      familyCounts: null,
-      muleFanIn: null,
-    },
-    defend: {
-      modelRunId: null,
-      score: null,
-      scoreBeforeRetrain: null,
-      missTechniqueId: null,
-      loopResult: null,
-    },
-    ui: { highlightTechniqueId: null, sourceChip: "recorded", recordedReason: null },
-  });
+  beginBoothSession();
+}
+
+/** Fresh booth — no prior generate/defend/identify progress on glass. */
+export function beginBoothSession() {
+  persist(structuredClone(DEFAULT_SESSION));
+}
+
+export function clearDefendIfStale() {
+  const s = sessionCache;
+  if (!s.defend.score) return;
+  if (!s.generate.runId) {
+    persist({
+      ...s,
+      defend: { ...DEFAULT_SESSION.defend },
+    });
+    return;
+  }
+  if (s.defend.score.run_id !== s.generate.runId) {
+    persist({
+      ...s,
+      defend: { ...DEFAULT_SESSION.defend },
+    });
+  }
+}
+
+export function isDefendScoreCurrent(session: AegisSession = sessionCache): boolean {
+  if (!session.defend.score || !session.generate.runId) return false;
+  return session.defend.score.run_id === session.generate.runId;
+}
+
+export function canScoreGenerate(session: AegisSession = sessionCache): boolean {
+  return Boolean(session.generate.runId);
 }

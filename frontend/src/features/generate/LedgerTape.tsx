@@ -32,11 +32,11 @@ export function LedgerTape({
 }: {
   run: GenerateRunResponse | null;
   running: boolean;
-  seed: number;
+  seed: number | null;
   onSimulate?: () => void;
   simulateDisabled?: boolean;
 }) {
-  const rows = buildLedgerTape(run?.counts_by_label_family, seed, 40);
+  const rows = run ? buildLedgerTape(run.counts_by_label_family, seed ?? 42, 40) : [];
   const ref = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
   const [newCount, setNewCount] = useState(0);
@@ -122,21 +122,23 @@ export function LedgerTape({
                   <p className="text-[14px] text-ink-muted leading-relaxed max-w-[34ch] mx-auto">{COPY.generate.empty}</p>
                 </div>
                 {running ? (
-                  <p className="font-mono text-[12px] text-sage-600 animate-pulse motion-reduce:animate-none">
+                  <p className="font-mono text-[12px] text-sage-600">
                     Seeding ledger from approved recipes…
                   </p>
                 ) : (
                   <>
-                    <p className="font-mono text-[11px] text-ink-faint uppercase tracking-wide">
-                      seed {seed} · reproducible
-                    </p>
+                    {seed != null ? (
+                      <p className="font-mono text-[11px] text-ink-faint uppercase tracking-wide">
+                        seed {seed} · reproducible
+                      </p>
+                    ) : null}
                     {onSimulate ? (
                       <Button
                         variant="primary"
                         className="h-11 px-7 mt-1"
                         disabled={simulateDisabled}
                         onClick={onSimulate}
-                        data-demo="simulate-hero"
+                        data-demo="simulate"
                       >
                         {COPY.generate.primary}
                       </Button>

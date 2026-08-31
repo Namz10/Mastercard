@@ -18,6 +18,7 @@ from packages.eval.fit import (
     run_paths,
     score_run,
 )
+from packages.eval.job_progress import emit_job_progress
 from packages.sim.export import RUNS_DIR, TRAIN_ALLOWLIST
 from packages.sim.ledger import LABEL_FAMILIES
 from packages.sim.runner import run_population
@@ -220,6 +221,7 @@ def run_loop_m(
     gtest_id = f"{run_id}__gtest"
     aug_id = f"{run_id}__loopm-train"
 
+    emit_job_progress("RETRAIN", f"Extra training of {family.replace('_', ' ')}")
     run_population(
         None,
         run_id=extra_id,
@@ -254,6 +256,7 @@ def run_loop_m(
     if set(gtest_split["event_id"].astype(str)) & extra_ids:
         raise AssertionError("Loop M extra event_ids leaked onto G-test")
 
+    emit_job_progress("FIT", "Refit detector on expanded training")
     fit_champion(run_id, world_seed=train_seed, runs_dir=runs, models_dir=models_dir)
     fit_champion(
         aug_id,
@@ -262,6 +265,7 @@ def run_loop_m(
         models_dir=models_dir,
         force_train_event_ids=extra_ids,
     )
+    emit_job_progress("SCORE", "Grade on a new holdout — cannot mark own homework")
     before = score_run(
         gtest_id, model_run_id=run_id, runs_dir=runs, models_dir=models_dir, all_rows=True
     )
