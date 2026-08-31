@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { SidebarNav, type NavGroupData } from "@/components/ui/dashboard-sidebar";
 import { ModeChip } from "@/components/ui/ModeChip";
 import { COPY } from "@/lib/copy";
-import { useSessionSnapshot } from "@/lib/session-store";
+import { useSessionSnapshot, isDefendScoreCurrent } from "@/lib/session-store";
 
 const PHASES = [
   { id: "identify", to: "/identify", label: COPY.nav.identify },
@@ -22,11 +22,10 @@ function phaseBadge(
     return n > 0 ? n : undefined;
   }
   if (phase === "generate") {
-    if (session.generate.seed != null) return session.generate.seed;
-    if (session.generate.runId) return "run";
+    if (session.generate.fidelityPass === true && session.generate.seed != null) return session.generate.seed;
     return undefined;
   }
-  if (phase === "defend" && session.defend.score) {
+  if (phase === "defend" && session.defend.score && isDefendScoreCurrent(session) && session.generate.fidelityPass === true) {
     const recall = session.defend.score.metrics.recall_at_op;
     return recall != null ? `${Math.round(recall * 100)}%` : "✓";
   }
@@ -136,7 +135,6 @@ export function AegisSidebar({
         sessionContext={{
           title: COPY.wordmark,
           subtitle: "Closed-loop booth",
-          badge: session.ui.sourceChip.toUpperCase(),
         }}
         header={
           <div className="flex items-center justify-between mb-1 -mt-0.5">
@@ -150,17 +148,6 @@ export function AegisSidebar({
               <PanelLeftClose className="w-[16px] h-[16px]" strokeWidth={1.5} />
             </button>
           </div>
-        }
-        footer={
-          <button
-            type="button"
-            className="mt-2 px-2.5 py-2 text-left text-[12px] text-ink-faint hover:text-ink hover:bg-accent-muted rounded-lg transition-colors duration-100 w-full"
-            data-demo="command-palette"
-            onClick={() => window.dispatchEvent(new Event("aegis:toggle-palette"))}
-          >
-            <span className="font-mono text-[10px]">⌘K</span>
-            <span className="ml-2">Ops commands</span>
-          </button>
         }
       />
     </aside>

@@ -16,19 +16,23 @@ export function PageHeader({
   strip?: ReactNode;
 }) {
   return (
-    <header className="shrink-0 mb-2">
-      <div className="h-12 flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-3 min-w-0">
-          <h1 className="font-sans text-[22px] font-semibold text-ink shrink-0 tracking-tight">{title}</h1>
-          {census}
-          {caption ? <p className="text-[12px] text-ink-faint truncate hidden xl:block max-w-[36ch]">{caption}</p> : null}
+    <header className="shrink-0 mb-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-3">
+            <h1 className="font-serif text-[24px] font-medium text-ink shrink-0 tracking-tight leading-tight">
+              {title}
+            </h1>
+            {census}
+          </div>
+          {caption ? <p className="text-[13px] text-ink-faint mt-1 leading-snug">{caption}</p> : null}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 pt-0.5">
           {secondaryActions}
           {actions}
         </div>
       </div>
-      {strip ? <div className="mt-1 mb-1">{strip}</div> : null}
+      {strip ? <div className="mt-2">{strip}</div> : null}
     </header>
   );
 }

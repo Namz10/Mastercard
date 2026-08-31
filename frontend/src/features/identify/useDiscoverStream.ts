@@ -2,31 +2,57 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, postSse, type SseEvent } from "@/lib/api-client";
 import { COPY } from "@/lib/copy";
 import { formatIstClock } from "@/lib/format";
+import { mapDiscoverCatalogLine, mergeCatalogLine } from "@/lib/discover-catalog-map";
 import { subscribeRecordedIdentify, subscribeSkipIdentify } from "@/lib/identify-bus";
 import { paceEvents, scheduleOffsets } from "@/lib/pace-events";
 import { setSession, setSourceChip } from "@/lib/session-store";
 
-export interface LogLine {
-  id: string;
-  t: number;
-  verb: string;
-  body: string;
-  status?: string;
-  clock?: string;
-  artifacts?: Record<string, unknown>;
-}
+import type { OpsTapeLine } from "@/lib/ops-tape-types";
+
+export type LogLine = OpsTapeLine;
 
 export type IdentifyStage = "rest" | "scanning" | "review";
 
-function toLine(ev: SseEvent, index: number): LogLine {
-  const verb = ev.verb ?? "";
-  let body = ev.body ?? "";
-  if (verb === "REPLAY" && !body.includes("recorded")) body = `${body} · recorded`;
+function extractUrlsFromText(text: string): string[] {
+  const matches = text.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
+  return matches.map((u) => u.replace(/[),.;]+$/, ""));
+}
+
+function normalizeUrlEntry(u: unknown): string | null {
+  if (typeof u === "string") return u;
+  if (u && typeof u === "object" && "url" in u) return String((u as { url: string }).url);
+  return null;
+}
+
+function collectUrls(ev: SseEvent): string[] {
+  const found: string[] = [];
+  const artifacts = ev.artifacts;
+  if (artifacts?.urls && Array.isArray(artifacts.urls)) {
+    for (const u of artifacts.urls) {
+      const url = normalizeUrlEntry(u);
+      if (url) found.push(url);
+    }
+  }
+  const result = ev.result as { candidate_urls?: unknown[] } | undefined;
+  if (result?.candidate_urls && Array.isArray(result.candidate_urls)) {
+    for (const u of result.candidate_urls) {
+      const url = normalizeUrlEntry(u);
+      if (url) found.push(url);
+    }
+  }
+  if (ev.body) found.push(...extractUrlsFromText(ev.body));
+  return found;
+}
+
+function toLine(ev: SseEvent, index: number): LogLine | null {
+  const rawVerb = ev.verb ?? "";
+  const mapped = mapDiscoverCatalogLine(rawVerb, ev.body ?? "");
+  if (mapped.skip) return null;
   return {
-    id: `${ev.t ?? 0}-${verb}-${index}`,
+    id: `${ev.t ?? 0}-${mapped.verb}-${index}`,
     t: ev.t ?? 0,
-    verb,
-    body,
+    verb: mapped.verb,
+    body: mapped.body,
     status: ev.status,
     clock: formatIstClock(),
     artifacts: ev.artifacts,
@@ -37,7 +63,7 @@ function collectStarted(): SseEvent {
   return {
     t: 0,
     verb: "COLLECT",
-    body: "started · FinCEN / RBI / OSINT",
+    body: "Open allowlisted OSINT collectors",
     status: "ok",
   };
 }
@@ -64,11 +90,12 @@ export function useDiscoverStream(onComplete?: () => void) {
 
   const appendEvent = useCallback((ev: SseEvent) => {
     const line = toLine(ev, lineIndex.current++);
-    setLines((prev) => [...prev, line]);
+    if (!line) return;
+    setLines((prev) => mergeCatalogLine(prev, line));
     if (!followRef.current) setNewCount((n) => n + 1);
-    const urls = ev.artifacts?.urls;
-    if (Array.isArray(urls)) {
-      setSources((prev) => [...new Set([...prev, ...urls.map(String)])]);
+    const urls = collectUrls(ev);
+    if (urls.length > 0) {
+      setSources((prev) => [...new Set([...prev, ...urls])]);
     }
   }, []);
 
@@ -106,6 +133,10 @@ export function useDiscoverStream(onComplete?: () => void) {
       setError(null);
       setNewCount(0);
       lineIndex.current = 0;
+      setSession((prev) => ({
+        ...prev,
+        identify: { ...prev.identify, runId: null, topic },
+      }));
       const ac = new AbortController();
       abortRef.current = ac;
       const runId = `identify-${crypto.randomUUID().slice(0, 12)}`;
@@ -124,9 +155,6 @@ export function useDiscoverStream(onComplete?: () => void) {
               setSourceChip("recorded", ev.reason ?? COPY.identify.fallback);
             }
             if (ev.verb && ev.body) {
-              if (ev.verb === "COLLECT" && ev.body.toLowerCase().includes("started") && lineIndex.current <= 1) {
-                return;
-              }
               if (recorded) buffered.push(ev);
               else appendEvent(ev);
             }
@@ -143,13 +171,8 @@ export function useDiscoverStream(onComplete?: () => void) {
       } catch (e) {
         if ((e as { name?: string }).name === "AbortError") return;
         setError(COPY.identify.sseDrop);
-        setSourceChip("recorded", COPY.identify.fallback);
-        try {
-          const pack = await api.get<{ events: SseEvent[]; run_id: string }>("/demo/recorded/identify");
-          await playEvents(pack.events ?? [], pack.run_id ?? runId, topic, true, ac.signal);
-        } catch {
-          finishReview(runId, topic);
-        }
+        setRunning(false);
+        abortRef.current = null;
       }
     },
     [appendEvent, finishReview, playEvents],

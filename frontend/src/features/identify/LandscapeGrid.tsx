@@ -1,9 +1,18 @@
 import clsx from "clsx";
+import { Bot, MessageSquare, Network, Shield, UserRound } from "lucide-react";
 import type { MergedTechnique } from "@/lib/api-types";
 import { coverageToChipStatus } from "@/lib/format";
 import { StatusChip } from "@/components/ui/StatusChip";
 
 const CATEGORIES = [1, 2, 3, 4, 5] as const;
+
+const CATEGORY_ICONS = {
+  1: Network,
+  2: UserRound,
+  3: MessageSquare,
+  4: Bot,
+  5: Shield,
+} as const;
 
 function TechniqueCell({
   technique: t,
@@ -73,12 +82,14 @@ export function LandscapeGrid({
   onSelect,
   highlightId,
   compact = false,
+  loading = false,
 }: {
   byCategory: Record<number, MergedTechnique[]>;
   categoryLabels: Record<number, string>;
   onSelect: (t: MergedTechnique) => void;
   highlightId?: string | null;
   compact?: boolean;
+  loading?: boolean;
 }) {
   if (compact) {
     return (
@@ -104,19 +115,23 @@ export function LandscapeGrid({
     );
   }
 
-  const maxRows = Math.max(...CATEGORIES.map((cat) => (byCategory[cat] ?? []).length), 0);
+  const maxRows = Math.max(...CATEGORIES.map((cat) => (byCategory[cat] ?? []).length), loading ? 4 : 0);
 
   return (
     <div className="bento-panel flex flex-col h-full min-h-0 overflow-hidden">
       <div className="sticky top-0 z-10 grid grid-cols-5 shrink-0 border-b border-border bg-surface-solid/90">
-        {CATEGORIES.map((cat) => (
-          <div
-            key={cat}
-            className="h-9 px-2.5 flex items-center text-[11px] font-mono uppercase tracking-wide text-ink-faint truncate"
-          >
-            {categoryLabels[cat]}
-          </div>
-        ))}
+        {CATEGORIES.map((cat) => {
+          const Icon = CATEGORY_ICONS[cat];
+          return (
+            <div
+              key={cat}
+              className="h-9 px-2.5 flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wide text-ink-faint truncate"
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0 text-sage-700" strokeWidth={1.75} aria-hidden />
+              <span className="truncate">{categoryLabels[cat]}</span>
+            </div>
+          );
+        })}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0 p-2">
         <div
@@ -127,7 +142,15 @@ export function LandscapeGrid({
             CATEGORIES.map((cat) => {
               const t = (byCategory[cat] ?? [])[rowIdx];
               if (!t) {
-                return <div key={`${cat}-${rowIdx}`} className="min-h-9" aria-hidden />;
+                return (
+                  <div
+                    key={`${cat}-${rowIdx}`}
+                    className="min-h-9 rounded-xl border border-dashed border-border/70 flex items-center justify-center font-mono text-[12px] text-ink-faint"
+                    aria-hidden
+                  >
+                    —
+                  </div>
+                );
               }
               return (
                 <TechniqueCell

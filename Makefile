@@ -1,4 +1,4 @@
-.PHONY: install up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow defend-fit defend-gtest defend-gdev defend-loop-m defend-remediate defend-validate stage4-saml-d
+.PHONY: install check-venv setup dev demo up down seed api test catalog-validate osint-validate identify-validate batch2-validate validate-all validate-all-live generate-validate generate-scale generate-slow defend-fit defend-gtest defend-gdev defend-loop-m defend-remediate defend-validate stage4-saml-d
 
 PYTHONPATH ?= $(CURDIR)
 export PYTHONPATH
@@ -14,8 +14,26 @@ endif
 
 VALIDATE_ENV = IDENTIFY_LIVE_SEARCH=false AEGIS_EMBEDDINGS=hash
 
+# --- Local dev (offline): make install → make dev ---
+
 install:
-	uv sync --extra dev
+	@if command -v uv >/dev/null 2>&1; then \
+		uv sync --extra dev; \
+	elif [ -x "$(CURDIR)/.venv/bin/python" ] || [ -x "$(CURDIR)/.venv/Scripts/python.exe" ]; then \
+		$(PY) -m pip install -U pip && $(PY) -m pip install -e ".[dev]"; \
+	else \
+		python3 -m venv "$(CURDIR)/.venv"; \
+		"$(CURDIR)/.venv/bin/python" -m pip install -U pip; \
+		"$(CURDIR)/.venv/bin/python" -m pip install -e ".[dev]"; \
+	fi
+
+check-venv:
+	@if [ "$(PY)" = "python3" ]; then \
+		echo "No .venv found. Run: make install" >&2; \
+		exit 1; \
+	fi
+
+setup: install up seed
 
 up:
 	docker compose up -d postgres --wait
@@ -23,11 +41,15 @@ up:
 down:
 	docker compose down
 
-seed:
+seed: check-venv up
 	$(PY) apps/api/seed.py --reset
 
-api:
-	uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
+api: check-venv
+	$(PY) -m uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
+
+dev: check-venv up seed api
+
+demo: dev
 
 test:
 	$(PY) -m pytest tests/ -q -m "not live_llm and not live_identify"
@@ -114,4 +136,3 @@ validate-all-live:
 	./run.sh --check
 endif
 
-demo: up seed api

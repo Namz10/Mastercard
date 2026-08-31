@@ -45,7 +45,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   mule: "mule layering",
   identity_burst: "identity burst",
   ato: "ATO",
-  app_fraud: "APP scam",
+  app_fraud: "APP fraud",
   invoice_fraud: "invoice",
 };
 

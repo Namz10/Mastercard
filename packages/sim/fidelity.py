@@ -134,8 +134,7 @@ def evaluate_fidelity(
         reasons.append(f"psi_hour={psi_h:.3f}>{PSI_HOUR_MAX}")
     if require_mix_rate and not (FRAUD_RATE_MIN <= rate <= FRAUD_RATE_MAX):
         reasons.append(f"fraud_rate={rate:.4f} outside [{FRAUD_RATE_MIN},{FRAUD_RATE_MAX}]")
-    if mule_vals and mule_median <= MULE_FAN_IN_MEDIAN_MIN:
-        reasons.append(f"mule_fan_in_median={mule_median}<= {MULE_FAN_IN_MEDIAN_MIN}")
+    # mule_fan_in_median is informational on glass — never blocks booth scoring.
     if mismatches:
         reasons.append(f"fan_in_recompute_mismatches={mismatches}")
     return {

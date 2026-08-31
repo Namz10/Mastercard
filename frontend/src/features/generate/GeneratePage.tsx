@@ -1,182 +1,187 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
-import { PageHeader } from "@/components/layout/Topbar";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
+import { JobThread } from "@/components/ui/JobThread";
+import { RunGate } from "@/components/ui/RunGate";
+import { StickyContinue } from "@/components/layout/StickyContinue";
+import { StageShell } from "@/components/layout/StageShell";
 import { COPY } from "@/lib/copy";
 import { formatInt } from "@/lib/format";
-import { useSessionSnapshot } from "@/lib/session-store";
+import { useElapsedJob } from "@/hooks/useElapsedJob";
+import { useGenerateProgress } from "@/hooks/useGenerateProgress";
+import { useSessionSnapshot, clearDefendIfStale } from "@/lib/session-store";
 import type { GenerateRunResponse } from "@/lib/api-types";
 import { useGenerate } from "./useGenerate";
 import { LedgerTape } from "./LedgerTape";
 import { LayeredMuleGraph } from "./LayeredMuleGraph";
-import { SeedStamp } from "./SeedStamp";
-import { CorpusGrowthGraph } from "./CorpusGrowthGraph";
+
+function sessionToRun(session: ReturnType<typeof useSessionSnapshot>): GenerateRunResponse | null {
+  if (!session.generate.runId) return null;
+  return {
+    run_id: session.generate.runId,
+    mode: session.generate.scale,
+    parquet_path: "",
+    sidecar_path: "",
+    fidelity: {
+      pass: session.generate.fidelityPass === true,
+      reasons: session.generate.fidelityReasons ?? undefined,
+      mule_fan_in_median: session.generate.muleFanIn ?? undefined,
+    },
+    counts_by_label_family: session.generate.familyCounts ?? {},
+    event_count: session.generate.eventCount ?? 0,
+    world_seed: session.generate.seed ?? undefined,
+  };
+}
+
+function GenerateLedgerSkeleton() {
+  return (
+    <div className="panel flex flex-col h-full min-h-0 opacity-60" aria-hidden>
+      <div className="h-9 px-3 border-b border-border flex items-center shrink-0">
+        <span className="font-mono text-[11px] uppercase text-ink-faint">Ledger tape</span>
+      </div>
+      <div className="flex-1 p-3 space-y-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-7 rounded-md bg-border/40 animate-pulse" style={{ width: `${70 + (i % 3) * 10}%` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function GeneratePage() {
   const session = useSessionSnapshot();
-  const { simulate, canary } = useGenerate();
-  const running = simulate.isPending || canary.isPending;
-  const fidelityKnown = session.generate.fidelityPass != null;
+  const { simulate, stream } = useGenerate();
+  const running = simulate.isPending || stream.running;
+  const elapsed = useElapsedJob(running);
+  const progress = useGenerateProgress(stream.lines);
   const seed = session.generate.seed ?? 42;
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
-  const sessionRun: GenerateRunResponse | null = session.generate.runId
-    ? {
-        run_id: session.generate.runId,
-        mode: session.generate.scale,
-        parquet_path: "",
-        sidecar_path: "",
-        fidelity: {
-          pass: session.generate.fidelityPass ?? false,
-          mule_fan_in_median: session.generate.muleFanIn ?? undefined,
-        },
-        counts_by_label_family: session.generate.familyCounts ?? {},
-        event_count: session.generate.eventCount ?? 0,
-        world_seed: session.generate.seed ?? 42,
-      }
-    : null;
-  const run = simulate.data ?? canary.data ?? sessionRun;
-  const autoRan = useRef(false);
-  const showFloatingSimulate = !run && !running;
+
+  const run = simulate.data ?? sessionToRun(session);
+  const hasRun = Boolean(run && !running);
+  const fidelityPass = run?.fidelity?.pass === true;
+  const fidelityFail = hasRun && run?.fidelity?.pass === false;
+  const reasons = run?.fidelity?.reasons ?? session.generate.fidelityReasons ?? [];
+
+  const onSimulate = () => simulate.mutate();
 
   useEffect(() => {
-    if (autoRan.current || run || running) return;
-    if (session.identify.approved.length < 1) return;
-    autoRan.current = true;
-    simulate.mutate("demo");
-  }, [run, running, session.identify.approved.length, simulate]);
+    clearDefendIfStale();
+  }, []);
 
-  useEffect(() => {
-    if (!moreOpen) return;
-    const close = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [moreOpen]);
-
-  const onSimulate = () => simulate.mutate("demo");
+  const counterParts: string[] = [];
+  if (progress.eventCount != null) counterParts.push(`${formatInt(progress.eventCount)} events`);
+  if (progress.customersDone != null && progress.nCustomers != null) {
+    counterParts.push(`${formatInt(progress.customersDone)} / ${formatInt(progress.nCustomers)} customers`);
+  }
 
   return (
-    <div className="generate-atmosphere flex flex-col h-full min-h-0 relative -mx-4 -my-3 px-4 py-3">
-      <PageHeader
-        title={COPY.nav.generate}
-        caption="Synthetic payment traffic · reproducible seed"
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="relative hidden sm:block" ref={moreRef}>
-              <Button
-                variant="ghost"
-                disabled={running}
-                className="gap-1.5 pr-3"
-                onClick={() => setMoreOpen((v) => !v)}
-                aria-expanded={moreOpen}
-              >
-                Modes
-                <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-              </Button>
-              {moreOpen ? (
-                <div className="absolute right-0 top-[calc(100%+6px)] z-20 glass-sheet rounded-drawer p-1 min-w-[240px] shadow-float">
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2.5 text-[13px] rounded-md hover:bg-accent-muted transition-colors"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      simulate.mutate("full");
-                    }}
-                  >
-                    {COPY.generate.fullPopulation}
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2.5 text-[13px] rounded-md hover:bg-accent-muted transition-colors"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      canary.mutate();
-                    }}
-                  >
-                    {COPY.generate.canary}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-            <Button variant="primary" disabled={running} onClick={onSimulate} data-demo="simulate">
-              {COPY.generate.primary}
-            </Button>
-          </div>
-        }
-      />
-
-      {simulate.error || canary.error ? (
+    <StageShell
+      title={COPY.nav.generate}
+      caption={COPY.generate.caption}
+      actions={
+        hasRun || running ? (
+          <Button variant="secondary" disabled={running} onClick={onSimulate}>
+            {running ? COPY.generate.fidelityChecking : COPY.generate.primary}
+          </Button>
+        ) : null
+      }
+      footer={
+        hasRun ? (
+          <StickyContinue
+            to="/defend/detection"
+            label={COPY.generate.continue}
+            demoId="continue-defend"
+            secondary={
+              <div className="flex items-center gap-2 min-w-0">
+                <StatusChip status={fidelityPass ? "pass" : fidelityFail ? "fail" : "pending"} />
+                {run ? (
+                  <span className="font-mono text-[11px] text-ink-faint tabular-nums">
+                    {formatInt(run.event_count)} events
+                  </span>
+                ) : null}
+              </div>
+            }
+          />
+        ) : undefined
+      }
+    >
+      {simulate.error ? (
         <p className="text-[13px] text-signal-block mb-2 border border-signal-block/30 bg-surface px-3 py-2 rounded-sheet">
-          Approved recipes missing — using catalog seed, or retry.
+          Could not simulate. Retry.
         </p>
       ) : null}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,60fr)_minmax(0,40fr)] gap-3 min-h-0">
-        <LedgerTape
-          run={run}
-          running={running}
-          seed={seed}
-          onSimulate={onSimulate}
-          simulateDisabled={running}
-        />
-        <div className="flex flex-col min-h-0 gap-2.5">
-          <SeedStamp seed={seed} />
-          <CorpusGrowthGraph run={run} running={running} seed={seed} />
-          <LayeredMuleGraph run={run} running={running} />
-        </div>
-      </div>
-
-      {showFloatingSimulate ? (
-        <div className="pointer-events-none fixed bottom-20 left-1/2 z-20 -translate-x-1/2 lg:absolute lg:bottom-16 lg:left-[30%]">
-          <Button
-            variant="primary"
-            disabled={running}
-            onClick={onSimulate}
-            className="pointer-events-auto h-11 px-6 shadow-[0_8px_28px_rgba(62,107,79,0.32)]"
-            data-demo="simulate-float"
+      {running ? (
+        <div className="flex-1 min-h-[420px] flex flex-col gap-2">
+          <div
+            className="shrink-0 h-12 flex items-center px-3 bento-panel catalog-scan-banner"
+            data-demo="generate-scanning"
           >
-            {COPY.generate.primary}
-          </Button>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] text-ink truncate">
+                {COPY.generate.primary} — {elapsed}s · seed {seed}
+              </p>
+              {counterParts.length > 0 ? (
+                <p className="font-mono text-[11px] text-ink-faint tabular-nums mt-0.5">
+                  {counterParts.join(" · ")}
+                </p>
+              ) : (
+                <p className="text-[12px] text-ink-faint mt-0.5 truncate">
+                  {progress.lastBody ?? COPY.generate.fidelityChecking}
+                </p>
+              )}
+            </div>
+            <span className="tape-live-dot shrink-0 ml-2" aria-hidden />
+          </div>
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,62fr)_minmax(0,38fr)] gap-3 min-h-0">
+            <JobThread
+              lines={stream.lines}
+              running
+              title="Simulating payment traffic"
+              emptyLabel={COPY.generate.fidelityChecking}
+            />
+            <GenerateLedgerSkeleton />
+          </div>
         </div>
-      ) : null}
-
-      <footer className="generate-footer glass-sheet sticky bottom-0 z-10 -mx-1 px-4 mt-2.5 shrink-0 h-12 flex items-center gap-3 rounded-sheet">
-        <div className="flex items-center gap-2 min-w-0">
-          {fidelityKnown ? (
-            session.generate.fidelityPass ? (
-              <StatusChip status="pass" />
-            ) : (
-              <StatusChip status="fail" />
-            )
-          ) : running ? (
-            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-              {COPY.generate.fidelityChecking}
+      ) : hasRun ? (
+        <div className="booth-crossfade-enter flex-1 flex flex-col gap-2 min-h-0">
+          <div
+            className={
+              fidelityPass ? "fidelity-strip fidelity-strip-pass shrink-0" : "fidelity-strip fidelity-strip-fail shrink-0"
+            }
+          >
+            {fidelityPass ? <StatusChip status="pass" /> : <StatusChip status="fail" />}
+            <span className="text-[13px]">
+              {fidelityPass ? COPY.generate.fidelityPass : COPY.generate.fidelityFail}
+              {run ? ` · ${formatInt(run.event_count)} events` : ""}
             </span>
-          ) : (
-            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint truncate">
-              {COPY.generate.continueDisabled}
-            </span>
-          )}
-        </div>
-        {run ? (
-          <span className="font-mono text-[11px] text-ink-faint tabular-nums">
-            {formatInt(run.event_count)} events
-          </span>
-        ) : null}
-        <div className="ml-auto flex items-center gap-2">
-          {fidelityKnown ? (
-            <Link to="/defend">
-              <Button variant="primary" className="h-9 px-5" data-demo="continue-defend">
-                {COPY.generate.continue}
-              </Button>
-            </Link>
+          </div>
+          {fidelityFail && reasons.length > 0 ? (
+            <ul className="text-[12px] text-ink-muted list-disc pl-5 shrink-0 max-w-prose">
+              {reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
           ) : null}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,62fr)_minmax(0,38fr)] gap-3 min-h-0">
+            <LedgerTape run={run!} running={false} seed={seed} onSimulate={onSimulate} simulateDisabled={running} />
+            <div className="flex flex-col min-h-0 gap-2.5">
+              <LayeredMuleGraph run={run!} running={false} />
+            </div>
+          </div>
         </div>
-      </footer>
-    </div>
+      ) : (
+        <RunGate
+          verb="COMMIT"
+          title="Simulate payment traffic"
+          body={COPY.generate.empty}
+          runLabel={COPY.generate.primary}
+          onRun={onSimulate}
+          running={running}
+          runningDetail={running ? `${COPY.generate.fidelityChecking}… ${elapsed}s` : undefined}
+          demoId="simulate"
+        />
+      )}
+    </StageShell>
   );
 }

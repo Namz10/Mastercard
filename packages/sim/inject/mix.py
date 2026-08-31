@@ -20,6 +20,30 @@ from packages.sim.inject.identity import inject_identity
 from packages.sim.inject.jitter import clamp_ts, jitter_signals
 from packages.sim.world import WorldResult
 
+try:
+    from packages.eval.job_progress import emit_job_progress
+except ImportError:  # pragma: no cover
+    def emit_job_progress(_verb: str, _body: str, _artifacts: dict | None = None) -> None:
+        return
+
+_INJECT_LABELS: dict[str, str] = {
+    "mule": "Mule fan-in paths",
+    "identity_burst": "Identity burst",
+    "ato": "ATO takeover",
+    "app_fraud": "APP fraud sessions",
+    "invoice_fraud": "Invoice fraud",
+}
+
+
+def _emit_family_inject(family: str, world: WorldResult) -> None:
+    n = sum(1 for e in world.events if e["label_family"] == family)
+    label = _INJECT_LABELS.get(family, family.replace("_", " "))
+    emit_job_progress(
+        "INJECT",
+        f"{label} — {n:,} events",
+        {"event_count": len(world.events), "family": family, "family_count": n},
+    )
+
 DEFAULT_SHARES = {
     "mule": 0.40,
     "identity_burst": 0.25,
@@ -191,7 +215,7 @@ def _inject_mule_budget(
             break
 
     # Coverage pass: one of each harder mode so tests/G-dev see variants, but not enough
-    # to pull mule_fan_in_median ≤ 5 (those rows are a minority next to funnel_fast).
+    # to pull mule_fan_in_median below 5 (those rows are a minority next to funnel_fast).
     if n_target >= 8:
         for variant in ("smurf", "hop", "dust"):
             _one(variant)
@@ -296,14 +320,17 @@ def apply_mix(
 
     if "mule" in want:
         mule_tally = _inject_mule_budget(world, rng, alloc["mule"], mule_sig)
+        _emit_family_inject("mule", world)
     if "identity_burst" in want:
         ident = _inject_identity_budget(
             world, rng, family="identity_burst", n_target=alloc["identity_burst"], signals=id_sig, pin=pin
         )
+        _emit_family_inject("identity_burst", world)
     if "ato" in want:
         ato = _inject_identity_budget(
             world, rng, family="ato", n_target=max(2, alloc["ato"]), signals=ato_sig, pin=pin
         )
+        _emit_family_inject("ato", world)
     if "app_fraud" in want:
         after = 12 if world.sim_days > 20 else max(2, world.sim_days // 3)
         apps = inject_app_sessions(
@@ -313,8 +340,10 @@ def apply_mix(
             signals=app_sig,
             after_day=after,
         )
+        _emit_family_inject("app_fraud", world)
     if "invoice_fraud" in want:
         inv = inject_invoices(world, rng, n_invoices=max(1, alloc["invoice_fraud"]))
+        _emit_family_inject("invoice_fraud", world)
 
     world.rebuild_features()
     counts: dict[str, int] = {}

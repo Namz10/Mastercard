@@ -52,12 +52,22 @@ export function buildLedgerTape(
   const entries = Object.entries(counts ?? {}).filter(([, n]) => n > 0);
   if (entries.length === 0) return [];
   const total = entries.reduce((sum, [, n]) => sum + n, 0);
+  const queues = entries.map(([family, n]) => {
+    const share = Math.max(family === "normal" ? 0 : 1, Math.round((n / total) * cap));
+    return Array.from({ length: share }, () => family);
+  });
   const planned: string[] = [];
-  for (const [family, n] of entries) {
-    const share = Math.max(1, Math.round((n / total) * cap));
-    for (let i = 0; i < share; i++) planned.push(family);
+  let added = true;
+  while (planned.length < cap && added) {
+    added = false;
+    for (const q of queues) {
+      if (q.length > 0 && planned.length < cap) {
+        planned.push(q.pop() as string);
+        added = true;
+      }
+    }
   }
-  const rows = planned.slice(-cap);
+  const rows = planned.slice(0, cap);
   const rand = mulberry32(seed);
   return rows.map((family, i) => {
     const payer = PAYERS[Math.floor(rand() * PAYERS.length)];

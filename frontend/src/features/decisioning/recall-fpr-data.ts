@@ -86,11 +86,20 @@ export function buildRecallFprCurve(
   }));
 }
 
-/** Zoom Y-axis to the curve so 98–99% recall is not visually flat. */
-export function recallYDomain(points: RecallFprPoint[]): [number, number] {
+/** Y-axis for booth curve — fixed 50–100 unless any series dips below 50. */
+export function recallYDomain(
+  points: RecallFprPoint[],
+  opts?: { fixed?: boolean },
+): [number, number] {
   const recalls = points.flatMap((p) =>
     [p.recall, p.beforeRecall].filter((v): v is number => v != null),
   );
+  if (opts?.fixed) {
+    if (recalls.length === 0) return [50, 100];
+    const min = Math.min(...recalls);
+    if (min < 50) return [0, 100];
+    return [50, 100];
+  }
   if (recalls.length === 0) return [95, 100];
   const min = Math.min(...recalls);
   const max = Math.max(...recalls);

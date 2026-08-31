@@ -75,3 +75,14 @@ def test_fan_in_not_catalog_constant():
     ]
     assert mule
     assert not all(v == knob for v in mule)
+
+
+def test_mule_fan_in_does_not_block_pass():
+    """mule_fan_in_median is computed for glass but never fails pass."""
+    import inspect
+
+    from packages.sim.fidelity import evaluate_fidelity
+
+    src = inspect.getsource(evaluate_fidelity)
+    assert "mule_median < MULE_FAN_IN_MEDIAN_MIN" not in src
+    assert "mule_fan_in_median=" not in src

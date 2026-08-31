@@ -33,13 +33,6 @@
     "src/features/copilot",
     "src/features/simulation",
     "src/features/demo",
-    "src/features/identify/HitlQueueTable.tsx",
-    "src/features/identify/TopicResearchPanel.tsx",
-    "src/features/identify/useIdentifySession.ts",
-    "src/features/decisioning/DecisioningPage.tsx",
-    "src/features/decisioning/useDecisioning.ts",
-    "src/features/decisioning/useDecisioningState.ts",
-    "src/hooks/useGenerateRun.ts",
-    "src/hooks/useLoopMRun.ts"
+    "src/features/identify/useIdentifySession.ts"
   ]
 }

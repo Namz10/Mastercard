@@ -2,10 +2,15 @@ import { Command } from "cmdk";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { COPY } from "@/lib/copy";
+import { runBoothDemo } from "@/lib/booth-demo";
+import { POPULATION_SCALE } from "@/lib/generate-job";
 import { useRecordedPacks } from "@/hooks/useRecordedPacks";
 import { useHonestyProbe } from "@/hooks/useHonestyProbe";
 import { requestRecordedIdentify, requestSkipIdentify } from "@/lib/identify-bus";
 import { getSession, setSourceChip } from "@/lib/session-store";
+import { api } from "@/lib/api-client";
+import type { GenerateRunResponse } from "@/lib/api-types";
+import { setGenerateRun } from "@/lib/session-store";
 
 /** Structure from 21st originui Command id:382 — restyled paper/sage/ink. */
 export function CommandPalette() {
@@ -40,6 +45,25 @@ export function CommandPalette() {
     setOpen(false);
   };
 
+  const simulateFull = async () => {
+    const data = await api.post<GenerateRunResponse>("/generate/population", {
+      world_seed: 42,
+      pin: true,
+      ...POPULATION_SCALE,
+    });
+    setGenerateRun(
+      data.run_id,
+      data.world_seed ?? 42,
+      "full",
+      data.fidelity?.pass ?? false,
+      data.event_count ?? 0,
+      data.counts_by_label_family ?? null,
+      data.fidelity?.mule_fan_in_median ?? null,
+      data.fidelity?.reasons ?? null,
+    );
+    return data;
+  };
+
   if (!open) return null;
 
   return (
@@ -61,11 +85,27 @@ export function CommandPalette() {
         />
         <Command.List className="overflow-y-auto py-1 max-h-[50vh]">
           <Command.Empty className="px-4 py-6 text-[13px] text-ink-faint">No matching command.</Command.Empty>
+          <Group heading="Booth">
+            <Item
+              onSelect={() =>
+                run(() => {
+                  void runBoothDemo({
+                    navigate,
+                    simulate: simulateFull,
+                    loadScore,
+                  });
+                })
+              }
+              label={COPY.palette.boothDemo}
+              kbd="B D"
+              demoId="booth-demo"
+            />
+          </Group>
           <Group heading="Recorded">
             <Item
               onSelect={() =>
                 run(() => {
-                  navigate("/identify");
+                  navigate("/identify/discover");
                   requestRecordedIdentify();
                 })
               }
@@ -89,7 +129,7 @@ export function CommandPalette() {
           <Group heading="Navigate">
             <Item onSelect={() => run(() => navigate("/identify"))} label={COPY.nav.identify} kbd="G I" />
             <Item onSelect={() => run(() => navigate("/generate"))} label={COPY.nav.generate} kbd="G G" />
-            <Item onSelect={() => run(() => navigate("/defend"))} label={COPY.nav.defend} kbd="G D" />
+            <Item onSelect={() => run(() => navigate("/defend/detection"))} label={COPY.nav.defend} kbd="G D" />
           </Group>
           <Group heading="Copy">
             <Item
@@ -112,11 +152,6 @@ export function CommandPalette() {
               }
               label={COPY.palette.copyOp}
             />
-            <Item
-              onSelect={() => run(() => navigate("/generate"))}
-              label={COPY.generate.fullPopulation}
-            />
-            <Item onSelect={() => run(() => navigate("/defend"))} label={COPY.palette.fitHyperparams} />
           </Group>
         </Command.List>
       </Command>
@@ -140,17 +175,20 @@ function Item({
   label,
   kbd,
   disabled,
+  demoId,
 }: {
   onSelect: () => void;
   label: string;
   kbd?: string;
   disabled?: boolean;
+  demoId?: string;
 }) {
   return (
     <Command.Item
       value={label}
       disabled={disabled}
       onSelect={onSelect}
+      data-demo={demoId}
       className="flex h-9 items-center justify-between px-4 text-[13px] data-[selected=true]:bg-accent-muted data-[disabled=true]:opacity-40 cursor-pointer"
     >
       <span>{label}</span>

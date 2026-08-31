@@ -10,5 +10,7 @@ describe("ledger tape", () => {
     expect(a).toEqual(b);
     expect(a[0].parties).toMatch(/→/);
     expect(a[0].clock).toMatch(/\d{2}:\d{2}:\d{2}/);
+    expect(a.some((r) => r.family !== "normal")).toBe(true);
+    expect(a.some((r) => r.family === "mule")).toBe(true);
   });
 });

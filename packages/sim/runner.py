@@ -17,6 +17,7 @@ from packages.sim.fidelity import evaluate_fidelity
 from packages.sim.inject.canary import inject_fincen_chain
 from packages.sim.inject.mix import DEFAULT_SIGNALS, apply_mix
 from packages.sim.verifier import verify_events
+from packages.eval.job_progress import emit_job_progress
 from packages.sim.world import generate_quiet_world
 
 FAST_CUSTOMERS = 20
@@ -115,6 +116,7 @@ def run_population(
         sim_days=sim_days,
     )
     rng = np.random.default_rng(world_seed + 1)
+    emit_job_progress("INJECT", "Layer mule fan-in and cash-out paths")
     mix_signals = dict(DEFAULT_SIGNALS)
     if spec and spec.simulator:
         inj = spec.simulator.injector_id
@@ -133,6 +135,15 @@ def run_population(
     fidelity = evaluate_fidelity(
         world.events, world.priors, rng=np.random.default_rng(world_seed), require_mix_rate=require_rate
     )
+    median = fidelity.get("mule_fan_in_median") or 0.0
+    emit_job_progress(
+        "FIDELITY",
+        (
+            f"PSI {fidelity['psi_amount']:.2f} · fraud rate {fidelity['fraud_rate']:.2%} · "
+            f"mule fan-in median {median:.1f}"
+        ),
+        {"event_count": len(world.events), "fidelity_pass": fidelity.get("pass")},
+    )
     sidecar = {
         "run_id": rid,
         "mode": "population",
@@ -149,6 +160,7 @@ def run_population(
         "knobs_used": mix["knobs_used"],
         "mix": {k: mix[k] for k in ("n_app", "n_funnel", "ident_burst", "ato_burst") if k in mix},
     }
+    emit_job_progress("COMMIT", "Persist ledger and train splits", {"event_count": len(world.events)})
     paths = export_run(world.events, sidecar, rid, runs_dir=runs_dir)
     extra = {
         "vector_id": vector_id,
