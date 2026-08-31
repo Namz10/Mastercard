@@ -1,265 +1,424 @@
-# AegisLoop — Mastercard Innovation Challenge @ GFF 2026
+<div align="center">
 
-**AI Defense Lab for Payment Security** · Build the attack, then build the defense.
+# AegisLoop
 
-End-to-end **red-team / blue-team** system: **Identify** emerging GenAI payment fraud → **Generate** high-fidelity simulations at scale → **Defend** with an ML detector and closed-loop feedback.
+### Mastercard Innovation Challenge @ GFF 2026 · AI Defense Lab for Payment Security
 
-Aligned to the official problem statement: [`MC_PS.md`](MC_PS.md).
+**Identify → Generate → Defend** as one closed-loop red-team / blue-team system.
 
-| Doc | Purpose |
-|-----|---------|
-| [`walkthrough.md`](walkthrough.md) | Technical handoff — Generate, Defend, APIs |
-| [`Docs/HACKATHON_RESEARCH.md`](Docs/HACKATHON_RESEARCH.md) | Threat landscape research |
-| [`frontend/README.md`](frontend/README.md) | Web prototype UI (this PR) |
-| [`VALIDATION.md`](VALIDATION.md) | Lab metrics, gates G1–G7, champion protocol |
+Build the attack. Train the defense. Close the loop.
 
----
+[![Problem statement](https://img.shields.io/badge/Challenge-MC_PS.md-sage?style=for-the-badge)](MC_PS.md)
+[![Walkthrough](https://img.shields.io/badge/Handoff-walkthrough.md-ink?style=for-the-badge)](walkthrough.md)
+[![Validation](https://img.shields.io/badge/Metrics-VALIDATION.md-ink?style=for-the-badge)](VALIDATION.md)
 
-## Challenge mapping ([`MC_PS.md`](MC_PS.md))
-
-| Pillar | Challenge ask | AegisLoop implementation |
-|--------|----------------|---------------------------|
-| **Identify** | Breadth + depth of GenAI payment fraud vectors; grounded in real rails | KillChain Atlas **T01–T24** (`data/catalog/seed.yaml`); allowlisted OSINT → LLM extract → HITL → catalog; landscape + coverage map |
-| **Generate** | Simulate attacks at scale with **fidelity** (realistic distributions, behaviours) | Event-driven UPI-like sim: quiet world → typed injectors (mule, identity burst, APP, invoice) → causal feature replay → PSI / fraud-rate fidelity gates → parquet export |
-| **Defend** | Accurate detection; low false positives on legitimate payments | HistGradientBoosting champion + v0 rule bits; recall @ **genuine FPR** operating point; Brake policy histogram; **Loop M** retrain on miss families; optional Optuna on inner-val |
-
-**Closed loop:** gaps from Defend (miss family, coverage chips) feed back to Identify landscape and Loop M — attacks you generate become the training and stress-test ground for defense.
+</div>
 
 ---
 
-## Submission artifacts ([`MC_PS.md`](MC_PS.md))
+## Table of contents
 
-| Required artifact | Where |
-|-------------------|--------|
-| **1. Code repository** (Identify + Generate + Defend, runnable) | This repo — `make dev` + [`walkthrough.md`](walkthrough.md) |
-| **2. Solution walkthrough** (.docx) | Team write-up + [`walkthrough.md`](walkthrough.md) + validation JSON in `data/validation/v1/` |
-| **3. Working web prototype** | [`frontend/`](frontend/) — Vite React booth UI at `http://localhost:5173` |
-
-### Web prototype — two ways to run it
-
-| Mode | When to use | How |
-|------|-------------|-----|
-| **Full lab** (live API + ML) | Reproducibility, real SSE, your own runs | `make dev` + `cd frontend && npm run dev` — see [Quick start](#quick-start) |
-| **Booth demo** (recorded packs) | Judges / quick walkthrough without 10–20 min generate + multi-minute fit | Separate deploy on fork `aarush323/markoblitz`, branch **`demo`** — _[Netlify URL — add here]_ |
-
-The full pipeline is **slow by design** (population sim + nested HGB fit + permutation + bootstrap). Use the **booth demo site** to understand the flow in minutes; use **`make dev`** for the real stack.
+1. [What this repo is](#what-this-repo-is)
+2. [Visual proof — working prototype](#visual-proof--working-prototype)
+3. [Model metrics (champion freeze)](#model-metrics-champion-freeze)
+4. [Evaluator quickstart — run everything](#evaluator-quickstart--run-everything)
+5. [API keys & services you need](#api-keys--services-you-need)
+6. [OmniRoute setup (default LLM)](#omniroute-setup-default-llm)
+7. [Alternative: OpenRouter / Groq (no OmniRoute)](#alternative-openrouter--groq-no-omniroute)
+8. [Booth walkthrough (UI)](#booth-walkthrough-ui)
+9. [Architecture & repo map](#architecture--repo-map)
+10. [Verify & troubleshoot](#verify--troubleshoot)
+11. [Booth demo site (fast preview)](#booth-demo-site-fast-preview)
+12. [Docs index](#docs-index)
 
 ---
 
-## Evaluation criteria ([`MC_PS.md`](MC_PS.md))
+## What this repo is
 
-| Criterion | How we address it |
-|-----------|-------------------|
-| **Diversity of attacks** | 24 techniques T01–T24 across mule, identity, APP, adversarial, merchant; coverage map (`live_rule`, `named_gap`, `case_only`) |
-| **Fidelity of simulation** | PSI on amount/hour; fraud-rate band; mule fan-in checks; ~400K-row ledger with family injectors |
-| **Detection efficacy** | Champion freeze: **~98.5% recall @ ~0.032% genuine FPR** on locked gtest (`data/validation/v1/internal_01pct_fpr_freeze.json`); Loop M identity_burst AP lift on gtest |
-| **Novelty** | Closed-loop lab: OSINT → atlas → sim → nested CV champion → Loop M on new gtest seed (cannot mark own homework) |
-| **Real-world feasibility** | UPI-like rails, Brake actions (allow/notify/step-up/hold/decline/mule restrict); lab protocol documented — not issuer SLA claims |
+Aligned to [`MC_PS.md`](MC_PS.md) — three pillars, one feedback loop:
 
-Reported metrics use **recall at genuine FPR operating point** on locked holdout — not accuracy trophies or live UPI feeds.
+| Pillar | Challenge ask | AegisLoop |
+|--------|----------------|-----------|
+| **Identify** | Map emerging GenAI payment fraud — breadth + depth | KillChain Atlas **T01–T24** · allowlisted OSINT → LLM → HITL → catalog |
+| **Generate** | Simulate attacks at scale with **fidelity** | UPI-like event sim · quiet world → injectors → PSI / fraud-rate gates → parquet |
+| **Defend** | Detect with high accuracy, low false positives | **HistGradientBoosting** champion · recall @ **genuine FPR** OP · Brake policy · **Loop M** |
 
----
+**Submission artifacts:** runnable code (this repo) · solution walkthrough ([`walkthrough.md`](walkthrough.md) + team docx) · **web prototype** ([`frontend/`](frontend/)).
 
-## Architecture
-
-Monorepo: browser UI + one Python process (API, agents, sim, eval).
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  frontend/  (Vite React :5173)  ──proxy /api──►  apps/api :8000 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-  packages/agents/     packages/sim/         packages/eval/
-  packages/osint/      Generate world        Defend fit/score
-  Identify LLM         injectors+fidelity    Loop M, Optuna
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              ▼
-                    Postgres + pgvector (:5433)
-                    KillChain Atlas (seed.yaml)
-```
-
-| Layer | Path | Role |
-|-------|------|------|
-| API | `apps/api/` | FastAPI routes: catalog, identify, generate, defend, streaming SSE |
-| Identify | `packages/agents/`, `packages/osint/` | LangGraph, Tavily, pgvector, HITL |
-| Generate | `packages/sim/` | Quiet world, injectors, feature replay, export |
-| Defend | `packages/eval/`, `packages/policy/` | HistGBM champion, rules, coverage, Loop M |
-| UI | `frontend/` | Booth chrome: Identify → Generate → Defend |
-| Data | `data/catalog/`, `data/validation/` | Atlas seed + frozen metrics |
+> **Note for evaluators:** Full generate + ML fit can take **10–20+ minutes** on a laptop. For a **5-minute UI walkthrough** without waiting, use the booth demo site (branch `demo` on fork) — link in [Booth demo site](#booth-demo-site-fast-preview). This README gets you the **real** stack running locally.
 
 ---
 
-## Repository structure
+## Visual proof — working prototype
 
-```
-markoblitz/                          # Team repo (GitHub)
-├── MC_PS.md                         # Official challenge problem statement
-├── README.md                        # This file
-├── walkthrough.md                   # Engineer handoff
-├── VALIDATION.md                    # Metrics protocol + G1–G7 gates
-├── Makefile                         # make dev, seed, validate-all, …
-├── run.sh                           # Live e2e gates + API
-├── pyproject.toml                   # Python package (aegisloop)
-├── docker-compose.yml               # Postgres/pgvector
-│
-├── apps/api/                        # FastAPI application
-│   ├── main.py
-│   ├── streaming.py               # SSE job progress
-│   └── routes/                    # catalog, identify, generate, defend, demo
-│
-├── packages/
-│   ├── agents/                    # Identify LangGraph
-│   ├── osint/                     # Allowlist, Tavily, fixtures
-│   ├── sim/                       # World, injectors, fidelity, export
-│   ├── eval/                      # fit_champion, loop_m, score, job_progress
-│   └── policy/                    # v0 rules, coverage map, Brake
-│
-├── frontend/                      # ★ Web prototype (this PR)
-│   ├── src/
-│   │   ├── features/
-│   │   │   ├── landing/           # Hero, enter workspace
-│   │   │   ├── identify/          # Landscape, Discover, Review (HITL)
-│   │   │   ├── generate/          # Population sim + ledger + mule graph
-│   │   │   ├── defend/            # Detection, Interventions, Feedback, Tune
-│   │   │   └── decisioning/       # Recall–FPR curve, metrics
-│   │   ├── components/            # Shell, JobThread, MetricHero, …
-│   │   └── lib/                   # session-store, api-client, job streams
-│   ├── package.json
-│   └── README.md                  # UI route map
-│
-├── data/
-│   ├── catalog/seed.yaml          # T01–T24 attack specs (SSOT)
-│   ├── validation/v1/             # Champion freeze, loop_m, pareto curves
-│   └── osint/fixtures/            # Recorded identify URLs (CI / demo)
-│
-├── tests/                         # pytest (offline + integration)
-└── Docs/                          # Planning locks, identify runbooks
-```
+Screenshots from the live booth UI (`frontend/` + `make dev`).
 
-`demo/` (static Netlify booth SPA) lives on fork branch **`demo`** only — not in this product branch (`demo/` is gitignored here).
+### Landing — closed loop on glass
+
+![AegisLoop landing — Identify, Generate, Defend](DEMO_PICS/landing.png)
+
+### Identify — threat landscape (T01–T24)
+
+![Identify landscape — catalog and coverage](DEMO_PICS/idenitfy.png)
+
+### Generate — simulate payment traffic
+
+![Generate phase 1 — job thread and scan banner](DEMO_PICS/generate_p1.png)
+
+![Generate phase 2 — ledger tape and mule graph](DEMO_PICS/generate_p2.png)
+
+### Defend — detection & champion metrics
+
+![Defend detection — MetricHero and recall–FPR curve](DEMO_PICS/defend_p1.png)
+
+### Feedback loop (Loop M)
+
+![Loop M — gtest before/after and verdict](DEMO_PICS/feedbackloop.png)
+
+### Hyperparameters (Optuna)
+
+![Optuna tune — base vs feedback vs tuned](DEMO_PICS/optuna.png)
 
 ---
 
-## Web prototype flow (`frontend/`)
+## Model metrics (champion freeze)
 
-Landing → workspace with three phases and SSE job threads (⌘K command palette, LIVE/RECORDED chip).
+Locked holdout: **`v1-gtest-48`** · Model: **`v1-train-46__loopm-train`** (post Loop M) · Threshold selected on **inner-val only** (never on gtest).
 
-| Route | Stage | What the judge sees |
-|-------|--------|---------------------|
-| `/` | Landing | Closed-loop story; enter workspace |
-| `/identify` | Landscape | T01–T24 grid + coverage chips (live_rule / named_gap) |
-| `/identify/discover` | Discover | OSINT stream: COLLECT → EXTRACT → RANK → GROUND → PROPOSE |
-| `/identify/review` | Review | HITL approve attacks → catalog seed |
-| `/generate` | Generate | Quiet traffic → inject families → fidelity → ledger tape + mule graph |
-| `/defend/detection` | Detection | Fit + score stream; **MetricHero** recall @ OP; Recall–FPR curve |
-| `/defend/interventions` | Interventions | Brake policy histogram at operating point |
-| `/defend/feedback` | Feedback | Loop M — gtest before/after curves, miss-family verdict |
-| `/defend/hyperparameters` | Tune | Base vs feedback vs Optuna compare |
+Source: [`data/validation/v1/internal_01pct_fpr_freeze.json`](data/validation/v1/internal_01pct_fpr_freeze.json) · Protocol: [`VALIDATION.md`](VALIDATION.md)
 
-Legacy paths redirect: `/simulation` → `/generate`, `/decisioning` → `/defend/detection`, `/arms-race` → `/defend/feedback`.
+### Best score (operating point)
 
-Design system: [`frontend/DESIGN.md`](frontend/DESIGN.md) (paper/sage/ink, booth glass chrome).
+| Metric | Value |
+|--------|-------|
+| **Recall @ OP** | **98.52%** |
+| **Precision @ OP** | **98.57%** |
+| **Recall at 0.1% FPR** (reference post-hoc on gtest-48) | **98.7%** |
+| **PR-AUC** (binary average precision) | **0.9985** |
+| **Genuine false-positive rate @ OP** | **0.032%** |
+
+> We report **recall at genuine FPR operating point** on a locked time-cut holdout — not headline “accuracy” on a random split. Simulated corpus; lab protocol, not issuer SLA.
+
+### Fraud family — average precision @ champion OP
+
+| Fraud family | Average precision |
+|--------------|-------------------|
+| Identity burst | **0.984** |
+| Mule behavior | **0.994** |
+| Authorized-push scam (APP) | **0.990** |
+| Account takeover | **0.056** |
+| Invoice fraud | **1.000** |
+
+Loop M example: identity_burst AP **0.34 → 0.97** on new gtest seed 48 ([`loop_m_result.json`](data/validation/v1/loop_m_result.json)) — loop cannot grade its own homework.
 
 ---
 
-## Quick start
+## Evaluator quickstart — run everything
 
-**Prerequisites:** Docker, Python 3.11+, Node 18+, Tavily + LLM keys for live Identify.
+**Goal:** Postgres + API on `:8000` + UI on `:5173` with **live** Identify (Tavily + LLM).
+
+### 0. Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Docker** | recent | Postgres + pgvector (`:5433` on host) |
+| **Python** | 3.11+ | API, sim, ML (`uv` or venv) |
+| **Node.js** | 18+ | Frontend only |
+| **Git** | — | Clone repo |
+
+Network: Tavily API, your LLM endpoint (OmniRoute or OpenRouter), Docker Hub for Postgres image.
+
+### 1. Clone
 
 ```bash
 git clone git@github.com:aarush323/markoblitz.git
 cd markoblitz
+```
+
+### 2. Python environment
+
+```bash
 make install
-cp .env.example .env    # edit DATABASE_URL, TAVILY_API_KEY, AEGIS_LLM_*
-make dev                # Postgres → seed → API :8000
+# Creates .venv and installs aegisloop + dev deps (FastAPI, sim, sklearn, LangGraph, …)
 ```
 
-**Frontend (terminal 2):**
+### 3. Configure `.env`
 
 ```bash
-cd frontend && npm install && npm run dev
+cp .env.example .env
 ```
 
-Open **http://localhost:5173** — Vite proxies `/api` → `:8000` (keys never in browser).
-
-**Suggested booth path:** Landscape → Discover → Review (approve) → Generate → Defend Detection → Interventions → Feedback (Loop M).
-
-**Full live validation:** `./run.sh --check` then `./run.sh`
-
----
-
-## Verify
+**Minimum for live product** (copy from [API keys table](#api-keys--services-you-need)):
 
 ```bash
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/ready
-make validate-all          # offline CI gates
-./run.sh --check           # live Tavily + LLM gates
+DATABASE_URL=postgresql://aegisloop:aegisloop@127.0.0.1:5433/aegisloop
+
+# Identify — live OSINT
+IDENTIFY_LIVE_SEARCH=true
+TAVILY_API_KEY=tvly-xxxxxxxx
+
+# LLM — OmniRoute (default) — see OmniRoute section below
+AEGIS_LLM_PROFILE=omniroute
+AEGIS_LLM_BASE_URL=http://127.0.0.1:20128/v1
+AEGIS_LLM_MODEL=auto
+AEGIS_LLM_API_KEY=your-omniroute-dashboard-key
+AEGIS_LLM_ALLOW_LOOPBACK_HTTP=true
 ```
 
+Never commit `.env`. Keys stay server-side; the browser only talks to `/api` via Vite proxy.
+
+### 4. Start OmniRoute (if using default profile)
+
+See [OmniRoute setup](#omniroute-setup-default-llm). Router must be listening on **`http://127.0.0.1:20128/v1`** before Identify runs.
+
+### 5. Start backend (one command)
+
+```bash
+make dev
+# Docker Postgres → seed catalog → FastAPI on http://127.0.0.1:8000
+```
+
+**Or** full live validation gates first:
+
+```bash
+./run.sh --check   # Tavily + LLM + pgvector gates — exits 0 if OK
+./run.sh           # same gates, then API stays up
+```
+
+### 6. Start frontend (second terminal)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**
+
+### 7. Smoke-check API
+
+```bash
+curl -s http://127.0.0.1:8000/health | head
+curl -s http://127.0.0.1:8000/ready
+```
+
+`/ready` should show `postgres: true`, `pgvector: true`, `tavily_configured: true`, `llm.configured: true`.
+
+### 8. Walk the booth (recommended path)
+
+1. **Landing** → Enter workspace  
+2. **Identify → Landscape** — T01–T24 grid  
+3. **Discover** — OSINT stream (COLLECT → … → PROPOSE)  
+4. **Review** — approve HITL items  
+5. **Generate** — Simulate payment traffic (SSE; **slow** at full scale)  
+6. **Defend → Detection** — Fit & score (**slow** — nested HGB + bootstrap)  
+7. **Interventions** — Brake histogram  
+8. **Feedback** — Loop M  
+9. **Hyperparameters** — Optuna compare  
+
+⌘K command palette: jump stages, copy seed, booth shortcuts.
+
+### 9. Offline CI (no API keys)
+
+```bash
+make validate-all
+```
+
+Uses fixtures + hash embeddings — proves repo integrity without Tavily/LLM.
+
 ---
 
-## Key metrics (lab protocol)
+## API keys & services you need
 
-| Label | Slice | Recall @ OP | Genuine FPR | Source |
-|-------|--------|-------------|-------------|--------|
-| Champion freeze | `v1-gtest-48` | ~98.5% | ~0.032% | `internal_01pct_fpr_freeze.json` |
-| Loop M (identity_burst AP) | gtest before/after | family AP lift | FPR guard ε | `loop_m_result.json` |
+| Service | Env variable(s) | Required for | Get it |
+|---------|-----------------|--------------|--------|
+| **Postgres** | `DATABASE_URL` | Everything | `make up` (Docker, no key) |
+| **Tavily** | `TAVILY_API_KEY` | Live Identify search/extract | [tavily.com](https://tavily.com) |
+| **OmniRoute** (default LLM) | `AEGIS_LLM_API_KEY`, `AEGIS_LLM_BASE_URL` | Live Identify LLM steps | OmniRoute dashboard (local `:20128`) |
+| **OpenRouter** (alt LLM) | `AEGIS_LLM_PROFILE=generic_openai`, `AEGIS_LLM_API_KEY` | Same | [openrouter.ai](https://openrouter.ai) |
+| **Groq** (alt LLM) | `AEGIS_LLM_PROFILE=groq`, `GROQ_API_KEY` | Same | [console.groq.com](https://console.groq.com) |
+| **GreyNoise** (optional) | `GREYNOISE_API_KEY` | `./run.sh` telemetry gate | [greynoise.io](https://www.greynoise.io) |
 
-Cold first-fit on a new seed-42 population (~75% OP) is an honest live reference — not the hero metric. See [`VALIDATION.md`](VALIDATION.md).
+### Identify tuning (optional — in `.env.example`)
 
----
-
-## Environment variables
-
-| Variable | Effect |
-|----------|--------|
-| `DATABASE_URL` | Postgres + pgvector (default host port **5433**) |
-| `TAVILY_API_KEY` | Live OSINT |
-| `AEGIS_LLM_*` | LLM for Identify (OmniRoute / OpenRouter / Groq) |
-| `IDENTIFY_LIVE_SEARCH` | `true` = live; `false` = fixtures (CI) |
-| `VITE_API_BASE_URL` | Frontend API base (`/api` in dev) |
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `IDENTIFY_TAVILY_MAX_CALLS_PER_RUN` | `12` | Tavily budget per run |
+| `IDENTIFY_MAX_DOCS` | `0` | Max URLs to deep-extract (`0` = unlimited) |
+| `IDENTIFY_MAX_HITL` | `0` | Max HITL rows (`0` = unlimited) |
+| `IDENTIFY_CURATOR_ENABLED` | `true` | LLM rank before extract |
+| `AEGIS_EMBEDDINGS` | `fastembed` | `hash` for CI only |
 
 Full list: [`.env.example`](.env.example)
 
 ---
 
-## Makefile
+## OmniRoute setup (default LLM)
+
+AegisLoop’s **default** profile routes LLM calls through **OmniRoute** — an OpenAI-compatible proxy (model routing, dashboard keys).
+
+1. **Install & run OmniRoute** on the same machine (dashboard docs — typically listens on port **20128**).
+2. Copy your **Bearer API key** from the OmniRoute dashboard.
+3. In `.env`:
 
 ```bash
-make install          # Python deps
-make dev              # Postgres + seed + API
-make seed             # Reload catalog YAML → Postgres
-make api              # API only (reload)
-make test             # pytest
-make validate-all     # offline gates
-make defend-fit       # train champion on a run
+AEGIS_LLM_PROFILE=omniroute
+AEGIS_LLM_BASE_URL=http://127.0.0.1:20128/v1
+AEGIS_LLM_MODEL=auto          # or pin e.g. openai/gpt-4o-mini for reproducibility
+AEGIS_LLM_API_KEY=sk-or-...   # OmniRoute dashboard key
+AEGIS_LLM_ALLOW_LOOPBACK_HTTP=true
+```
+
+4. Verify router responds:
+
+```bash
+curl -s http://127.0.0.1:20128/v1/models -H "Authorization: Bearer $AEGIS_LLM_API_KEY" | head
+```
+
+5. Start API (`make dev` or `./run.sh`) — Identify graph uses this endpoint for extract / curator / HITL staging.
+
+> Do **not** set `GROQ_API_KEY` while `AEGIS_LLM_PROFILE=omniroute` unless you intend to switch profile.
+
+---
+
+## Alternative: OpenRouter / Groq (no OmniRoute)
+
+If you do not run OmniRoute locally:
+
+**OpenRouter:**
+
+```bash
+AEGIS_LLM_PROFILE=generic_openai
+AEGIS_LLM_BASE_URL=https://openrouter.ai/api/v1
+AEGIS_LLM_MODEL=openai/gpt-4o-mini
+AEGIS_LLM_API_KEY=sk-or-v1-...
+AEGIS_LLM_ALLOW_LOOPBACK_HTTP=false
+```
+
+**Groq:**
+
+```bash
+AEGIS_LLM_PROFILE=groq
+AEGIS_LLM_MODEL=openai/gpt-oss-20b
+GROQ_API_KEY=gsk_...
+```
+
+Restart API after changing `.env`.
+
+---
+
+## Booth walkthrough (UI)
+
+| Route | Pillar | What you see |
+|-------|--------|--------------|
+| `/` | — | Landing + loop story |
+| `/identify` | Identify | Landscape — coverage chips |
+| `/identify/discover` | Identify | Live OSINT job thread (SSE) |
+| `/identify/review` | Identify | HITL approve → catalog |
+| `/generate` | Generate | Quiet traffic → inject → fidelity → ledger |
+| `/defend/detection` | Defend | Fit stream · **98.5% recall** hero · PR curve |
+| `/defend/interventions` | Defend | Brake actions at OP |
+| `/defend/feedback` | Defend | Loop M before/after on gtest |
+| `/defend/hyperparameters` | Defend | Optuna three-column compare |
+
+Design: [`frontend/DESIGN.md`](frontend/DESIGN.md) · UI details: [`frontend/README.md`](frontend/README.md)
+
+---
+
+## Architecture & repo map
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  frontend/  :5173  ──proxy /api──►  apps/api  :8000          │
+└──────────────────────────────────────────────────────────────┘
+         │              │                    │
+         ▼              ▼                    ▼
+   session-store   packages/agents/   packages/sim/     packages/eval/
+   JobThread SSE   packages/osint/    Generate world    Defend + Loop M
+                         │                    │                    │
+                         └────────────────────┴────────────────────┘
+                                              ▼
+                              Postgres + pgvector  (:5433)
+                              data/catalog/seed.yaml (T01–T24)
+```
+
+```
+markoblitz/
+├── MC_PS.md                 # Official challenge statement
+├── README.md                # ← you are here
+├── walkthrough.md           # Engineer API handoff
+├── VALIDATION.md            # G1–G7 gates + metric protocol
+├── Makefile / run.sh        # make dev · live e2e gates
+├── apps/api/                # FastAPI + SSE streaming
+├── packages/
+│   ├── agents/              # Identify LangGraph
+│   ├── osint/               # Tavily, allowlist, fixtures
+│   ├── sim/                 # Generate + fidelity
+│   └── eval/                # HistGBM fit, score, Loop M
+├── frontend/                # ★ Web prototype (Vite React)
+├── data/
+│   ├── catalog/seed.yaml    # Attack atlas SSOT
+│   └── validation/v1/       # Champion freeze JSON
+├── DEMO_PICS/               # Screenshots for this README
+└── tests/                   # pytest
 ```
 
 ---
 
-## Troubleshooting
+## Verify & troubleshoot
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/ready
+make validate-all          # offline — no keys
+./run.sh --check           # live — Tavily + LLM required
+```
 
 | Symptom | Fix |
 |---------|-----|
-| API import errors | `make install` then `make api` |
-| Postgres refused | `make up`; `DATABASE_URL` port **5433** |
-| UI shows RECORDED | Expected without Tavily/LLM; set keys + `IDENTIFY_LIVE_SEARCH=true` |
-| Generate / fit very slow | Full-scale sim + ML — use booth demo URL for quick UI walkthrough |
-| Frontend 404 on API | Ensure `make api` on :8000 |
+| `No module named 'sqlalchemy'` | `make install` then `make dev` |
+| Postgres connection refused | `make up`; `DATABASE_URL` port **5433** |
+| `llm.configured: false` | Set `AEGIS_LLM_API_KEY`; start OmniRoute or use OpenRouter |
+| `tavily_configured: false` | Set `TAVILY_API_KEY`; `IDENTIFY_LIVE_SEARCH=true` |
+| UI chip says RECORDED | Missing live keys — expected in CI mode |
+| Generate / fit hangs long | **Normal** at full scale — use booth demo URL for quick UI |
+| Frontend can't reach API | `make api` or `make dev` must run on **:8000** |
+| `./run.sh` telemetry fail | Optional — use `make dev` for local booth |
 
 ---
 
-## Planning & docs
+## Booth demo site (fast preview)
 
-[`Docs/LOCKED.md`](Docs/LOCKED.md) · [`Docs/plans/`](Docs/plans/) · Phase 1a: [`Docs/plans/04-phase-1-provider-baseline-identify.md`](Docs/plans/04-phase-1-provider-baseline-identify.md)
+Full `make dev` pipeline is slow. For judges / quick understanding:
+
+| | |
+|--|--|
+| **Fork** | `aarush323/markoblitz` |
+| **Branch** | `demo` |
+| **URL** | _[add Netlify URL here]_ |
+| **What it is** | Same UI · recorded champion metrics · SSE replay · no Python install |
+
+Product code + this README live on **`main`** / **`feature/frotnend-final`**. Static booth SPA is on branch **`demo`** only.
 
 ---
 
-## Team
+## Docs index
 
-Mastercard Innovation Challenge 2026 — GFF Mumbai.  
-Repository: **markoblitz** (public GitHub). PR branch: **`feature/frotnend-final`** → `main`.
+| Doc | Content |
+|-----|---------|
+| [`MC_PS.md`](MC_PS.md) | Official problem statement |
+| [`walkthrough.md`](walkthrough.md) | Generate / Defend APIs |
+| [`VALIDATION.md`](VALIDATION.md) | Metrics protocol, G1–G7 |
+| [`frontend/README.md`](frontend/README.md) | UI routes & session |
+| [`Docs/HACKATHON_RESEARCH.md`](Docs/HACKATHON_RESEARCH.md) | Threat research |
+| [`Docs/LOCKED.md`](Docs/LOCKED.md) | Planning SSOT |
+
+---
+
+<div align="center">
+
+**Mastercard Innovation Challenge 2026** · Global Fintech Fest · Team markoblitz
+
+PR branch: `feature/frotnend-final` → `main`
+
+</div>
