@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": "hitl-t13",
+      "technique_id": "T13",
+      "vector_id": "t13-upi-impersonation-app",
+      "name": "UPI impersonation APP",
+      "confidence": 0.92,
+      "source_url": "https://www.rbi.org.in/",
+      "rationale": "RBI alert on impersonation scams via UPI collect requests."
+    },
+    {
+      "id": "hitl-t11",
+      "technique_id": "T11",
+      "vector_id": "t11-identity-farming",
+      "name": "Identity farming burst",
+      "confidence": 0.88,
+      "source_url": "https://www.fincen.gov/",
+      "rationale": "FinCEN pattern: synthetic identity burst before cash-out."
+    },
+    {
+      "id": "hitl-t09",
+      "technique_id": "T09",
+      "vector_id": "t09-deepfake-vkyc",
+      "name": "Deepfake vKYC bypass",
+      "confidence": 0.75,
+      "source_url": "https://www.fincen.gov/",
+      "rationale": "Named gap — documented case, not simulatable live rule."
+    }
+  ]
+}

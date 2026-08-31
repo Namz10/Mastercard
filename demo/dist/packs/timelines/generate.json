@@ -1,0 +1,318 @@
+{
+  "events": [
+    {
+      "t": 0,
+      "verb": "COMMIT",
+      "body": "Build quiet payment world · 2400 customers · 90d",
+      "status": "started",
+      "now": "Building quiet payment world",
+      "why": "Legitimate traffic first — fraud injected later.",
+      "happening": "Quiet world",
+      "visual": "customers"
+    },
+    {
+      "t": 8500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 20000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 20000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 20000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 16500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 40000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 40000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 40000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 24500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 60000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 60000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 60000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 32500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 80000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 80000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 80000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 40500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 100000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 100000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 100000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 48500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 120000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 120000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 120000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 56500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 140000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 140000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 140000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 64500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 160000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 160000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 160000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 72500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 180000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 180000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 180000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 80500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 200000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 200000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 200000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 88500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 220000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 220000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 220000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 96500,
+      "verb": "COMMIT",
+      "body": "Quiet traffic — 240000 of 2400 customers",
+      "status": "progress",
+      "artifacts": {
+        "customers": 240000,
+        "total": 2400
+      },
+      "now": "Materializing legitimate spends — 240000 of 2400 customers",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Fraud is not in the ledger yet.",
+      "visual": "customers"
+    },
+    {
+      "t": 12000,
+      "verb": "COMMIT",
+      "body": "390,411 quiet events materialized",
+      "status": "ok",
+      "artifacts": {
+        "events": 390411
+      },
+      "now": "390,411 quiet events on ledger",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "390K events",
+      "visual": "events"
+    },
+    {
+      "t": 14000,
+      "verb": "COMMIT",
+      "body": "Replaying causal features on quiet ledger",
+      "status": "progress",
+      "now": "Replaying causal features on 390K rows",
+      "why": "G1 — past rows only, no label leakage.",
+      "happening": "Causal feature replay"
+    },
+    {
+      "t": 16000,
+      "verb": "INJECT",
+      "body": "Layer mule fan-in and cash-out paths",
+      "status": "ok",
+      "artifacts": {
+        "family": "mule",
+        "count": 3191
+      },
+      "now": "Overlaying mule — 3191 rows",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Layer mule fan-in and cash-out paths",
+      "visual": "families"
+    },
+    {
+      "t": 18500,
+      "verb": "INJECT",
+      "body": "Identity burst overlay",
+      "status": "ok",
+      "artifacts": {
+        "family": "identity_burst",
+        "count": 1549
+      },
+      "now": "Overlaying identity_burst — 1549 rows",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Identity burst overlay",
+      "visual": "families"
+    },
+    {
+      "t": 21000,
+      "verb": "INJECT",
+      "body": "Account takeover sessions",
+      "status": "ok",
+      "artifacts": {
+        "family": "ato",
+        "count": 398
+      },
+      "now": "Overlaying ato — 398 rows",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Account takeover sessions",
+      "visual": "families"
+    },
+    {
+      "t": 23500,
+      "verb": "INJECT",
+      "body": "APP impersonation sessions",
+      "status": "ok",
+      "artifacts": {
+        "family": "app_fraud",
+        "count": 1586
+      },
+      "now": "Overlaying app_fraud — 1586 rows",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "APP impersonation sessions",
+      "visual": "families"
+    },
+    {
+      "t": 26000,
+      "verb": "INJECT",
+      "body": "Invoice beneficiary swap",
+      "status": "ok",
+      "artifacts": {
+        "family": "invoice_fraud",
+        "count": 760
+      },
+      "now": "Overlaying invoice_fraud — 760 rows",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Invoice beneficiary swap",
+      "visual": "families"
+    },
+    {
+      "t": 28500,
+      "verb": "FIDELITY",
+      "body": "PSI amount 0.05 · fraud rate 1.88%",
+      "status": "ok",
+      "now": "Fidelity gates pass — priors match lab band",
+      "why": "Anti-stub: PSI + fraud-rate band.",
+      "happening": "PSI pass"
+    },
+    {
+      "t": 30500,
+      "verb": "COMMIT",
+      "body": "Export train/split parquet — allowlisted columns only",
+      "status": "progress",
+      "now": "Writing parquet — labels never in X",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Allowlisted feature columns only"
+    },
+    {
+      "t": 33500,
+      "verb": "COMMIT",
+      "body": "Population committed — 398,431 events",
+      "status": "done",
+      "result": {
+        "run_id": "demo-pop-v1",
+        "seed": 42,
+        "scale": "full",
+        "fidelity_pass": true,
+        "fidelity_reasons": [],
+        "event_count": 398431,
+        "family_counts": {
+          "mule": 3191,
+          "identity_burst": 1549,
+          "ato": 398,
+          "app_fraud": 1586,
+          "invoice_fraud": 760
+        },
+        "mule_fan_in": 18
+      },
+      "now": "Generate complete — 398,431 events",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Done",
+      "next": "Defend fit on train fold"
+    }
+  ]
+}

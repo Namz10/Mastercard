@@ -1,0 +1,511 @@
+{
+  "categories": {
+    "1": [
+      {
+        "technique_id": "T01",
+        "name": "Mule fan-in funnel",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t01-mule-fan-in",
+            "technique_id": "T01",
+            "name": "Mule fan-in funnel",
+            "category": 1,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T02",
+        "name": "Mule fan-out cash-out",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t02-mule-fan-out",
+            "technique_id": "T02",
+            "name": "Mule fan-out cash-out",
+            "category": 1,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          },
+          {
+            "vector_id": "t02-reuters-cashout",
+            "technique_id": "T02",
+            "name": "Rapid mule cash-out pattern",
+            "category": 1,
+            "confidence_level": "reported-unverified",
+            "source_tier": 4
+          }
+        ],
+        "variants": 2
+      },
+      {
+        "technique_id": "T03",
+        "name": "UPI-cap smurfing",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t03-upi-cap-smurfing",
+            "technique_id": "T03",
+            "name": "UPI-cap smurfing",
+            "category": 1,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T04",
+        "name": "Rail hop UPI-IMPS-wallet",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t04-rail-hop",
+            "technique_id": "T04",
+            "name": "Rail hop UPI-IMPS-wallet",
+            "category": 1,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T05",
+        "name": "Dust and layering",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 2,
+        "chips": [
+          {
+            "vector_id": "t05-dust-layering",
+            "technique_id": "T05",
+            "name": "Dust and layering",
+            "category": 1,
+            "confidence_level": "confirmed",
+            "source_tier": 2
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T06",
+        "name": "Synthetic merchant collusion",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t06-synthetic-merchant",
+            "technique_id": "T06",
+            "name": "Synthetic merchant collusion",
+            "category": 1,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T07",
+        "name": "Card testing and BIN enumeration",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t07-card-testing",
+            "technique_id": "T07",
+            "name": "Card testing and BIN enumeration",
+            "category": 1,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      }
+    ],
+    "2": [
+      {
+        "technique_id": "T08",
+        "name": "Synthetic identity mix",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t08-synthetic-identity",
+            "technique_id": "T08",
+            "name": "Synthetic identity mix",
+            "category": 2,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T09",
+        "name": "Deepfake VKYC liveness bypass",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t09-deepfake-vkyc",
+            "technique_id": "T09",
+            "name": "Deepfake VKYC liveness bypass",
+            "category": 2,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T10",
+        "name": "KYC document field forgery",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 2,
+        "chips": [
+          {
+            "vector_id": "t10-kyc-doc-forgery",
+            "technique_id": "T10",
+            "name": "KYC document field forgery",
+            "category": 2,
+            "confidence_level": "confirmed",
+            "source_tier": 2
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T11",
+        "name": "Identity farming seasoning",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t11-identity-farming",
+            "technique_id": "T11",
+            "name": "Identity farming seasoning",
+            "category": 2,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          },
+          {
+            "vector_id": "t11-kurshan-seasoned",
+            "technique_id": "T11",
+            "name": "Seasoned synthetic bust-out",
+            "category": 2,
+            "confidence_level": "confirmed",
+            "source_tier": 2
+          }
+        ],
+        "variants": 2
+      },
+      {
+        "technique_id": "T12",
+        "name": "ATO device session shift",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t12-ato-device-shift",
+            "technique_id": "T12",
+            "name": "ATO device session shift",
+            "category": 2,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      }
+    ],
+    "3": [
+      {
+        "technique_id": "T13",
+        "name": "UPI impersonation APP India",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t13-upi-impersonation-app",
+            "technique_id": "T13",
+            "name": "UPI impersonation APP India",
+            "category": 3,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          },
+          {
+            "vector_id": "t13-rbi-app-scale",
+            "technique_id": "T13",
+            "name": "RBI-scale UPI APP surge",
+            "category": 3,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 2
+      },
+      {
+        "technique_id": "T14",
+        "name": "Family emergency voice-clone APP",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t14-family-emergency-voice",
+            "technique_id": "T14",
+            "name": "Family emergency voice-clone APP",
+            "category": 3,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T15",
+        "name": "Romance investment long-con APP",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "T15-romance-long-con",
+            "technique_id": "T15",
+            "name": "Romance investment long-con APP",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T16",
+        "name": "Voice-clone BEC CFO",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 4,
+        "chips": [
+          {
+            "vector_id": "t16-voice-bec-cfo",
+            "technique_id": "T16",
+            "name": "Voice-clone BEC CFO",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 4
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T17",
+        "name": "Polymorphic phishing smishing",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t17-polymorphic-phishing",
+            "technique_id": "T17",
+            "name": "Polymorphic phishing smishing",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T18",
+        "name": "Invoice-timed impersonation",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t18-invoice-impersonation",
+            "technique_id": "T18",
+            "name": "Invoice-timed impersonation",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T19",
+        "name": "Live MFA-relay class",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "reported-unverified",
+        "source_tier": 4,
+        "chips": [
+          {
+            "vector_id": "t19-mfa-relay-class",
+            "technique_id": "T19",
+            "name": "Live MFA-relay class",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 4
+          },
+          {
+            "vector_id": "t19-session-signals",
+            "technique_id": "T19",
+            "name": "MFA-relay session signal pattern",
+            "category": 3,
+            "confidence_level": "reported-unverified",
+            "source_tier": 4
+          }
+        ],
+        "variants": 2
+      }
+    ],
+    "4": [
+      {
+        "technique_id": "T20",
+        "name": "Detector evasion probing",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "confirmed",
+        "source_tier": 2,
+        "chips": [
+          {
+            "vector_id": "t20-detector-evasion",
+            "technique_id": "T20",
+            "name": "Detector evasion probing",
+            "category": 4,
+            "confidence_level": "confirmed",
+            "source_tier": 2
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T21",
+        "name": "Training-data poisoning",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t21-training-poisoning",
+            "technique_id": "T21",
+            "name": "Training-data poisoning",
+            "category": 4,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T22",
+        "name": "Detector fingerprinting",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "confirmed",
+        "source_tier": 2,
+        "chips": [
+          {
+            "vector_id": "t22-detector-fingerprint",
+            "technique_id": "T22",
+            "name": "Detector fingerprinting",
+            "category": 4,
+            "confidence_level": "confirmed",
+            "source_tier": 2
+          }
+        ],
+        "variants": 1
+      },
+      {
+        "technique_id": "T23",
+        "name": "KYC LLM supply-chain injection",
+        "status": "open",
+        "generate_mode": "name_only",
+        "confidence_level": "reported-unverified",
+        "source_tier": 3,
+        "chips": [
+          {
+            "vector_id": "t23-supply-chain-llm",
+            "technique_id": "T23",
+            "name": "KYC LLM supply-chain injection",
+            "category": 4,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 1
+      }
+    ],
+    "5": [
+      {
+        "technique_id": "T24",
+        "name": "Beneficiary invoice rewrite",
+        "status": "open",
+        "generate_mode": "generate",
+        "confidence_level": "confirmed",
+        "source_tier": 1,
+        "chips": [
+          {
+            "vector_id": "t24-beneficiary-invoice",
+            "technique_id": "T24",
+            "name": "Beneficiary invoice rewrite",
+            "category": 5,
+            "confidence_level": "confirmed",
+            "source_tier": 1
+          },
+          {
+            "vector_id": "t24-invoice-linked-t16",
+            "technique_id": "T24",
+            "name": "Invoice rewrite linked BEC",
+            "category": 5,
+            "confidence_level": "reported-unverified",
+            "source_tier": 3
+          }
+        ],
+        "variants": 2
+      }
+    ]
+  },
+  "technique_count": 29
+}

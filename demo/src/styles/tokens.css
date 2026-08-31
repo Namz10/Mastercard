@@ -1,0 +1,93 @@
+:root {
+  /* Paper / sage / ink — status + honesty (DESIGN.md §1) */
+  --paper-0: #f7f5f0;
+  --paper-1: #ffffff;
+  --hairline: #e4e6ee;
+  --ink: #191c19;
+  --ink-2: #3d4240;
+  --ink-3: #6b7367;
+
+  --sage-100: #e9f0e9;
+  --sage-600: #3e6b4f;
+  --sage-700: #2e5340;
+  --ochre-700: #8a5a00;
+  --slate-600: #55606b;
+  --rust-700: #9c3b23;
+
+  /* Bento × Spatial canvas — cool white, not beige slab */
+  --canvas: #fbfbfc;
+  --surface-solid: #ffffff;
+  --surface-warm: #fffefb;
+  --surface-float: rgba(255, 255, 255, 0.74);
+
+  /* ONE accent — landing sage (primary CTA, active nav, LIVE) */
+  --accent: #3e6b4f;
+  --accent-hover: #2e5340;
+  --accent-muted: #e9f0e9;
+  --accent-fg: #ffffff;
+  --accent-border: rgba(62, 107, 79, 0.22);
+
+  /* Legacy aliases */
+  --bg: var(--canvas);
+  --surface: var(--surface-solid);
+  --surface-sunken: var(--accent-muted);
+  --border: var(--hairline);
+  --border-strong: #c9cdd8;
+  --ink-muted: var(--ink-2);
+  --ink-faint: var(--ink-3);
+
+  --signal-block: var(--rust-700);
+  --signal-watch: var(--ochre-700);
+  --signal-safe: var(--sage-600);
+  --signal-idle: var(--slate-600);
+  --signal-info: var(--accent);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-drawer: 12px;
+  --radius-sheet: 20px;
+  --radius-bento: 24px;
+
+  --shadow-drawer: 0 8px 24px rgba(25, 28, 25, 0.12);
+  --shadow-panel: 0 1px 2px rgba(25, 28, 25, 0.04), 0 10px 28px rgba(25, 28, 25, 0.05);
+  --shadow-float: 0 1px 2px rgba(25, 28, 25, 0.04), 0 8px 24px rgba(25, 28, 25, 0.06);
+  --shadow-bento: 0 1px 2px rgba(25, 28, 25, 0.04), 0 12px 32px rgba(25, 28, 25, 0.06);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+
+  --workspace-mesh:
+    radial-gradient(ellipse 70% 48% at 4% -4%, rgba(62, 107, 79, 0.06) 0%, transparent 58%),
+    radial-gradient(ellipse 36% 30% at 96% 4%, rgba(62, 107, 79, 0.025) 0%, transparent 52%),
+    linear-gradient(180deg, #fbfbfc 0%, #f8f9f8 100%);
+
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.58);
+  --glass-border: rgba(25, 28, 25, 0.08);
+  --glass-shadow: var(--shadow-float);
+  --glass-blur: 18px;
+  --workspace-lift-shadow: 0 4px 16px rgba(25, 28, 25, 0.08), 0 1px 3px rgba(25, 28, 25, 0.04);
+}
+
+/* Landing — unified sage mesh canvas (full viewport, both columns) */
+.landing-root {
+  --landing-mesh:
+    radial-gradient(ellipse 110% 85% at 18% 42%, rgba(62, 107, 79, 0.11) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 65% at 88% 38%, rgba(233, 240, 233, 0.22) 0%, transparent 52%),
+    radial-gradient(ellipse 50% 42% at 62% 92%, rgba(62, 107, 79, 0.06) 0%, transparent 48%),
+    radial-gradient(ellipse 45% 38% at 100% 8%, rgba(255, 255, 255, 0.75) 0%, transparent 55%),
+    linear-gradient(168deg, #ffffff 0%, #fbfbfc 36%, #f2f6f3 100%);
+  --landing-globe-vignette:
+    radial-gradient(ellipse 88% 78% at 58% 46%, transparent 38%, rgba(251, 251, 252, 0.14) 72%, rgba(238, 242, 248, 0.28) 100%);
+  --landing-globe-glow:
+    radial-gradient(ellipse 72% 62% at 54% 44%, rgba(62, 107, 79, 0.16) 0%, transparent 70%);
+  --landing-split-fade: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(251, 251, 252, 0.18) 55%,
+    transparent 100%
+  );
+  --landing-glass: rgba(255, 255, 255, 0.78);
+  --landing-glass-border: rgba(25, 28, 25, 0.08);
+  --landing-shadow-soft: 0 2px 8px rgba(25, 28, 25, 0.04), 0 12px 32px rgba(25, 28, 25, 0.06);
+  --landing-shadow-lift: 0 4px 14px rgba(62, 107, 79, 0.28), 0 1px 3px rgba(25, 28, 25, 0.08);
+  --landing-gradient-ink: linear-gradient(135deg, var(--ink) 0%, var(--accent) 70%);
+}

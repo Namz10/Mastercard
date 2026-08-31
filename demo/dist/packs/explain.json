@@ -1,0 +1,13 @@
+{
+  "top_features": [
+    "rail",
+    "fan_in_1h",
+    "account_age_days",
+    "mule_account_age_days",
+    "rule__mule-fan-in-burst"
+  ],
+  "importances_mean": {},
+  "bootstrap_ci": {},
+  "champion_recall": 0.9851609657947686,
+  "champion_genuine_fp": 0.00031834860848147715
+}

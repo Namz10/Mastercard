@@ -1,0 +1,134 @@
+{
+  "events": [
+    {
+      "t": 0,
+      "verb": "TUNE",
+      "body": "Optuna search on inner-val only",
+      "status": "started",
+      "now": "Hyperparameter search — inner-val only",
+      "why": "Holdout frozen; skip if too few fraud rows.",
+      "happening": "Optuna"
+    },
+    {
+      "t": 4000,
+      "verb": "TUNE",
+      "body": "Trial 3 of 12 — learning_rate 0.08",
+      "status": "progress",
+      "artifacts": {
+        "trial": 3,
+        "total": 12
+      }
+    },
+    {
+      "t": 8000,
+      "verb": "TUNE",
+      "body": "Trial 8 of 12 — max_depth 4",
+      "status": "progress",
+      "artifacts": {
+        "trial": 8,
+        "total": 12
+      }
+    },
+    {
+      "t": 12000,
+      "verb": "TUNE",
+      "body": "Tune complete",
+      "status": "done",
+      "result": {
+        "tune": {
+          "trials": 12,
+          "best": 0.9871609657947686
+        },
+        "score": {
+          "run_id": "v1-gtest-48",
+          "model_run_id": "v1-train-46__loopm-train-tuned",
+          "metrics": {
+            "pass": true,
+            "n_eval": 183025,
+            "ap_by_family": {
+              "app_fraud": {
+                "ap": 0.9900763253852783
+              },
+              "ato": {
+                "ap": 0.0556767427981058
+              },
+              "identity_burst": {
+                "ap": 0.9844365822097962
+              },
+              "invoice_fraud": {
+                "ap": 0.9999999999999999
+              },
+              "mule": {
+                "ap": 0.9942435343917385
+              }
+            },
+            "tpr_at_fpr": {
+              "0.05": {
+                "tpr": 0.9994607710973308,
+                "fpr_target": 0.05
+              },
+              "0.02": {
+                "tpr": 0.9989215421946617,
+                "fpr_target": 0.02
+              },
+              "0.01": {
+                "tpr": 0.9956861687786466,
+                "fpr_target": 0.01
+              },
+              "0.005": {
+                "tpr": 0.9947425181989754,
+                "fpr_target": 0.005
+              },
+              "0.001": {
+                "tpr": 0.9867,
+                "fpr_target": 0.001
+              },
+              "0.000318349": {
+                "tpr": 0.9851609657947686,
+                "fpr_target": 0.00031834860848147715
+              }
+            },
+            "genuine_fp": 0.00031834860848147715,
+            "f1_at_op": 0,
+            "precision_at_op": 0.9856567689984902,
+            "recall_at_op": 0.9871609657947686,
+            "binary_ap": 0.9984912981431321,
+            "confusion_matrix": [
+              178992,
+              57,
+              59,
+              3917
+            ],
+            "op_threshold": 0.9151932016993464,
+            "recipe_hash": "frozen",
+            "model_freeze_id": "frozen",
+            "top_features": [],
+            "n_pos": {
+              "app_fraud": 726,
+              "ato": 150,
+              "identity_burst": 1018,
+              "invoice_fraud": 326,
+              "mule": 1756,
+              "normal": 179049
+            }
+          },
+          "action_histogram": {
+            "allow": 177906,
+            "decline": 7,
+            "hold": 761,
+            "mule_credit_restrict": 2505,
+            "notify": 1782,
+            "step_up": 64
+          },
+          "split": "gtest",
+          "recipe_hash": "frozen",
+          "model_freeze_id": "frozen",
+          "frozen": true
+        }
+      },
+      "now": "Tune complete — compare base / feedback / tuned",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Done"
+    }
+  ]
+}

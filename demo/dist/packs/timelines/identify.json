@@ -1,0 +1,90 @@
+{
+  "events": [
+    {
+      "t": 0,
+      "verb": "COLLECT",
+      "body": "Collect started",
+      "status": "started",
+      "now": "Scanning allowlisted OSINT sources",
+      "why": "Identify only uses vetted URLs — not open web search.",
+      "happening": "FinCEN, RBI, IOC feeds"
+    },
+    {
+      "t": 800,
+      "verb": "COLLECT",
+      "body": "Source fincen.gov",
+      "status": "ok",
+      "artifacts": {
+        "urls": [
+          "fincen.gov"
+        ]
+      },
+      "now": "Reading fincen.gov",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "fincen.gov"
+    },
+    {
+      "t": 3000,
+      "verb": "COLLECT",
+      "body": "Source rbi.org.in",
+      "status": "ok",
+      "now": "COLLECT: rbi.org.in",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "rbi.org.in"
+    },
+    {
+      "t": 6000,
+      "verb": "EXTRACT",
+      "body": "Reading articles",
+      "status": "ok",
+      "now": "Extracting attack phrases",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "NER + citation spans"
+    },
+    {
+      "t": 9000,
+      "verb": "RANK",
+      "body": "Ranking sources",
+      "status": "ok",
+      "now": "Ranking by tier and corroboration",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Ranking sources"
+    },
+    {
+      "t": 11000,
+      "verb": "GROUND",
+      "body": "Matching to the catalog",
+      "status": "ok",
+      "now": "Grounding to T01–T24 atlas",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Matching to the catalog",
+      "visual": "customers"
+    },
+    {
+      "t": 14000,
+      "verb": "PROPOSE",
+      "body": "Proposing attacks for review",
+      "status": "ok",
+      "now": "Three HITL candidates ready",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Proposing attacks"
+    },
+    {
+      "t": 15000,
+      "verb": "REPLAY",
+      "body": "Playback complete",
+      "status": "done",
+      "result": {
+        "run_id": "recorded-identify",
+        "candidate_urls": [
+          "fincen.gov",
+          "rbi.org.in",
+          "reuters.com"
+        ]
+      },
+      "now": "Discover complete — review queue open",
+      "why": "Lab protocol step — see How it works.",
+      "happening": "Complete"
+    }
+  ]
+}

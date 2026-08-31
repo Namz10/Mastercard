@@ -1,0 +1,217 @@
+{
+  "run_id": "v1-train-46",
+  "miss_family": "identity_burst",
+  "train_seed": 46,
+  "gtest_seed": 48,
+  "n_extra": 1537,
+  "ap_equal_eps": 0.05,
+  "genuine_fpr_eps": 0.02,
+  "comparison": {
+    "family": "identity_burst",
+    "family_chosen_from_slice": "gdev44",
+    "ap_before": 0.3366613002759016,
+    "ap_after": 0.9666629213276045,
+    "ap_delta": 0.6300016210517029,
+    "ap_verdict": "improved",
+    "genuine_fp_before": 0.08792989554518806,
+    "genuine_fp_after": 0.08067637587217703,
+    "genuine_fp_ok": true,
+    "genuine_fp_note": "genuine FPR not worse beyond frozen epsilon",
+    "n_pos_before": {
+      "app_fraud": 1572,
+      "ato": 395,
+      "identity_burst": 1542,
+      "invoice_fraud": 747,
+      "mule": 3162,
+      "normal": 387536
+    },
+    "n_pos_after": {
+      "app_fraud": 1572,
+      "ato": 395,
+      "identity_burst": 1542,
+      "invoice_fraud": 747,
+      "mule": 3162,
+      "normal": 387536
+    },
+    "other_family_ap": {
+      "app_fraud": {
+        "ap_before": 0.9800523420612413,
+        "ap_after": 0.9828928278626385,
+        "n_pos": 1572,
+        "relative_delta": 0.002898300100404015,
+        "verdict": "improved"
+      },
+      "ato": {
+        "ap_before": 0.5462530623130241,
+        "ap_after": 0.5331669543711842,
+        "n_pos": 395,
+        "relative_delta": -0.023956127378817325,
+        "verdict": "equal"
+      },
+      "invoice_fraud": {
+        "ap_before": 0.9998985551498483,
+        "ap_after": 0.9998809749321714,
+        "n_pos": 747,
+        "relative_delta": -0.00001758200128032329,
+        "verdict": "equal"
+      },
+      "mule": {
+        "ap_before": 0.996460079361299,
+        "ap_after": 0.994629294465454,
+        "n_pos": 3162,
+        "relative_delta": -0.001837288752218214,
+        "verdict": "equal"
+      }
+    },
+    "other_family_ok": true,
+    "other_family_rel_drop_eps": 0.05
+  },
+  "metrics": {
+    "pass": true,
+    "protocol": "g_test_new_seed",
+    "gtest_before": {
+      "pass": true,
+      "n_eval": 394954,
+      "ap_by_family": {
+        "app_fraud": {
+          "ap": 0.9900763253852783
+        },
+        "ato": {
+          "ap": 0.0556767427981058
+        },
+        "identity_burst": {
+          "ap": 0.3366613002759016
+        },
+        "invoice_fraud": {
+          "ap": 0.9999999999999999
+        },
+        "mule": {
+          "ap": 0.9942435343917385
+        }
+      },
+      "tpr_at_fpr": {
+        "0.05": {
+          "tpr": 0.9994607710973308,
+          "fpr_target": 0.05
+        },
+        "0.02": {
+          "tpr": 0.9989215421946617,
+          "fpr_target": 0.02
+        },
+        "0.01": {
+          "tpr": 0.9956861687786466,
+          "fpr_target": 0.01
+        },
+        "0.005": {
+          "tpr": 0.9947425181989754,
+          "fpr_target": 0.005
+        },
+        "0.001": {
+          "tpr": 0.9867,
+          "fpr_target": 0.001
+        },
+        "0.000318349": {
+          "tpr": 0.9851609657947686,
+          "fpr_target": 0.00031834860848147715
+        }
+      },
+      "genuine_fp": 0.08792989554518806,
+      "recall_at_op": 0.72,
+      "precision_at_op": 0.9856567689984902,
+      "binary_ap": 0.9984912981431321,
+      "confusion_matrix": {
+        "tn": 178992,
+        "fp": 57,
+        "fn": 59,
+        "tp": 3917
+      },
+      "op_threshold": 0.9151932016993464,
+      "recipe_hash": "frozen",
+      "model_freeze_id": "frozen",
+      "n_pos": {
+        "app_fraud": 1572,
+        "ato": 395,
+        "identity_burst": 1542,
+        "invoice_fraud": 747,
+        "mule": 3162,
+        "normal": 387536
+      }
+    },
+    "gtest_after": {
+      "pass": true,
+      "n_eval": 394954,
+      "ap_by_family": {
+        "app_fraud": {
+          "ap": 0.9900763253852783
+        },
+        "ato": {
+          "ap": 0.0556767427981058
+        },
+        "identity_burst": {
+          "ap": 0.9666629213276045
+        },
+        "invoice_fraud": {
+          "ap": 0.9999999999999999
+        },
+        "mule": {
+          "ap": 0.9942435343917385
+        }
+      },
+      "tpr_at_fpr": {
+        "0.05": {
+          "tpr": 0.9994607710973308,
+          "fpr_target": 0.05
+        },
+        "0.02": {
+          "tpr": 0.9989215421946617,
+          "fpr_target": 0.02
+        },
+        "0.01": {
+          "tpr": 0.9956861687786466,
+          "fpr_target": 0.01
+        },
+        "0.005": {
+          "tpr": 0.9947425181989754,
+          "fpr_target": 0.005
+        },
+        "0.001": {
+          "tpr": 0.9867,
+          "fpr_target": 0.001
+        },
+        "0.000318349": {
+          "tpr": 0.9851609657947686,
+          "fpr_target": 0.00031834860848147715
+        }
+      },
+      "genuine_fp": 0.00031834860848147715,
+      "recall_at_op": 0.9851609657947686,
+      "precision_at_op": 0.9856567689984902,
+      "binary_ap": 0.9984912981431321,
+      "confusion_matrix": {
+        "tn": 178992,
+        "fp": 57,
+        "fn": 59,
+        "tp": 3917
+      },
+      "op_threshold": 0.9151932016993464,
+      "recipe_hash": "frozen",
+      "model_freeze_id": "frozen",
+      "n_pos": {
+        "app_fraud": 1572,
+        "ato": 395,
+        "identity_burst": 1542,
+        "invoice_fraud": 747,
+        "mule": 3162,
+        "normal": 387536
+      }
+    }
+  },
+  "model_run_id_before": "v1-train-46",
+  "model_run_id_after": "v1-train-46__loopm-train",
+  "gtest_run_id": "v1-train-46__gtest",
+  "gtest_alias": {
+    "aliased_run_id": "v1-gtest-48",
+    "note": "v1-train-46__gtest is a second generate of world_seed 48; event_id sequences are byte-identical to v1-gtest-48 (394,954 rows). Not independent holdout confirmation."
+  },
+  "pass": true
+}
