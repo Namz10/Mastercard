@@ -4,32 +4,78 @@
 
 ### Mastercard Innovation Challenge @ GFF 2026 · AI Defense Lab for Payment Security
 
-**Identify → Generate → Defend** as one closed-loop red-team / blue-team system.
+**Identify → Generate → Defend** — one closed-loop red-team / blue-team system.
 
 Build the attack. Train the defense. Close the loop.
 
-[![Problem statement](https://img.shields.io/badge/Challenge-MC_PS.md-sage?style=for-the-badge)](MC_PS.md)
+[![Live demo](https://img.shields.io/badge/Live_demo-markoblitz.netlify.app-sage?style=for-the-badge)](https://markoblitz.netlify.app/)
+[![Problem statement](https://img.shields.io/badge/Challenge-MC_PS.md-ink?style=for-the-badge)](MC_PS.md)
 [![Walkthrough](https://img.shields.io/badge/Handoff-walkthrough.md-ink?style=for-the-badge)](walkthrough.md)
-[![Validation](https://img.shields.io/badge/Metrics-VALIDATION.md-ink?style=for-the-badge)](VALIDATION.md)
+[![Validation](https://img.shields.io/badge/Protocol-VALIDATION.md-ink?style=for-the-badge)](VALIDATION.md)
 
 </div>
 
 ---
 
-## Table of contents
+## Try it now — live booth demo
 
-1. [What this repo is](#what-this-repo-is)
-2. [Visual proof — working prototype](#visual-proof--working-prototype)
-3. [Model metrics (champion freeze)](#model-metrics-champion-freeze)
-4. [Evaluator quickstart — run everything](#evaluator-quickstart--run-everything)
-5. [API keys & services you need](#api-keys--services-you-need)
-6. [OmniRoute setup (default LLM)](#omniroute-setup-default-llm)
-7. [Alternative: OpenRouter / Groq (no OmniRoute)](#alternative-openrouter--groq-no-omniroute)
-8. [Booth walkthrough (UI)](#booth-walkthrough-ui)
-9. [Architecture & repo map](#architecture--repo-map)
-10. [Verify & troubleshoot](#verify--troubleshoot)
-11. [Booth demo site (fast preview)](#booth-demo-site-fast-preview)
-12. [Docs index](#docs-index)
+**No install.** Same UI, champion metrics, narrated SSE replay.
+
+| | |
+|---|---|
+| **URL** | **[https://markoblitz.netlify.app/](https://markoblitz.netlify.app/)** |
+| **Repo** | [`aarush323/markoblitz`](https://github.com/aarush323/markoblitz) · branch `demo` |
+| **What you get** | Identify → Generate → Defend walkthrough · **98.5% recall** hero · Loop M · Optuna · **How it works** |
+| **What it is not** | The slow full Python pipeline — use [Evaluator quickstart](#evaluator-quickstart--run-the-full-stack) below for the real stack |
+
+> Full **generate + ML fit** locally takes **10–20+ minutes** on a laptop. Judges and first-time viewers should start with the **live demo link** above; developers use this README to run Postgres, Tavily, OmniRoute, and the product UI.
+
+---
+
+## Champion metrics (locked holdout)
+
+**Holdout:** `v1-gtest-48` · **Model:** `v1-train-46__loopm-train` (post Loop M) · **Threshold:** inner-val only (never tuned on gtest).
+
+**Source:** [`data/validation/v1/internal_01pct_fpr_freeze.json`](data/validation/v1/internal_01pct_fpr_freeze.json) · **Protocol:** [`VALIDATION.md`](VALIDATION.md)
+
+### Best score @ operating point
+
+We report **recall at genuine false-positive rate** on a **locked time-cut holdout** — not headline accuracy on a random split. Simulated corpus; lab protocol, not issuer SLA.
+
+| Metric | Value |
+|--------|-------|
+| **Recall @ OP** | **98.52%** |
+| **Precision @ OP** | **98.57%** |
+| **Recall at 0.1% FPR** (post-hoc on gtest-48) | **98.7%** |
+| **PR-AUC** (binary average precision) | **0.9985** |
+| **Genuine false-positive rate @ OP** | **0.032%** |
+
+### Fraud family — average precision @ champion OP
+
+| Fraud family | Average precision |
+|--------------|-------------------|
+| Identity burst | **0.984** |
+| Mule behavior | **0.994** |
+| Authorized-push scam (APP) | **0.990** |
+| Account takeover | **0.056** |
+| Invoice fraud | **1.000** |
+
+**Loop M example:** identity_burst AP **0.34 → 0.97** on new gtest seed 48 ([`loop_m_result.json`](data/validation/v1/loop_m_result.json)) — the loop cannot grade its own homework.
+
+---
+
+## Visual proof — working prototype
+
+Screenshots from the product UI (`frontend/` + `make dev`) and the live booth site.
+
+| | |
+|---|---|
+| **Landing** — closed loop on glass | ![Landing](DEMO_PICS/landing.png) |
+| **Identify** — T01–T24 landscape | ![Identify](DEMO_PICS/idenitfy.png) |
+| **Generate** — job thread + ledger | ![Generate 1](DEMO_PICS/generate_p1.png) · ![Generate 2](DEMO_PICS/generate_p2.png) |
+| **Defend** — MetricHero + recall–FPR curve | ![Defend](DEMO_PICS/defend_p1.png) |
+| **Feedback** — Loop M before/after | ![Loop M](DEMO_PICS/feedbackloop.png) |
+| **Hyperparameters** — Optuna compare | ![Optuna](DEMO_PICS/optuna.png) |
 
 ---
 
@@ -43,90 +89,37 @@ Aligned to [`MC_PS.md`](MC_PS.md) — three pillars, one feedback loop:
 | **Generate** | Simulate attacks at scale with **fidelity** | UPI-like event sim · quiet world → injectors → PSI / fraud-rate gates → parquet |
 | **Defend** | Detect with high accuracy, low false positives | **HistGradientBoosting** champion · recall @ **genuine FPR** OP · Brake policy · **Loop M** |
 
-**Submission artifacts:** runnable code (this repo) · solution walkthrough ([`walkthrough.md`](walkthrough.md) + team docx) · **web prototype** ([`frontend/`](frontend/)).
-
-> **Note for evaluators:** Full generate + ML fit can take **10–20+ minutes** on a laptop. For a **5-minute UI walkthrough** without waiting, use the booth demo site (branch `demo` on fork) — link in [Booth demo site](#booth-demo-site-fast-preview). This README gets you the **real** stack running locally.
+**Submission artifacts:** runnable code (this repo) · solution walkthrough ([`walkthrough.md`](walkthrough.md) + team docx) · **web prototype** ([`frontend/`](frontend/)) · **live booth** ([markoblitz.netlify.app](https://markoblitz.netlify.app/)).
 
 ---
 
-## Visual proof — working prototype
+## Table of contents
 
-Screenshots from the live booth UI (`frontend/` + `make dev`).
-
-### Landing — closed loop on glass
-
-![AegisLoop landing — Identify, Generate, Defend](DEMO_PICS/landing.png)
-
-### Identify — threat landscape (T01–T24)
-
-![Identify landscape — catalog and coverage](DEMO_PICS/idenitfy.png)
-
-### Generate — simulate payment traffic
-
-![Generate phase 1 — job thread and scan banner](DEMO_PICS/generate_p1.png)
-
-![Generate phase 2 — ledger tape and mule graph](DEMO_PICS/generate_p2.png)
-
-### Defend — detection & champion metrics
-
-![Defend detection — MetricHero and recall–FPR curve](DEMO_PICS/defend_p1.png)
-
-### Feedback loop (Loop M)
-
-![Loop M — gtest before/after and verdict](DEMO_PICS/feedbackloop.png)
-
-### Hyperparameters (Optuna)
-
-![Optuna tune — base vs feedback vs tuned](DEMO_PICS/optuna.png)
+1. [Evaluator quickstart — run the full stack](#evaluator-quickstart--run-the-full-stack)
+2. [API keys & services](#api-keys--services-you-need)
+3. [OmniRoute setup (default LLM)](#omniroute-setup-default-llm)
+4. [Alternative: OpenRouter / Groq](#alternative-openrouter--groq-no-omniroute)
+5. [Booth walkthrough (UI routes)](#booth-walkthrough-ui-routes)
+6. [Architecture & repo map](#architecture--repo-map)
+7. [Verify & troubleshoot](#verify--troubleshoot)
+8. [Docs index](#docs-index)
 
 ---
 
-## Model metrics (champion freeze)
-
-Locked holdout: **`v1-gtest-48`** · Model: **`v1-train-46__loopm-train`** (post Loop M) · Threshold selected on **inner-val only** (never on gtest).
-
-Source: [`data/validation/v1/internal_01pct_fpr_freeze.json`](data/validation/v1/internal_01pct_fpr_freeze.json) · Protocol: [`VALIDATION.md`](VALIDATION.md)
-
-### Best score (operating point)
-
-| Metric | Value |
-|--------|-------|
-| **Recall @ OP** | **98.52%** |
-| **Precision @ OP** | **98.57%** |
-| **Recall at 0.1% FPR** (reference post-hoc on gtest-48) | **98.7%** |
-| **PR-AUC** (binary average precision) | **0.9985** |
-| **Genuine false-positive rate @ OP** | **0.032%** |
-
-> We report **recall at genuine FPR operating point** on a locked time-cut holdout — not headline “accuracy” on a random split. Simulated corpus; lab protocol, not issuer SLA.
-
-### Fraud family — average precision @ champion OP
-
-| Fraud family | Average precision |
-|--------------|-------------------|
-| Identity burst | **0.984** |
-| Mule behavior | **0.994** |
-| Authorized-push scam (APP) | **0.990** |
-| Account takeover | **0.056** |
-| Invoice fraud | **1.000** |
-
-Loop M example: identity_burst AP **0.34 → 0.97** on new gtest seed 48 ([`loop_m_result.json`](data/validation/v1/loop_m_result.json)) — loop cannot grade its own homework.
-
----
-
-## Evaluator quickstart — run everything
+## Evaluator quickstart — run the full stack
 
 **Goal:** Postgres + API on `:8000` + UI on `:5173` with **live** Identify (Tavily + LLM).
 
-### 0. Prerequisites
+### Prerequisites
 
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **Docker** | recent | Postgres + pgvector (`:5433` on host) |
 | **Python** | 3.11+ | API, sim, ML (`uv` or venv) |
-| **Node.js** | 18+ | Frontend only |
+| **Node.js** | 18+ | Frontend |
 | **Git** | — | Clone repo |
 
-Network: Tavily API, your LLM endpoint (OmniRoute or OpenRouter), Docker Hub for Postgres image.
+Network: Tavily API, LLM endpoint (OmniRoute or OpenRouter), Docker Hub for Postgres image.
 
 ### 1. Clone
 
@@ -139,8 +132,9 @@ cd markoblitz
 
 ```bash
 make install
-# Creates .venv and installs aegisloop + dev deps (FastAPI, sim, sklearn, LangGraph, …)
 ```
+
+Creates `.venv` and installs aegisloop + dev deps (FastAPI, sim, sklearn, LangGraph, …).
 
 ### 3. Configure `.env`
 
@@ -148,7 +142,7 @@ make install
 cp .env.example .env
 ```
 
-**Minimum for live product** (copy from [API keys table](#api-keys--services-you-need)):
+**Minimum for live product:**
 
 ```bash
 DATABASE_URL=postgresql://aegisloop:aegisloop@127.0.0.1:5433/aegisloop
@@ -157,7 +151,7 @@ DATABASE_URL=postgresql://aegisloop:aegisloop@127.0.0.1:5433/aegisloop
 IDENTIFY_LIVE_SEARCH=true
 TAVILY_API_KEY=tvly-xxxxxxxx
 
-# LLM — OmniRoute (default) — see OmniRoute section below
+# LLM — OmniRoute (default) — see section below
 AEGIS_LLM_PROFILE=omniroute
 AEGIS_LLM_BASE_URL=http://127.0.0.1:20128/v1
 AEGIS_LLM_MODEL=auto
@@ -167,11 +161,11 @@ AEGIS_LLM_ALLOW_LOOPBACK_HTTP=true
 
 Never commit `.env`. Keys stay server-side; the browser only talks to `/api` via Vite proxy.
 
-### 4. Start OmniRoute (if using default profile)
+### 4. Start OmniRoute
 
-See [OmniRoute setup](#omniroute-setup-default-llm). Router must be listening on **`http://127.0.0.1:20128/v1`** before Identify runs.
+Router must listen on **`http://127.0.0.1:20128/v1`** before Identify runs. See [OmniRoute setup](#omniroute-setup-default-llm).
 
-### 5. Start backend (one command)
+### 5. Start backend
 
 ```bash
 make dev
@@ -181,7 +175,7 @@ make dev
 **Or** full live validation gates first:
 
 ```bash
-./run.sh --check   # Tavily + LLM + pgvector gates — exits 0 if OK
+./run.sh --check   # Tavily + LLM + pgvector — exits 0 if OK
 ./run.sh           # same gates, then API stays up
 ```
 
@@ -204,14 +198,14 @@ curl -s http://127.0.0.1:8000/ready
 
 `/ready` should show `postgres: true`, `pgvector: true`, `tavily_configured: true`, `llm.configured: true`.
 
-### 8. Walk the booth (recommended path)
+### 8. Walk the product UI
 
 1. **Landing** → Enter workspace  
 2. **Identify → Landscape** — T01–T24 grid  
 3. **Discover** — OSINT stream (COLLECT → … → PROPOSE)  
 4. **Review** — approve HITL items  
-5. **Generate** — Simulate payment traffic (SSE; **slow** at full scale)  
-6. **Defend → Detection** — Fit & score (**slow** — nested HGB + bootstrap)  
+5. **Generate** — simulate payment traffic (SSE; **slow** at full scale)  
+6. **Defend → Detection** — fit & score (**slow** — nested HGB + bootstrap)  
 7. **Interventions** — Brake histogram  
 8. **Feedback** — Loop M  
 9. **Hyperparameters** — Optuna compare  
@@ -224,7 +218,7 @@ curl -s http://127.0.0.1:8000/ready
 make validate-all
 ```
 
-Uses fixtures + hash embeddings — proves repo integrity without Tavily/LLM.
+Fixtures + hash embeddings — proves repo integrity without Tavily/LLM.
 
 ---
 
@@ -257,14 +251,14 @@ Full list: [`.env.example`](.env.example)
 
 AegisLoop’s **default** profile routes LLM calls through **OmniRoute** — an OpenAI-compatible proxy (model routing, dashboard keys).
 
-1. **Install & run OmniRoute** on the same machine (dashboard docs — typically listens on port **20128**).
+1. **Install & run OmniRoute** on the same machine (dashboard docs — typically port **20128**).
 2. Copy your **Bearer API key** from the OmniRoute dashboard.
 3. In `.env`:
 
 ```bash
 AEGIS_LLM_PROFILE=omniroute
 AEGIS_LLM_BASE_URL=http://127.0.0.1:20128/v1
-AEGIS_LLM_MODEL=auto          # or pin e.g. openai/gpt-4o-mini for reproducibility
+AEGIS_LLM_MODEL=auto          # or pin e.g. openai/gpt-4o-mini
 AEGIS_LLM_API_KEY=sk-or-...   # OmniRoute dashboard key
 AEGIS_LLM_ALLOW_LOOPBACK_HTTP=true
 ```
@@ -282,8 +276,6 @@ curl -s http://127.0.0.1:20128/v1/models -H "Authorization: Bearer $AEGIS_LLM_AP
 ---
 
 ## Alternative: OpenRouter / Groq (no OmniRoute)
-
-If you do not run OmniRoute locally:
 
 **OpenRouter:**
 
@@ -307,7 +299,7 @@ Restart API after changing `.env`.
 
 ---
 
-## Booth walkthrough (UI)
+## Booth walkthrough (UI routes)
 
 | Route | Pillar | What you see |
 |-------|--------|--------------|
@@ -356,12 +348,15 @@ markoblitz/
 │   ├── sim/                 # Generate + fidelity
 │   └── eval/                # HistGBM fit, score, Loop M
 ├── frontend/                # ★ Web prototype (Vite React)
+├── demo/                    # Static booth SPA (branch demo → Netlify)
 ├── data/
 │   ├── catalog/seed.yaml    # Attack atlas SSOT
 │   └── validation/v1/       # Champion freeze JSON
 ├── DEMO_PICS/               # Screenshots for this README
 └── tests/                   # pytest
 ```
+
+**Branches:** product + this README → `main` / `feature/frotnend-final` · static booth SPA → `demo` on fork ([Netlify](https://markoblitz.netlify.app/)).
 
 ---
 
@@ -381,24 +376,9 @@ make validate-all          # offline — no keys
 | `llm.configured: false` | Set `AEGIS_LLM_API_KEY`; start OmniRoute or use OpenRouter |
 | `tavily_configured: false` | Set `TAVILY_API_KEY`; `IDENTIFY_LIVE_SEARCH=true` |
 | UI chip says RECORDED | Missing live keys — expected in CI mode |
-| Generate / fit hangs long | **Normal** at full scale — use booth demo URL for quick UI |
+| Generate / fit hangs long | **Normal** at full scale — use [live demo](https://markoblitz.netlify.app/) |
 | Frontend can't reach API | `make api` or `make dev` must run on **:8000** |
 | `./run.sh` telemetry fail | Optional — use `make dev` for local booth |
-
----
-
-## Booth demo site (fast preview)
-
-Full `make dev` pipeline is slow. For judges / quick understanding:
-
-| | |
-|--|--|
-| **Fork** | `aarush323/markoblitz` |
-| **Branch** | `demo` |
-| **URL** | https://markoblitz.netlify.app/|
-| **What it is** | Same UI · recorded champion metrics · SSE replay · no Python install |
-
-Product code + this README live on **`main`** / **`feature/frotnend-final`**. Static booth SPA is on branch **`demo`** only.
 
 ---
 
@@ -419,6 +399,6 @@ Product code + this README live on **`main`** / **`feature/frotnend-final`**. St
 
 **Mastercard Innovation Challenge 2026** · Global Fintech Fest · Team markoblitz
 
-PR branch: `feature/frotnend-final` → `main`
+**Live demo:** [markoblitz.netlify.app](https://markoblitz.netlify.app/) · PR branch: `feature/frotnend-final` → `main`
 
 </div>
